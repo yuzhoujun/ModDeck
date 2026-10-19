@@ -1,5 +1,9 @@
 # ModDeck
 
+[![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck)](https://github.com/yuzhoujun/ModDeck/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 面向 3DMigoto / XXMI 系游戏的本地 Mod 管理器。开源、离线、无账号、无服务端。
 
 ModDeck 只做一件事：把 `Mods` 目录里的角色和 Mod 管好。注入仍然交给 XXMI / 3DMigoto，
@@ -22,7 +26,7 @@ ModDeck 不会修改游戏本体的任何文件。
 
 ## 下载与运行
 
-V1.0 提供免安装 ZIP：
+V1.0 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck/releases/latest)
 
 1. 下载 `ModDeck-1.0.0-win-x64.zip`
 2. 解压到任意目录（不要在压缩包里直接运行）
