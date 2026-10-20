@@ -44,15 +44,105 @@ import {
 import { runImport } from './services/imports'
 import type { MetadataStore } from '../shared/types'
 
+// 部分地区安全软件会阻止 Chromium 沙箱初始化，导致主进程直接退出。
+// ModDeck 只加载本地打包内容，开启 contextIsolation，关闭 OS 沙箱以兼容这类环境。
+app.commandLine.appendSwitch('no-sandbox')
+
 const SMOKE_TEST = process.argv.includes('--smoke-test')
 const SCAN_REPORT = process.argv.includes('--scan-report')
 const APP_ID = 'dev.moddeck.app'
 const SCHEME = 'moddeck'
 
+const STARTUP_LOG_CANDIDATES = [
+  path.join(process.env.APPDATA || '', 'ModDeck', 'logs', 'startup.log'),
+  path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming', 'ModDeck', 'logs', 'startup.log'),
+  path.join(process.env.TEMP || '', 'ModDeck-logs', 'startup.log'),
+  path.join(process.cwd(), 'ModDeck-logs', 'startup.log')
+].filter((candidate) => path.isAbsolute(candidate))
+
+let startupLogFile: string | null = null
+
+function ensureStartupLogFile(): string | null {
+  if (startupLogFile) return startupLogFile
+  const failures: string[] = []
+  for (const candidate of STARTUP_LOG_CANDIDATES) {
+    try {
+      fsSync.mkdirSync(path.dirname(candidate), { recursive: true })
+      fsSync.appendFileSync(candidate, '')
+      startupLogFile = candidate
+      break
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code || 'unknown'
+      failures.push(`${candidate} => ${code} ${(error as Error).message}`)
+    }
+  }
+  if (startupLogFile) {
+    try {
+      fsSync.appendFileSync(
+        startupLogFile,
+        [
+          `[log] file=${startupLogFile}`,
+          `[log] APPDATA=${process.env.APPDATA || ''}`,
+          `[log] USERPROFILE=${process.env.USERPROFILE || ''}`,
+          `[log] TEMP=${process.env.TEMP || ''}`,
+          ...failures.map((failure) => `[log] failed: ${failure}`)
+        ].join('\n') + '\n'
+      )
+    } catch {
+      // ignore
+    }
+  }
+  return startupLogFile
+}
+
+function startupLog(scope: string, message: string): void {
+  const target = ensureStartupLogFile()
+  if (!target) return
+  try {
+    fsSync.appendFileSync(
+      target,
+      `[${new Date().toISOString()}] [${scope}] ${message}\n`,
+      'utf8'
+    )
+  } catch {
+    // 启动日志不能影响主流程
+  }
+}
+
+startupLog(
+  'boot',
+  `exe=${process.execPath} cwd=${process.cwd()} resources=${process.resourcesPath} packaged=${app.isPackaged} argv=${JSON.stringify(process.argv)}`
+)
+startupLog(
+  'boot',
+  `app.asar=${fsSync.existsSync(path.join(process.resourcesPath || '', 'app.asar'))} app-dir=${fsSync.existsSync(path.join(process.resourcesPath || '', 'app'))}`
+)
+process.on('uncaughtException', (error) => {
+  startupLog('uncaught', error.stack || String(error))
+})
+process.on('unhandledRejection', (reason) => {
+  startupLog('rejection', reason instanceof Error ? reason.stack || reason.message : String(reason))
+})
+app.on('child-process-gone', (_event, details) => {
+  startupLog('child-process-gone', JSON.stringify(details))
+})
+
 app.setName('ModDeck')
 if (SCAN_REPORT) {
   app.setPath('userData', path.join(process.cwd(), '.scan-data'))
 }
+function canWriteDirectory(dir: string): boolean {
+  try {
+    fsSync.mkdirSync(dir, { recursive: true })
+    const probe = path.join(dir, `.write-test-${process.pid}`)
+    fsSync.writeFileSync(probe, 'ok')
+    fsSync.rmSync(probe, { force: true })
+    return true
+  } catch {
+    return false
+  }
+}
+
 if (SMOKE_TEST) {
   app.setPath('userData', path.join(process.cwd(), '.smoke-data'))
   try {
@@ -73,6 +163,53 @@ if (SMOKE_TEST) {
     console.error('smoke boot write failed', error)
   }
 }
+
+function configureUserData(): void {
+  if (SMOKE_TEST || SCAN_REPORT) return
+  try {
+    const defaultUserData = app.getPath('userData')
+    if (canWriteDirectory(defaultUserData)) {
+      startupLog('userData', `default ${defaultUserData}`)
+      return
+    }
+  } catch (error) {
+    startupLog('userData', `default-path-failed ${String(error)}`)
+  }
+
+  const fallbacks = [
+    path.join(path.dirname(process.execPath), 'ModDeck-data'),
+    path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'ModDeck-data'),
+    path.join(process.cwd(), 'ModDeck-data')
+  ]
+  for (const candidate of fallbacks) {
+    if (!canWriteDirectory(candidate)) continue
+    app.setPath('userData', candidate)
+    startupLog('userData', `fallback ${candidate}`)
+    return
+  }
+  startupLog('userData', 'no-writable-location')
+}
+
+function prepareUserData(): void {
+  if (SMOKE_TEST || SCAN_REPORT) return
+  const appData = process.env.APPDATA || ''
+  const defaultDir = appData ? path.join(appData, 'ModDeck') : ''
+  if (defaultDir && canWriteDirectory(defaultDir)) return
+
+  const fallbacks = [
+    path.join(path.dirname(process.execPath), 'ModDeck-data'),
+    path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'ModDeck-data'),
+    path.join(process.cwd(), 'ModDeck-data')
+  ]
+  for (const candidate of fallbacks) {
+    if (!canWriteDirectory(candidate)) continue
+    app.setPath('userData', candidate)
+    startupLog('userData', `early-fallback ${candidate}`)
+    return
+  }
+}
+
+prepareUserData()
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -457,6 +594,7 @@ function registerIpc(): void {
 }
 
 function createWindow(): void {
+  startupLog('window', 'creating')
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 860,
@@ -474,7 +612,18 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show())
+  startupLog('window', 'created')
+  mainWindow.once('ready-to-show', () => {
+    startupLog('window', 'ready-to-show')
+    mainWindow?.show()
+  })
+  mainWindow.webContents.once('did-finish-load', () => startupLog('window', 'did-finish-load'))
+  mainWindow.webContents.on('did-fail-load', (_event, code, description, url) => {
+    startupLog('window', `did-fail-load code=${code} desc=${description} url=${url}`)
+  })
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    startupLog('window', `render-process-gone ${JSON.stringify(details)}`)
+  })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) shell.openExternal(url).catch(() => undefined)
@@ -630,11 +779,14 @@ function createWindow(): void {
 }
 
 async function bootstrap(): Promise<void> {
+  startupLog('bootstrap', 'start')
+  configureUserData()
   await ensureDir(baseDir())
   await ensureDir(path.join(baseDir(), 'logs'))
   await ensureDir(path.join(baseDir(), 'covers'))
   settings = await loadSettings(baseDir())
   metadata = await loadMetadata(baseDir())
+  startupLog('bootstrap', `settings-loaded userData=${baseDir()}`)
 
   protocol.handle(SCHEME, async (request) => {
     try {
@@ -662,6 +814,7 @@ async function bootstrap(): Promise<void> {
   })
 
   registerIpc()
+  startupLog('bootstrap', 'ipc-ready')
 
   if (SCAN_REPORT) {
     try {
@@ -676,11 +829,14 @@ async function bootstrap(): Promise<void> {
   }
 
   createWindow()
+  startupLog('bootstrap', 'window-created')
 }
 
 app.whenReady().then(() => {
+  startupLog('app', 'ready')
   app.setAppUserModelId(APP_ID)
   bootstrap().catch((error) => {
+    startupLog('bootstrap', `failed ${error instanceof Error ? error.stack || error.message : String(error)}`)
     logError('bootstrap', error)
     if (SMOKE_TEST) app.exit(1)
   })
