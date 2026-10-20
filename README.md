@@ -29,9 +29,12 @@ ModDeck 不会修改游戏本体的任何文件。
 V1.0 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck/releases/latest)
 
 1. 下载 `ModDeck-1.0.0-win-x64.zip`
-2. 解压到任意目录（不要在压缩包里直接运行）
-3. 双击 `ModDeck.exe`
+2. 完整解压到任意目录（不要在压缩包里直接运行）
+3. 双击 `Start ModDeck.cmd`（推荐）
 4. 打开“设置”，为对应游戏选择 `Mods` 目录
+
+> 某些安全软件会阻止 Electron 的 Chromium 沙箱，直接双击 `ModDeck.exe` 可能没有窗口。
+> `Start ModDeck.cmd` 会用 `--no-sandbox` 启动；自建快捷方式时请带上这个参数。
 
 系统要求：Windows 10 / 11 x64。
 
@@ -76,15 +79,23 @@ npm install
 | `npm run smoke` | 无头冒烟测试（假库，输出截图与 `smoke-result.json`） |
 | `npm run scan:report` | 只读扫描报告（需准备 `.scan-data/settings.json`） |
 | `npm run dist` | electron-builder 打包（NSIS + portable） |
+| `npm run package:portable` | 构建并生成带 README / 启动器的免安装 ZIP |
 
-### 打包免安装目录
+### 打包免安装 ZIP
+
+```bash
+npm run package:portable
+```
+
+脚本会构建、打包 `release/win-unpacked/`、放入 `README.txt` 和 `Start ModDeck.cmd`，
+再生成 `release/ModDeck-<version>-win-x64.zip` 并打印 SHA256。需要本机安装 7-Zip。
+
+只打包目录：
 
 ```bash
 npm run build
 npx electron-builder --dir
 ```
-
-产物在 `release/win-unpacked/`，压缩后即可分发。
 
 ### 打包 Inno Setup 安装器（可选）
 

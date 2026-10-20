@@ -12,6 +12,7 @@
     "preview": "electron-vite preview",
     "smoke": "node scripts/prepare-smoke.mjs && electron . --smoke-test --no-sandbox",
     "scan:report": "electron . --scan-report --no-sandbox",
+    "package:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-portable.ps1",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "dist": "npm run build && electron-builder --win --x64"
   },
