@@ -11,7 +11,7 @@ const userData = path.join(temp, 'smoke-data')
 fs.rmSync(fixture, { recursive: true, force: true })
 fs.rmSync(userData, { recursive: true, force: true })
 
-const ini = '[TextureOverrideTest]\nhash = 12345678\n'
+const ini = '[KeySwap]\nkey = F6\ncondition = $active\n\n[TextureOverrideTest]\nhash = 12345678\n'
 
 function writeMod(character, mod, text) {
   const dir = path.join(modsPath, character, mod)
@@ -22,6 +22,13 @@ function writeMod(character, mod, text) {
 writeMod('测试角色A', '泳装Mod', ini)
 writeMod('测试角色A', 'DISABLED_旧Mod', ini)
 writeMod('新角色B', '新衣服', ini)
+
+// 验证角色目录默认封面：新命名 .preview.png + 旧命名 _cover.png 兜底。
+const coverSource = path.join(root, 'docs', 'screenshot-character.png')
+if (fs.existsSync(coverSource)) {
+  fs.copyFileSync(coverSource, path.join(modsPath, '测试角色A', '.preview.png'))
+  fs.copyFileSync(coverSource, path.join(modsPath, '新角色B', '_cover.png'))
+}
 
 fs.mkdirSync(importSource, { recursive: true })
 fs.writeFileSync(path.join(importSource, 'mod.ini'), '[TextureOverrideImport]\nhash = 87654321\n', 'utf8')

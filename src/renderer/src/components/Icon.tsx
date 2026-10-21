@@ -16,6 +16,9 @@ export type IconName =
   | 'upload'
   | 'download'
   | 'edit'
+  | 'pin'
+  | 'pinOff'
+  | 'userPlus'
 
 const PATHS: Record<IconName, ReactNode> = {
   search: (
@@ -84,6 +87,26 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M4 20h4L20 8l-4-4L4 16v4Z" />
       <path d="m14 6 4 4" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M9 4h6l-1 6 4 3v2H6v-2l4-3-1-6Z" />
+      <path d="M12 15v5" />
+    </>
+  ),
+  pinOff: (
+    <>
+      <path d="M9 4h6l-1 6 4 3v2h-5" />
+      <path d="M9 15H6v-2l2-1.5" />
+      <path d="M12 15v5M4 4l16 16" />
+    </>
+  ),
+  userPlus: (
+    <>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 20a5.5 5.5 0 0 1 11 0" />
+      <path d="M18 8v6M15 11h6" />
     </>
   )
 }

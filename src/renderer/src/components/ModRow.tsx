@@ -10,6 +10,9 @@ export function ModRow({
   onDelete,
   onSelect,
   selected = false,
+  selectable = false,
+  checked = false,
+  onCheck,
   draggable = false,
   dragging = false,
   onDragStart,
@@ -23,6 +26,9 @@ export function ModRow({
   onDelete: () => void
   onSelect: () => void
   selected?: boolean
+  selectable?: boolean
+  checked?: boolean
+  onCheck?: () => void
   draggable?: boolean
   dragging?: boolean
   onDragStart?: (event: DragEvent<HTMLDivElement>) => void
@@ -43,6 +49,19 @@ export function ModRow({
       onDragEnd={onDragEnd}
       title={draggable ? '拖动排序' : mod.folderName}
     >
+      {selectable ? (
+        <input
+          type="checkbox"
+          className="mod-check"
+          checked={checked}
+          onChange={(event) => {
+            event.stopPropagation()
+            onCheck?.()
+          }}
+          onClick={(event) => event.stopPropagation()}
+          aria-label={`选择 ${mod.name}`}
+        />
+      ) : null}
       <div className="mod-thumb">
         {mod.previewUrl ? (
           <img src={mod.previewUrl} alt="" loading="lazy" />

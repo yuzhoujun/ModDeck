@@ -11,13 +11,16 @@ import {
   ipcMain,
   net,
   protocol,
+  screen,
   shell
 } from 'electron'
 import type {
   AppInfo,
   CharacterMeta,
+  CreateCharacterInput,
   GameId,
   ImportRequest,
+  OverlayDetailRequest,
   Settings,
   SettingsPatch,
   ToggleResult
@@ -42,6 +45,7 @@ import {
   getModDetails,
   listCharacterFolderNames,
   listMods,
+  resolveCharacterBase,
   resolveCharacterDir
 } from './services/library'
 import { runImport } from './services/imports'
@@ -227,6 +231,7 @@ let settings: Settings
 let metadata: MetadataStore
 let mainWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
+let overlayDetailWindow: BrowserWindow | null = null
 
 function baseDir(): string {
   return app.getPath('userData')
@@ -277,6 +282,7 @@ async function makeSnapshot(gameId: GameId) {
       const absolute = coverPath(baseDir(), meta)
       return absolute ? assetUrl(absolute) : null
     },
+    assetUrl,
     showHidden: settings.ui.showHidden,
     sortCharacters: settings.ui.sortCharacters,
     characterOrder: settings.characterOrders[gameId] ?? []
@@ -294,6 +300,7 @@ async function writeScanReport(): Promise<void> {
         const absolute = coverPath(baseDir(), meta)
         return absolute ? assetUrl(absolute) : null
       },
+      assetUrl,
       showHidden: settings.ui.showHidden,
       sortCharacters: settings.ui.sortCharacters,
       characterOrder: settings.characterOrders[game.id] ?? []
@@ -418,7 +425,7 @@ function createOverlayWindow(): BrowserWindow {
     show: false,
     frame: false,
     resizable: true,
-    alwaysOnTop: true,
+    alwaysOnTop: settings.ui.overlayPinned,
     skipTaskbar: true,
     backgroundColor: '#0b0d12',
     title: 'ModDeck Quick',
@@ -430,13 +437,16 @@ function createOverlayWindow(): BrowserWindow {
     }
   })
 
-  overlayWindow.setAlwaysOnTop(true, 'floating')
+  overlayWindow.setAlwaysOnTop(settings.ui.overlayPinned, 'floating')
   overlayWindow.on('closed', () => {
+    overlayDetailWindow?.destroy()
+    overlayDetailWindow = null
     overlayWindow = null
   })
   overlayWindow.webContents.on('before-input-event', (_event, input) => {
     if (input.type === 'keyDown' && input.key === 'Escape') {
       overlayWindow?.hide()
+      overlayDetailWindow?.hide()
       _event.preventDefault()
     }
   })
@@ -456,11 +466,159 @@ function toggleOverlay(): void {
   const win = createOverlayWindow()
   if (win.isVisible()) {
     win.hide()
+    overlayDetailWindow?.hide()
     return
   }
+  win.setAlwaysOnTop(settings.ui.overlayPinned, 'floating')
   win.center()
   win.show()
   win.focus()
+}
+
+function placeOverlayDetail(): void {
+  if (!overlayWindow || !overlayDetailWindow || overlayDetailWindow.isDestroyed()) return
+  const bounds = overlayWindow.getBounds()
+  const area = screen.getDisplayMatching(bounds).workArea
+  const width = 320
+  const height = Math.min(460, area.height - 24)
+  const rightSpace = area.x + area.width - (bounds.x + bounds.width)
+  const leftSpace = bounds.x - area.x
+
+  let x: number
+  if (rightSpace >= width + 12) x = bounds.x + bounds.width + 10
+  else if (leftSpace >= width + 12) x = bounds.x - width - 10
+  else x = rightSpace >= leftSpace ? bounds.x + bounds.width + 10 : bounds.x - width - 10
+
+  x = Math.max(area.x + 8, Math.min(x, area.x + area.width - width - 8))
+  const y = Math.max(area.y + 8, Math.min(bounds.y, area.y + area.height - height - 8))
+  overlayDetailWindow.setBounds({ x, y, width, height })
+}
+
+function loadOverlayDetail(win: BrowserWindow, request: OverlayDetailRequest): void {
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  if (devUrl) {
+    const query = new URLSearchParams({
+      mode: 'overlay-detail',
+      gameId: request.gameId,
+      character: request.characterFolder,
+      mod: request.modFolder
+    })
+    win.loadURL(`${devUrl}?${query.toString()}`).catch((error) => logError('overlay-detail', error))
+  } else {
+    win
+      .loadFile(path.join(__dirname, '../renderer/index.html'), {
+        query: {
+          mode: 'overlay-detail',
+          gameId: request.gameId,
+          character: request.characterFolder,
+          mod: request.modFolder
+        }
+      })
+      .catch((error) => logError('overlay-detail', error))
+  }
+}
+
+function showOverlayDetail(request: OverlayDetailRequest): void {
+  if (!overlayWindow) return
+  if (!overlayDetailWindow || overlayDetailWindow.isDestroyed()) {
+    overlayDetailWindow = new BrowserWindow({
+      width: 320,
+      height: 460,
+      minWidth: 280,
+      minHeight: 300,
+      show: false,
+      frame: false,
+      resizable: true,
+      alwaysOnTop: settings.ui.overlayPinned,
+      skipTaskbar: true,
+      backgroundColor: '#0b0d12',
+      title: 'ModDeck Hotkeys',
+      webPreferences: {
+        preload: path.join(__dirname, '../preload/index.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: false
+      }
+    })
+    overlayDetailWindow.setAlwaysOnTop(settings.ui.overlayPinned, 'floating')
+    overlayDetailWindow.on('closed', () => {
+      overlayDetailWindow = null
+    })
+    overlayDetailWindow.webContents.on('before-input-event', (_event, input) => {
+      if (input.type === 'keyDown' && input.key === 'Escape') {
+        overlayDetailWindow?.hide()
+        _event.preventDefault()
+      }
+    })
+  }
+
+  loadOverlayDetail(overlayDetailWindow, request)
+  placeOverlayDetail()
+  overlayDetailWindow.show()
+  overlayDetailWindow.focus()
+}
+
+function hideOverlayDetail(): void {
+  overlayDetailWindow?.hide()
+}
+
+function toSendKeys(value: string): string | null {
+  const tokens = String(value || '')
+    .trim()
+    .split(/[+\s]+/)
+    .filter(Boolean)
+  if (tokens.length === 0) return null
+
+  let prefix = ''
+  let keyToken = ''
+  for (const token of tokens) {
+    const lower = token.toLowerCase()
+    if (lower === 'ctrl' || lower === 'control') {
+      prefix += '^'
+    } else if (lower === 'alt') {
+      prefix += '%'
+    } else if (lower === 'shift') {
+      prefix += '+'
+    } else if (lower.startsWith('no_')) {
+      continue
+    } else if (!keyToken) {
+      keyToken = token
+    } else {
+      return null
+    }
+  }
+  if (!keyToken) return null
+
+  const rawKey = keyToken.replace(/^VK_/i, '')
+  if (/^[A-Za-z0-9]$/.test(rawKey)) return `${prefix}${rawKey}`
+  const key = rawKey.toUpperCase()
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) return `${prefix}{${key}}`
+
+  const named: Record<string, string> = {
+    SPACE: '{SPACE}',
+    TAB: '{TAB}',
+    ENTER: '{ENTER}',
+    RETURN: '{ENTER}',
+    ESC: '{ESC}',
+    ESCAPE: '{ESC}',
+    BACKSPACE: '{BACKSPACE}',
+    BACK: '{BACKSPACE}',
+    DELETE: '{DELETE}',
+    DEL: '{DELETE}',
+    INSERT: '{INSERT}',
+    HOME: '{HOME}',
+    END: '{END}',
+    PAGEUP: '{PGUP}',
+    PRIOR: '{PGUP}',
+    PAGEDOWN: '{PGDN}',
+    NEXT: '{PGDN}',
+    UP: '{UP}',
+    DOWN: '{DOWN}',
+    LEFT: '{LEFT}',
+    RIGHT: '{RIGHT}'
+  }
+  const sequence = named[key]
+  return sequence ? `${prefix}${sequence}` : null
 }
 
 function applyOverlayHotkey(value: string): { ok: boolean; error?: string } {
@@ -478,6 +636,105 @@ function applyOverlayHotkey(value: string): { ok: boolean; error?: string } {
       ok: false,
       error: error instanceof Error ? error.message : String(error)
     }
+  }
+}
+
+const CHARACTER_COVER_FILE = '.preview.png'
+const LEGACY_CHARACTER_COVERS = [
+  '.preview.jpg',
+  '.preview.jpeg',
+  '.preview.webp',
+  '_cover.png',
+  '_cover.jpg',
+  '_cover.jpeg',
+  '_cover.webp'
+]
+
+async function characterDirFor(gameId: GameId, characterFolder: string): Promise<string> {
+  requireGame(gameId)
+  const gameSettings = settings.games[gameId]
+  if (!gameSettings?.modsPath) throw new Error('未配置 Mods 目录')
+  if (!isSafeSegment(characterFolder)) throw new Error('角色目录名不合法')
+  return resolveCharacterDir(gameSettings.modsPath, characterFolder)
+}
+
+async function saveCharacterCoverData(
+  gameId: GameId,
+  characterFolder: string,
+  dataUrl: string
+): Promise<void> {
+  const characterDir = await characterDirFor(gameId, characterFolder)
+  const match = /^data:image\/png;base64,([A-Za-z0-9+/=\s]+)$/.exec(String(dataUrl || ''))
+  if (!match) throw new Error('封面数据格式不正确')
+  const buffer = Buffer.from(match[1], 'base64')
+  if (buffer.length === 0) throw new Error('封面数据为空')
+  if (buffer.length > 8 * 1024 * 1024) throw new Error('封面图片过大（>8MB）')
+
+  const target = path.join(characterDir, CHARACTER_COVER_FILE)
+  const temp = path.join(characterDir, `${CHARACTER_COVER_FILE}.tmp-${process.pid}`)
+  await fs.writeFile(temp, buffer)
+  await fs.rename(temp, target)
+
+  const current = getCharacterMeta(metadata, gameId, characterFolder)
+  const next = { ...current }
+  delete next.coverFile
+  metadata = setCharacterMeta(metadata, gameId, characterFolder, next)
+  await saveMetadata(baseDir(), metadata)
+}
+
+async function clearCharacterCoverFiles(
+  gameId: GameId,
+  characterFolder: string
+): Promise<void> {
+  const characterDir = await characterDirFor(gameId, characterFolder)
+  for (const name of [CHARACTER_COVER_FILE, ...LEGACY_CHARACTER_COVERS]) {
+    await fs.rm(path.join(characterDir, name), { force: true }).catch(() => undefined)
+  }
+  const current = getCharacterMeta(metadata, gameId, characterFolder)
+  const next = { ...current }
+  delete next.coverFile
+  metadata = setCharacterMeta(metadata, gameId, characterFolder, next)
+  await saveMetadata(baseDir(), metadata)
+}
+
+async function renameModAt(
+  characterDir: string,
+  modFolder: string,
+  enable: boolean
+): Promise<ToggleResult> {
+  const baseName = String(modFolder || '').replace(/^DISABLED_/i, '')
+  if (!isSafeSegment(baseName)) return { ok: false, error: 'Mod 名称不合法' }
+
+  const currentName = enable ? `DISABLED_${baseName}` : baseName
+  const nextName = enable ? baseName : `DISABLED_${baseName}`
+  const currentPath = path.join(characterDir, currentName)
+  const nextPath = path.join(characterDir, nextName)
+  if (await pathExists(nextPath)) {
+    if (enable && nextName === baseName) return { ok: true }
+    if (!enable && nextName === `DISABLED_${baseName}`) return { ok: true }
+    return { ok: false, error: '目标目录已存在' }
+  }
+  if (!(await pathExists(currentPath))) return { ok: false, error: 'Mod 目录不存在' }
+
+  let lastError: unknown = null
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      await fs.rename(currentPath, nextPath)
+      return { ok: true }
+    } catch (error) {
+      lastError = error
+      await new Promise((resolve) => setTimeout(resolve, 80))
+    }
+  }
+  const code = (lastError as NodeJS.ErrnoException)?.code
+  return {
+    ok: false,
+    error:
+      code === 'EPERM' || code === 'EBUSY'
+        ? '目录被占用，请关闭游戏或占用的程序后重试'
+        : lastError instanceof Error
+          ? lastError.message
+          : String(lastError)
   }
 }
 
@@ -537,7 +794,8 @@ function registerIpc(): void {
       gameId: GameId,
       characterFolder: string,
       modFolder: string,
-      enable: boolean
+      enable: boolean,
+      exclusive = false
     ): Promise<ToggleResult> => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
@@ -546,33 +804,47 @@ function registerIpc(): void {
       const baseName = String(modFolder || '').replace(/^DISABLED_/i, '')
       if (!isSafeSegment(baseName)) return { ok: false, error: 'Mod 名称不合法' }
 
-      const currentName = enable ? `DISABLED_${baseName}` : baseName
-      const nextName = enable ? baseName : `DISABLED_${baseName}`
-      const currentPath = path.join(characterDir, currentName)
-      const nextPath = path.join(characterDir, nextName)
-      if (!(await pathExists(currentPath))) return { ok: false, error: 'Mod 目录不存在' }
-      if (await pathExists(nextPath)) return { ok: false, error: '目标目录已存在' }
-
-      let lastError: unknown = null
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        try {
-          await fs.rename(currentPath, nextPath)
-          return { ok: true }
-        } catch (error) {
-          lastError = error
-          await new Promise((resolve) => setTimeout(resolve, 80))
+      if (exclusive && enable) {
+        const mods = await listMods(
+          gameSettings.modsPath,
+          gameId,
+          characterFolder,
+          assetUrl,
+          'name'
+        )
+        for (const mod of mods) {
+          if (!mod.enabled || mod.name === baseName) continue
+          const result = await renameModAt(characterDir, mod.folderName, false)
+          if (!result.ok) {
+            return {
+              ok: false,
+              error: `关闭 ${mod.name} 失败：${result.error || '未知错误'}`
+            }
+          }
         }
       }
-      const code = (lastError as NodeJS.ErrnoException)?.code
-      return {
-        ok: false,
-        error:
-          code === 'EPERM' || code === 'EBUSY'
-            ? '目录被占用，请关闭游戏或占用的程序后重试'
-            : lastError instanceof Error
-              ? lastError.message
-              : String(lastError)
+
+      return renameModAt(characterDir, modFolder, enable)
+    }
+  )
+
+  register(
+    IPC.setModsEnabled,
+    async (
+      gameId: GameId,
+      characterFolder: string,
+      folders: string[],
+      enable: boolean
+    ): Promise<ToggleResult> => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
+      for (const folder of Array.isArray(folders) ? folders : []) {
+        const result = await renameModAt(characterDir, folder, enable)
+        if (!result.ok) return result
       }
+      return { ok: true }
     }
   )
 
@@ -722,6 +994,55 @@ function registerIpc(): void {
   })
 
   register(
+    IPC.createCharacter,
+    async (gameId: GameId, input: CreateCharacterInput) => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath) throw new Error('未配置 Mods 目录')
+      if (!(await pathExists(gameSettings.modsPath))) throw new Error('Mods 目录不存在')
+
+      const folder = String(input?.folder || '').trim()
+      if (!folder) throw new Error('目录名不能为空')
+      if (folder.startsWith('.') || folder.startsWith('_')) {
+        throw new Error('目录名不能以 . 或 _ 开头（会被隐藏）')
+      }
+      if (!isSafeSegment(folder)) throw new Error('目录名包含非法字符')
+      if (['character', 'characters'].includes(folder.toLowerCase())) {
+        throw new Error('这个目录名是兼容容器保留名')
+      }
+
+      const base = await resolveCharacterBase(gameSettings.modsPath)
+      const target = path.join(base, folder)
+      if (!isInside(base, target)) throw new Error('目录越界')
+      if (await pathExists(target)) throw new Error('同名目录已存在')
+      await fs.mkdir(target)
+
+      const current = getCharacterMeta(metadata, gameId, folder)
+      metadata = setCharacterMeta(metadata, gameId, folder, {
+        ...current,
+        displayName: String(input.displayName || '').trim() || folder,
+        aliases: Array.isArray(input.aliases) ? input.aliases : current.aliases,
+        kind: input.kind === 'utility' ? 'utility' : 'character'
+      })
+      await saveMetadata(baseDir(), metadata)
+      return makeSnapshot(gameId)
+    }
+  )
+
+  register(
+    IPC.saveCharacterCoverData,
+    async (gameId: GameId, characterFolder: string, dataUrl: string) => {
+      await saveCharacterCoverData(gameId, characterFolder, dataUrl)
+      return makeSnapshot(gameId)
+    }
+  )
+
+  register(IPC.clearCharacterCover, async (gameId: GameId, characterFolder: string) => {
+    await clearCharacterCoverFiles(gameId, characterFolder)
+    return makeSnapshot(gameId)
+  })
+
+  register(
     IPC.getModDetails,
     async (gameId: GameId, characterFolder: string, modFolder: string) => {
       requireGame(gameId)
@@ -780,8 +1101,52 @@ function registerIpc(): void {
     return { ok: true, hotkey: value }
   })
 
+  register(IPC.setOverlayPinned, async (pinned: boolean) => {
+    settings = mergeSettings(settings, { ui: { overlayPinned: Boolean(pinned) } })
+    await saveSettings(baseDir(), settings)
+    overlayWindow?.setAlwaysOnTop(Boolean(pinned), 'floating')
+    overlayDetailWindow?.setAlwaysOnTop(Boolean(pinned), 'floating')
+    return { ok: true }
+  })
+
+  register(IPC.showOverlayDetail, async (request: OverlayDetailRequest) => {
+    if (!request || !isSafeSegment(request.characterFolder) || !isSafeSegment(request.modFolder)) {
+      return { ok: false, error: '参数不合法' }
+    }
+    requireGame(request.gameId)
+    if (!overlayWindow) return { ok: false, error: '快捷窗口未打开' }
+    showOverlayDetail(request)
+    return { ok: true }
+  })
+
+  register(IPC.hideOverlayDetail, async () => {
+    hideOverlayDetail()
+  })
+
+  register(IPC.sendModHotkey, async (key: string) => {
+    const sequence = toSendKeys(key)
+    if (!sequence) return { ok: false, error: '暂不支持这个热键格式' }
+    overlayWindow?.hide()
+    overlayDetailWindow?.hide()
+    await new Promise((resolve) => setTimeout(resolve, 180))
+    try {
+      const script = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${sequence}')`
+      const child = spawn(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script],
+        { detached: true, stdio: 'ignore', windowsHide: true }
+      )
+      child.on('error', (error) => logError('send-hotkey', error))
+      child.unref()
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
   register(IPC.overlayHide, async () => {
     overlayWindow?.hide()
+    overlayDetailWindow?.hide()
   })
 
   register(IPC.overlayToggle, async () => {
@@ -790,6 +1155,7 @@ function registerIpc(): void {
 
   register(IPC.overlayOpenManager, async () => {
     overlayWindow?.hide()
+    overlayDetailWindow?.hide()
     if (!mainWindow) return
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
@@ -898,6 +1264,17 @@ function createWindow(): void {
           const detailText = await bodyText()
           const detailShot = await shot('smoke-details.png')
 
+          await mainWindow?.webContents.executeJavaScript(
+            "[...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === '编辑')?.click()"
+          )
+          await delay(600)
+          const editText = await bodyText()
+          const editShot = await shot('smoke-edit.png')
+          await mainWindow?.webContents.executeJavaScript(
+            "document.querySelector('.modal-head button')?.click()"
+          )
+          await delay(300)
+
           await click('.back-link')
           await click('.side-action')
           const settingsText = await bodyText()
@@ -911,6 +1288,23 @@ function createWindow(): void {
             if (image && !image.isEmpty()) {
               await fs.writeFile(path.join(SMOKE_DIR, 'smoke-overlay.png'), image.toPNG())
               overlayShot = true
+            }
+          }
+          let overlayDetailShot = false
+          if (overlayWindow && !overlayWindow.isDestroyed()) {
+            await overlayWindow.webContents.executeJavaScript(
+              "document.querySelector('.overlay-mod')?.click()"
+            )
+            await delay(900)
+            if (overlayDetailWindow && !overlayDetailWindow.isDestroyed()) {
+              const detailImage = await overlayDetailWindow.webContents.capturePage()
+              if (detailImage && !detailImage.isEmpty()) {
+                await fs.writeFile(
+                  path.join(SMOKE_DIR, 'smoke-overlay-detail.png'),
+                  detailImage.toPNG()
+                )
+                overlayDetailShot = true
+              }
             }
           }
           await mainWindow?.webContents.executeJavaScript('window.moddeck.toggleOverlay()')
@@ -952,6 +1346,24 @@ function createWindow(): void {
           const metaResetName = metaReset?.characters?.find(
             (entry: { folder: string }) => entry.folder === '测试角色A'
           )?.displayName
+          const createdSnapshot = await mainWindow?.webContents.executeJavaScript(
+            "window.moddeck.createCharacter('wuthering-waves', { folder: '冒烟新建', displayName: '冒烟新建', kind: 'utility' })"
+          )
+          const createdCharacter = createdSnapshot?.characters?.find(
+            (entry: { folder: string }) => entry.folder === '冒烟新建'
+          )
+          const coverData =
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII='
+          const coverSnapshot = await mainWindow?.webContents.executeJavaScript(
+            `window.moddeck.saveCharacterCoverData('wuthering-waves', '冒烟新建', ${JSON.stringify(
+              coverData
+            )})`
+          )
+          const savedCover = Boolean(
+            coverSnapshot?.characters?.find(
+              (entry: { folder: string }) => entry.folder === '冒烟新建'
+            )?.coverUrl
+          )
 
           await fs.writeFile(
             path.join(SMOKE_DIR, 'smoke-result.json'),
@@ -962,12 +1374,15 @@ function createWindow(): void {
                 characterText,
                 settingsText,
                 detailText,
+                editText,
                 images: {
                   library: true,
                   character: characterShot,
                   details: detailShot,
+                  edit: editShot,
                   settings: settingsShot,
-                  overlay: overlayShot
+                  overlay: overlayShot,
+                  overlayDetail: overlayDetailShot
                 },
                 importResult,
                 importedMods,
@@ -975,7 +1390,9 @@ function createWindow(): void {
                 afterOff,
                 toggleOn,
                 metaUpdatedName,
-                metaResetName
+                metaResetName,
+                createdCharacter,
+                savedCover
               },
               null,
               2
@@ -1068,7 +1485,7 @@ app.whenReady().then(() => {
 })
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll()
+  if (app.isReady()) globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {

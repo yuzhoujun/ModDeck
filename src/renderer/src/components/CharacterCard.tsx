@@ -44,6 +44,7 @@ export function CharacterCard({
           </span>
         )}
         {!character.known ? <span className="tag new">新</span> : null}
+        {character.kind === 'utility' ? <span className="tag utility">功能</span> : null}
       </div>
       <div className="char-meta">
         <div className="char-name" title={name}>

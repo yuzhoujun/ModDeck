@@ -8,6 +8,7 @@ import type {
   SettingsPatch,
   UiSettings
 } from '../../shared/types'
+import { CreateCharacterModal } from './components/CreateCharacterModal'
 import { EditCharacterModal } from './components/EditCharacterModal'
 import { Icon } from './components/Icon'
 import { CharacterView } from './views/CharacterView'
@@ -37,6 +38,7 @@ export default function App() {
   const [charQuery, setCharQuery] = useState('')
   const [modQuery, setModQuery] = useState('')
   const [editing, setEditing] = useState<CharacterInfo | null>(null)
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -120,7 +122,7 @@ export default function App() {
     await loadModsFor(snapshot.game.id, character)
   }
 
-  async function toggleMod(mod: ModInfo) {
+  async function toggleMod(mod: ModInfo, exclusive = false) {
     if (!selected || !snapshot) return
     const gameId = snapshot.game.id
     const originalFolder = mod.folderName
@@ -143,13 +145,15 @@ export default function App() {
         gameId,
         selected.folder,
         originalFolder,
-        enable
+        enable,
+        exclusive
       )
       if (!result.ok) {
         notify(result.error || '切换失败', 'err')
         await loadModsFor(gameId, selected)
         return
       }
+      if (exclusive) await loadModsFor(gameId, selected)
       const snap = await refreshSnapshot(gameId)
       const updated = snap.characters.find((entry) => entry.folder === selected.folder)
       if (updated) setSelected(updated)
@@ -290,6 +294,84 @@ export default function App() {
       const snap = await refreshSnapshot(snapshot.game.id)
       const updated = snap.characters.find((entry) => entry.folder === selected.folder) ?? null
       setSelected(updated)
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    }
+  }
+
+  async function saveCharacterCoverData(dataUrl: string) {
+    if (!selected || !snapshot) return
+    const snap = await window.moddeck.saveCharacterCoverData(
+      snapshot.game.id,
+      selected.folder,
+      dataUrl
+    )
+    if (snap) {
+      setSnapshot(snap)
+      const updated = snap.characters.find((entry) => entry.folder === selected.folder) ?? null
+      setSelected(updated)
+      setEditing(updated)
+    }
+    notify('封面已保存')
+  }
+
+  async function removeCharacterCover() {
+    if (!selected || !snapshot) return
+    const snap = await window.moddeck.clearCharacterCover(snapshot.game.id, selected.folder)
+    if (snap) {
+      setSnapshot(snap)
+      const updated = snap.characters.find((entry) => entry.folder === selected.folder) ?? null
+      setSelected(updated)
+      setEditing(updated)
+    }
+    notify('封面已移除')
+  }
+
+  async function createCharacter(input: {
+    folder: string
+    displayName?: string
+    aliases?: string[]
+    kind?: 'character' | 'utility'
+  }) {
+    if (!snapshot) return
+    const snap = await window.moddeck.createCharacter(snapshot.game.id, input)
+    if (!snap) return
+    setSnapshot(snap)
+    setCreating(false)
+    const created = snap.characters.find((entry) => entry.folder === input.folder) ?? null
+    if (created) {
+      setSelected(created)
+      setView('character')
+      await loadModsFor(snap.game.id, created)
+    }
+    notify(`已创建 ${created?.displayName || input.folder}`)
+  }
+
+  async function setModsEnabled(folders: string[], enable: boolean) {
+    if (!selected || !snapshot) return
+    try {
+      const result = await window.moddeck.setModsEnabled(
+        snapshot.game.id,
+        selected.folder,
+        folders,
+        enable
+      )
+      if (!result.ok) {
+        notify(result.error || '批量操作失败', 'err')
+      }
+      await loadModsFor(snapshot.game.id, selected)
+      const snap = await refreshSnapshot(snapshot.game.id)
+      const updated = snap.characters.find((entry) => entry.folder === selected.folder)
+      if (updated) setSelected(updated)
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    }
+  }
+
+  async function changeModSelectMode(value: UiSettings['modSelectMode']) {
+    try {
+      const next = await window.moddeck.saveSettings({ ui: { modSelectMode: value } })
+      setBoot((current) => (current ? { ...current, settings: next } : current))
     } catch (error) {
       notify(errorMessage(error), 'err')
     }
@@ -479,6 +561,9 @@ export default function App() {
             onSort={changeModSort}
             onBack={() => setView('library')}
             onToggle={toggleMod}
+            selectMode={boot.settings.ui.modSelectMode}
+            onSelectMode={changeModSelectMode}
+            onSetMods={setModsEnabled}
             onOpen={openModFolder}
             onDelete={deleteMod}
             onImport={() => void runImport('files')}
@@ -512,6 +597,7 @@ export default function App() {
             onLaunchGame={() => void launchConfigured('game')}
             onLaunchLoader={() => void launchConfigured('loader')}
             onReorderCharacters={reorderCharacters}
+            onAdd={() => setCreating(true)}
           />
         )}
       </main>
@@ -522,6 +608,17 @@ export default function App() {
           onClose={() => setEditing(null)}
           onSave={saveCharacterMeta}
           onReset={resetCharacterMeta}
+          onSaveCover={saveCharacterCoverData}
+          onRemoveCover={removeCharacterCover}
+        />
+      ) : null}
+
+      {creating && snapshot ? (
+        <CreateCharacterModal
+          game={snapshot.game}
+          existingFolders={snapshot.characters.map((character) => character.folder)}
+          onClose={() => setCreating(false)}
+          onCreate={createCharacter}
         />
       ) : null}
 
