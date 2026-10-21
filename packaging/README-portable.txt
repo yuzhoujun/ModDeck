@@ -1,7 +1,7 @@
 ModDeck 1.0.0 免安装版
 ========================
 
-重要：请先完整解压，并优先运行 Start ModDeck.cmd。
+重要：请先完整解压。
 
 正确步骤
 --------
@@ -13,12 +13,17 @@ ModDeck 1.0.0 免安装版
    - locales 文件夹
 3. 双击 Start ModDeck.cmd。
 
-为什么不要直接双击 ModDeck.exe
-------------------------------
-部分安全软件（腾讯电脑管家、Windows Defender 等）会阻止 Electron 的 Chromium 沙箱初始化，
-表现为双击后没有任何窗口。Start ModDeck.cmd 会用 --no-sandbox 参数启动，绕过这个限制。
-如果你要自己建快捷方式，目标应写成：
-  "ModDeck.exe" --no-sandbox
+为什么直接双击 ModDeck.exe 可能没反应
+--------------------------------------
+部分安全软件（腾讯电脑管家、Windows Defender 等）会阻止 Electron 的 Chromium 沙箱初始化。
+沙箱在应用代码执行前就已初始化，程序内部无法给自己补参数，所以直接双击会没有窗口。
+Start ModDeck.cmd 会用 --no-sandbox 参数启动，绕过这个限制。
+
+如果你想要一个可双击的图标：
+1. 右键 ModDeck.exe → 创建快捷方式
+2. 右键快捷方式 → 属性
+3. 在“目标”末尾加一个空格和 --no-sandbox
+4. 双击这个快捷方式
 
 如果 Windows 提示“Windows 已保护你的电脑”
 ------------------------------------------
