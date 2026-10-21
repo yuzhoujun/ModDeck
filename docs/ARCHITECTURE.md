@@ -117,9 +117,9 @@ src/main/
 
 ## 诊断
 
-- `npm run smoke`：在 `scripts/fixture` 的假库上启动应用，自动验证扫描、角色页、
-  zip/rar 导入、启停与元数据，并输出截图和 `smoke-result.json`。
-- `--scan-report`：只读扫描 `.scan-data/settings.json` 中配置的目录，输出
+- `npm run smoke`：在 `temp/fixture` 的假库上启动应用，自动验证扫描、角色页、
+  文件夹导入、启停与元数据，并输出截图和 `smoke-result.json`。
+- `--scan-report`：只读扫描 `temp/scan-data/settings.json` 中配置的目录，输出
   `scan-report.json`（角色数、Mod 数、耗时、每个角色的 known 状态）。不会写 Mods 目录。
 
 ## 后续路线

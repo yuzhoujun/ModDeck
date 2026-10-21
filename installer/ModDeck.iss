@@ -1,7 +1,13 @@
 #define MyAppName "ModDeck"
+#ifndef MyAppVersion
 #define MyAppVersion "1.0.0"
+#endif
 #define MyAppPublisher "ModDeck contributors"
 #define MyAppExeName "ModDeck.exe"
+
+#ifndef AppDir
+#define AppDir "..\release\win-unpacked"
+#endif
 
 [Setup]
 AppId={{6F1C7B2E-3A4D-4E8F-9B1A-5C2D7E8F0A31}
@@ -26,11 +32,12 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
 
 [Files]
-Source: "..\release\win-unpacked\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#AppDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--no-sandbox"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--no-sandbox"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName} (CMD)"; Filename: "{app}\ModDeck.cmd"
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch ModDeck"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--no-sandbox"; Description: "Launch ModDeck"; Flags: nowait postinstall skipifsilent

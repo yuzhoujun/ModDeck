@@ -1,4 +1,4 @@
-ModDeck 1.0.0 免安装版
+﻿ModDeck 1.0.0 免安装版
 ========================
 
 重要：请先完整解压。
@@ -8,16 +8,16 @@ ModDeck 1.0.0 免安装版
 1. 右键这个 ZIP，选择“全部解压缩”。
 2. 进入解压后的文件夹，确认能看到：
    - ModDeck.exe
-   - Start ModDeck.cmd
+   - ModDeck.cmd
    - resources 文件夹（里面应有 app.asar）
    - locales 文件夹
-3. 双击 Start ModDeck.cmd。
+3. 双击 ModDeck.cmd。
 
 为什么直接双击 ModDeck.exe 可能没反应
 --------------------------------------
 部分安全软件（腾讯电脑管家、Windows Defender 等）会阻止 Electron 的 Chromium 沙箱初始化。
 沙箱在应用代码执行前就已初始化，程序内部无法给自己补参数，所以直接双击会没有窗口。
-Start ModDeck.cmd 会用 --no-sandbox 参数启动，绕过这个限制。
+ModDeck.cmd 会用 --no-sandbox 参数启动，绕过这个限制。
 
 如果你想要一个可双击的图标：
 1. 右键 ModDeck.exe → 创建快捷方式
@@ -46,3 +46,4 @@ Start ModDeck.cmd 会用 --no-sandbox 参数启动，绕过这个限制。
 正常情况下是 %APPDATA%\ModDeck\。
 如果安全软件拦截了 AppData 写入，ModDeck 会自动改用 exe 同目录的 ModDeck-data\。
 删除这个数据目录会重置设置和角色元数据（不会删除 Mods）。
+

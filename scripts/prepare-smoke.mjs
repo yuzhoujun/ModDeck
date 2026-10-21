@@ -2,20 +2,31 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const root = process.cwd()
-const modsPath = path.join(root, 'scripts', 'fixture', 'Mods')
-const userData = path.join(root, '.smoke-data')
+const temp = path.join(root, 'temp')
+const fixture = path.join(temp, 'fixture')
+const modsPath = path.join(fixture, 'Mods')
+const importSource = path.join(fixture, 'import-source', 'TestImport')
+const userData = path.join(temp, 'smoke-data')
+
+fs.rmSync(fixture, { recursive: true, force: true })
+fs.rmSync(userData, { recursive: true, force: true })
+
+const ini = '[TextureOverrideTest]\nhash = 12345678\n'
+
+function writeMod(character, mod, text) {
+  const dir = path.join(modsPath, character, mod)
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'mod.ini'), text, 'utf8')
+}
+
+writeMod('测试角色A', '泳装Mod', ini)
+writeMod('测试角色A', 'DISABLED_旧Mod', ini)
+writeMod('新角色B', '新衣服', ini)
+
+fs.mkdirSync(importSource, { recursive: true })
+fs.writeFileSync(path.join(importSource, 'mod.ini'), '[TextureOverrideImport]\nhash = 87654321\n', 'utf8')
 
 fs.mkdirSync(userData, { recursive: true })
-fs.rmSync(path.join(userData, 'characters.json'), { force: true })
-
-for (const name of [
-  'TestImport',
-  'DISABLED_TestImport',
-  'RarMod',
-  'DISABLED_RarMod'
-]) {
-  fs.rmSync(path.join(modsPath, '测试角色A', name), { recursive: true, force: true })
-}
 
 const settings = {
   schemaVersion: 1,
@@ -39,10 +50,6 @@ const settings = {
   }
 }
 
-fs.writeFileSync(
-  path.join(userData, 'settings.json'),
-  JSON.stringify(settings, null, 2),
-  'utf8'
-)
+fs.writeFileSync(path.join(userData, 'settings.json'), JSON.stringify(settings, null, 2), 'utf8')
 
 console.log(`smoke fixture ready: ${modsPath}`)
