@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { CharacterMeta, GameId, MetadataStore } from '../../shared/types'
+import type { CharacterKind, CharacterMeta, GameId, MetadataStore } from '../../shared/types'
 import { ensureDir, readJsonSafe, readdirSafe, writeJsonAtomic } from '../core/fsx'
 
 export const METADATA_FILE = 'characters.json'
@@ -94,6 +94,7 @@ export function setCharacterMeta(
   if (typeof meta.order === 'number' && Number.isFinite(meta.order)) clean.order = meta.order
   if (meta.hidden === true) clean.hidden = true
   if (typeof meta.note === 'string' && meta.note.trim()) clean.note = meta.note.trim()
+  if (meta.kind === 'utility' || meta.kind === 'character') clean.kind = meta.kind
 
   if (Object.keys(clean).length === 0) {
     delete characters[folder]
@@ -125,6 +126,10 @@ export function coverPath(baseDir: string, meta: CharacterMeta): string | null {
 export function coverUrlFor(baseDir: string, meta: CharacterMeta): string | null {
   const abs = coverPath(baseDir, meta)
   return abs ?? null
+}
+
+export function asCharacterKind(value: unknown): CharacterKind {
+  return value === 'utility' ? 'utility' : 'character'
 }
 
 export async function saveCover(

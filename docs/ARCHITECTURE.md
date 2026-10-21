@@ -117,10 +117,15 @@ src/main/
 
 ## 快捷窗口与全局快捷键
 
-- 主进程用 `globalShortcut` 注册 `settings.ui.overlayHotkey`，默认 `Alt+Shift+F`。
+- 主进程用 `globalShortcut` 注册 `settings.ui.overlayHotkey`，默认 `Alt+Shift+M`。
 - 快捷键回调创建/切换一个独立的 `BrowserWindow`，加载同一个渲染入口并带
   `?mode=overlay`，由 `OverlayApp` 渲染紧凑面板。
+- 点击快捷窗口里的 Mod 会创建一个相邻的 `?mode=overlay-detail` 窗口，按屏幕
+  左右剩余空间选择贴左侧或右侧；窗口内容是该 Mod 的热键列表。
 - 快捷窗口复用同一套 preload API，启停 Mod、读取角色列表都走正常 IPC。
+- 热键按钮会先隐藏面板，再通过 PowerShell `SendKeys` 把按键发送到当前前台窗口；
+  游戏需要是前台窗口，复杂/不支持的键会返回错误。
+- `settings.ui.overlayPinned` 控制置顶；快捷窗口和热键侧栏一起切换。
 - 注册失败时会回退到上一个可用快捷键，并在启动日志里记录。
 - `Escape` 或标题栏按钮隐藏窗口；关闭主窗口不会影响已注册的全局快捷键。
 
@@ -132,6 +137,16 @@ src/main/
 - 自定义排序只影响 `sortCharacters/sortMods = "custom"`；其他排序仍按名称/时间/启用状态。
 - 角色筛选（全部 / 有 Mod / 无 Mod）是纯前端过滤，不改变磁盘扫描结果。
 - `.`、`_` 开头的目录在扫描阶段就被忽略，不会出现在角色或 Mod 列表里。
+- `modSelectMode = "single"` 时，主进程在启用目标 Mod 前先关闭同角色其他已启用 Mod；
+  `"multi"` 时独立启停，并可批量启用/禁用选中的 Mod。
+
+## 角色封面与新建目录
+
+- 角色封面优先级：元数据 `coverFile`（旧的数据目录封面）→ 角色目录
+  `.preview.png/jpg/jpeg/webp` → 旧命名 `_cover.png/jpg/jpeg/webp`。
+- 新保存的封面统一写到角色目录的 `.preview.png`，800×800 PNG，卡片按 1:1 填充。
+- 新建角色/功能目录由主进程在 `resolveCharacterBase()` 下创建，拒绝 `.`/`_` 开头、
+  兼容保留名和重复目录；`kind = "utility"` 在卡片上显示“功能”标记。
 
 ## 诊断
 
@@ -143,7 +158,7 @@ src/main/
 ## 后续路线
 
 1. 冲突检测（重复 `hash`、同一 ini 覆盖）。
-2. 预设（启用集合快照）与批量启停。
+2. 预设（启用集合快照）。
 3. Mod 健康检查（缺 ini、空目录、重复目录）。
 4. 标签与本地搜索索引。
 5. 可选的角色元数据包导入/导出（社区维护，不依赖服务器）。

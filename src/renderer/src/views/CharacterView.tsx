@@ -22,6 +22,9 @@ export function CharacterView({
   onSort,
   onBack,
   onToggle,
+  selectMode,
+  onSelectMode,
+  onSetMods,
   onOpen,
   onDelete,
   onImport,
@@ -41,7 +44,10 @@ export function CharacterView({
   sort: UiSettings['sortMods']
   onSort: (value: UiSettings['sortMods']) => void
   onBack: () => void
-  onToggle: (mod: ModInfo) => Promise<void> | void
+  onToggle: (mod: ModInfo, exclusive?: boolean) => Promise<void> | void
+  selectMode: UiSettings['modSelectMode']
+  onSelectMode: (value: UiSettings['modSelectMode']) => void
+  onSetMods: (folders: string[], enable: boolean) => Promise<void> | void
   onOpen: (mod: ModInfo) => void
   onDelete: (mod: ModInfo) => Promise<void> | void
   onImport: () => void
@@ -57,10 +63,15 @@ export function CharacterView({
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [dragName, setDragName] = useState<string | null>(null)
+  const [checked, setChecked] = useState<Set<string>>(new Set())
 
   const name = displayNameOf(character)
   const visible = mods.filter((mod) => modMatches(mod, query))
   const selectedMod = selectedName ? mods.find((mod) => mod.name === selectedName) ?? null : null
+
+  useEffect(() => {
+    setChecked(new Set())
+  }, [character.folder])
 
   useEffect(() => {
     if (!selectedName) return
@@ -86,7 +97,7 @@ export function CharacterView({
 
   async function toggleAndRefresh(mod: ModInfo) {
     const nextFolder = mod.enabled ? `DISABLED_${mod.name}` : mod.name
-    await onToggle(mod)
+    await onToggle(mod, selectMode === 'single')
     if (selectedName === mod.name) {
       try {
         setDetails(await window.moddeck.getModDetails(game.id, character.folder, nextFolder))
@@ -178,7 +189,58 @@ export function CharacterView({
           <option value="enabled">启用的优先</option>
           <option value="custom">自定义顺序</option>
         </select>
+        <div className="segmented compact">
+          <button
+            className={selectMode === 'single' ? 'active' : ''}
+            onClick={() => {
+              onSelectMode('single')
+              setChecked(new Set())
+            }}
+            title="启用一个 Mod 时自动关闭其他 Mod"
+          >
+            单选
+          </button>
+          <button
+            className={selectMode === 'multi' ? 'active' : ''}
+            onClick={() => onSelectMode('multi')}
+            title="可以同时启用多个 Mod"
+          >
+            多选
+          </button>
+        </div>
+        {selectMode === 'multi' && checked.size > 0 ? (
+          <>
+            <span className="hint">已选 {checked.size}</span>
+            <button
+              className="btn ghost"
+              onClick={() => {
+                void onSetMods(
+                  mods.filter((mod) => checked.has(mod.name)).map((mod) => mod.folderName),
+                  true
+                )
+                setChecked(new Set())
+              }}
+            >
+              启用选中
+            </button>
+            <button
+              className="btn ghost"
+              onClick={() => {
+                void onSetMods(
+                  mods.filter((mod) => checked.has(mod.name)).map((mod) => mod.folderName),
+                  false
+                )
+                setChecked(new Set())
+              }}
+            >
+              禁用选中
+            </button>
+          </>
+        ) : null}
         {sort === 'custom' ? <span className="hint">拖动 Mod 排序</span> : null}
+        {selectMode === 'single' ? (
+          <span className="hint">单选：启用一个会关闭其他</span>
+        ) : null}
         <button className="btn ghost" onClick={onRefresh}>
           <Icon name="refresh" size={15} />
           刷新
@@ -215,6 +277,16 @@ export function CharacterView({
                   selected={selectedName === mod.name}
                   draggable={sort === 'custom'}
                   dragging={dragName === mod.name}
+                  selectable={selectMode === 'multi'}
+                  checked={checked.has(mod.name)}
+                  onCheck={() =>
+                    setChecked((current) => {
+                      const next = new Set(current)
+                      if (next.has(mod.name)) next.delete(mod.name)
+                      else next.add(mod.name)
+                      return next
+                    })
+                  }
                   onSelect={() => void loadDetails(mod)}
                   onToggle={() => void toggleAndRefresh(mod)}
                   onOpen={() => onOpen(mod)}

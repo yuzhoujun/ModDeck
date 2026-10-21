@@ -100,6 +100,29 @@ async function hasIniWithin(dir: string, depth: number): Promise<boolean> {
   return found
 }
 
+const CHARACTER_COVER_NAMES = [
+  '.preview.png',
+  '.preview.jpg',
+  '.preview.jpeg',
+  '.preview.webp',
+  '_cover.png',
+  '_cover.jpg',
+  '_cover.jpeg',
+  '_cover.webp'
+]
+
+async function findCharacterCoverFile(dir: string): Promise<string | null> {
+  const entries = await readdirSafe(dir)
+  const files = new Map(
+    entries.filter((entry) => entry.isFile()).map((entry) => [entry.name.toLowerCase(), entry.name])
+  )
+  for (const name of CHARACTER_COVER_NAMES) {
+    const actual = files.get(name)
+    if (actual) return path.join(dir, actual)
+  }
+  return null
+}
+
 async function findPreview(dir: string): Promise<string | null> {
   const stamp = await dirStamp(dir)
   const cached = previewCache.get(dir)
@@ -147,6 +170,7 @@ function sortCharacters(
 
 export interface ScanOptions {
   coverUrlFor: (meta: ReturnType<typeof getCharacterMeta>) => string | null
+  assetUrl: (absolutePath: string) => string
   showHidden: boolean
   sortCharacters: 'custom' | 'name' | 'count'
   characterOrder?: string[]
@@ -181,7 +205,11 @@ export async function scanCharacters(
     }
 
     const displayName = meta.displayName || entry.name
-    const cover = options.coverUrlFor(meta)
+    let cover = options.coverUrlFor(meta)
+    if (!cover) {
+      const coverFile = await findCharacterCoverFile(characterPath)
+      if (coverFile) cover = options.assetUrl(coverFile)
+    }
 
     characters.push({
       folder: entry.name,
@@ -193,7 +221,8 @@ export async function scanCharacters(
       hasCover: Boolean(cover),
       coverUrl: cover,
       known: Boolean(meta.displayName || meta.canonicalEnName || meta.aliases?.length),
-      order: typeof meta.order === 'number' ? meta.order : Number.MAX_SAFE_INTEGER
+      order: typeof meta.order === 'number' ? meta.order : Number.MAX_SAFE_INTEGER,
+      kind: meta.kind === 'utility' ? 'utility' : 'character'
     })
   }
 

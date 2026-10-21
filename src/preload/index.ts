@@ -10,8 +10,8 @@ const api: ModDeckApi = {
   scanGame: (gameId) => ipcRenderer.invoke(IPC.scanGame, gameId),
   getMods: (gameId, characterFolder) =>
     ipcRenderer.invoke(IPC.getMods, gameId, characterFolder),
-  toggleMod: (gameId, characterFolder, modFolder, enable) =>
-    ipcRenderer.invoke(IPC.toggleMod, gameId, characterFolder, modFolder, enable),
+  toggleMod: (gameId, characterFolder, modFolder, enable, exclusive) =>
+    ipcRenderer.invoke(IPC.toggleMod, gameId, characterFolder, modFolder, enable, exclusive),
   deleteMod: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.deleteMod, gameId, characterFolder, modFolder),
   openModFolder: (gameId, characterFolder, modFolder) =>
@@ -32,8 +32,15 @@ const api: ModDeckApi = {
     ipcRenderer.invoke(IPC.setCharacterCover, gameId, characterFolder),
   resetCharacterMeta: (gameId, characterFolder) =>
     ipcRenderer.invoke(IPC.resetCharacterMeta, gameId, characterFolder),
+  createCharacter: (gameId, input) => ipcRenderer.invoke(IPC.createCharacter, gameId, input),
+  saveCharacterCoverData: (gameId, characterFolder, dataUrl) =>
+    ipcRenderer.invoke(IPC.saveCharacterCoverData, gameId, characterFolder, dataUrl),
+  clearCharacterCover: (gameId, characterFolder) =>
+    ipcRenderer.invoke(IPC.clearCharacterCover, gameId, characterFolder),
   getModDetails: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.getModDetails, gameId, characterFolder, modFolder),
+  setModsEnabled: (gameId, characterFolder, folders, enable) =>
+    ipcRenderer.invoke(IPC.setModsEnabled, gameId, characterFolder, folders, enable),
   reorderCharacters: (gameId, folders) =>
     ipcRenderer.invoke(IPC.reorderCharacters, gameId, folders),
   reorderMods: (gameId, characterFolder, folders) =>
@@ -42,6 +49,10 @@ const api: ModDeckApi = {
   launchLoader: (gameId) => ipcRenderer.invoke(IPC.launchLoader, gameId),
   getOverlayHotkey: () => ipcRenderer.invoke(IPC.getOverlayHotkey),
   setOverlayHotkey: (hotkey) => ipcRenderer.invoke(IPC.setOverlayHotkey, hotkey),
+  setOverlayPinned: (pinned) => ipcRenderer.invoke(IPC.setOverlayPinned, pinned),
+  showOverlayDetail: (request) => ipcRenderer.invoke(IPC.showOverlayDetail, request),
+  hideOverlayDetail: () => ipcRenderer.invoke(IPC.hideOverlayDetail),
+  sendModHotkey: (key) => ipcRenderer.invoke(IPC.sendModHotkey, key),
   overlayHide: () => ipcRenderer.invoke(IPC.overlayHide),
   overlayOpenManager: () => ipcRenderer.invoke(IPC.overlayOpenManager),
   toggleOverlay: () => ipcRenderer.invoke(IPC.overlayToggle)

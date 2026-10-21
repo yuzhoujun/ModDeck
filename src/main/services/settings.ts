@@ -18,7 +18,9 @@ export function defaultSettings(): Settings {
       sortMods: 'name',
       showHidden: false,
       characterFilter: 'all',
-      overlayHotkey: 'Alt+Shift+F'
+      overlayHotkey: 'Alt+Shift+M',
+      overlayPinned: true,
+      modSelectMode: 'multi'
     },
     import: {
       deleteArchiveAfter: false,
@@ -88,7 +90,9 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
       overlayHotkey:
         typeof source.ui?.overlayHotkey === 'string'
           ? source.ui.overlayHotkey.trim()
-          : 'Alt+Shift+F'
+          : 'Alt+Shift+M',
+      overlayPinned: source.ui?.overlayPinned !== false,
+      modSelectMode: source.ui?.modSelectMode === 'single' ? 'single' : 'multi'
     },
     import: {
       deleteArchiveAfter: source.import?.deleteArchiveAfter === true,

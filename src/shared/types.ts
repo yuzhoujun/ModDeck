@@ -5,6 +5,8 @@ export type GameId =
   | 'endfield'
   | 'neverness-to-everness'
 
+export type CharacterKind = 'character' | 'utility'
+
 export interface GameDef {
   id: GameId
   name: string
@@ -28,6 +30,8 @@ export interface UiSettings {
   showHidden: boolean
   characterFilter: 'all' | 'withMods' | 'empty'
   overlayHotkey: string
+  overlayPinned: boolean
+  modSelectMode: 'single' | 'multi'
 }
 
 export interface ImportSettings {
@@ -53,6 +57,7 @@ export interface CharacterMeta {
   order?: number
   hidden?: boolean
   note?: string
+  kind?: CharacterKind
 }
 
 export interface MetadataStore {
@@ -73,6 +78,7 @@ export interface CharacterInfo {
   coverUrl: string | null
   known: boolean
   order: number
+  kind: CharacterKind
 }
 
 export interface ModInfo {
@@ -89,6 +95,19 @@ export interface ModInfo {
 export interface ModHotkey {
   section: string
   key: string
+}
+
+export interface CreateCharacterInput {
+  folder: string
+  displayName?: string
+  aliases?: string[]
+  kind?: CharacterKind
+}
+
+export interface OverlayDetailRequest {
+  gameId: GameId
+  characterFolder: string
+  modFolder: string
 }
 
 export interface ModDetails {

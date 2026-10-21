@@ -11,7 +11,9 @@ ModDeck 不会修改游戏本体的任何文件。
 
 ![角色库](docs/screenshot-library.png)
 ![角色详情与 Mod 详情](docs/screenshot-details.png)
+![编辑角色封面](docs/screenshot-cover-editor.png)
 ![快捷窗口](docs/screenshot-overlay.png)
+![快捷窗口热键侧栏](docs/screenshot-hotkeys.png)
 
 ## 功能
 
@@ -19,9 +21,13 @@ ModDeck 不会修改游戏本体的任何文件。
 - **磁盘即真相**：角色 = `Mods` 下的任意文件夹，不需要内置名单
 - **新角色基线**：第一次连接现有库时，当前角色会被登记为“已有”；此后新增的目录才会标“新”
 - **角色筛选**：全部 / 仅有 Mod / 仅无 Mod；`.` 和 `_` 开头的目录自动隐藏
+- **角色封面**：优先读取 `.preview.png/jpg/webp`，兼容旧的 `_cover.*`；编辑时可拖入/选择图片并裁剪 1:1 保存
+- **新增目录**：角色库可以直接创建新角色或“功能 Mod”目录
 - **自定义排序**：角色卡片、Mod 列表都可以拖动排序，顺序保存在本机
+- **单选 / 多选**：角色页和快捷窗口都能切换；单选时启用一个会自动关闭其他，多选支持批量启停
 - **快捷启动**：顶部直接启动游戏或 XXMI / 加载器，不做注入
-- **快捷窗口**：全局快捷键（默认 `Alt+Shift+F`，可改）呼出紧凑 Mod 开关面板
+- **快捷窗口**：全局快捷键（默认 `Alt+Shift+M`，可改）呼出紧凑 Mod 开关面板，可置顶/取消置顶
+- **热键侧栏**：点击快捷窗口里的 Mod，在旁边展开 ini 热键列表；点击热键会先隐藏面板再发送到游戏
 - **Mod 详情**：点击 Mod 在右侧查看预览、大小、文件数、ini、热键，并可启停/打开/删除
 - **启停**：用 `DISABLED_` 前缀重命名，失败自动重试并提示占用
 - **导入**：zip / 7z / rar / 文件夹，自动识别 `Mods/<角色>/<Mod>`、`<角色>/<Mod>`、单个 `<Mod>`
@@ -32,9 +38,9 @@ ModDeck 不会修改游戏本体的任何文件。
 
 ## 下载与运行
 
-V2.0 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck/releases/latest)
+V2.0.1 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck/releases/latest)
 
-1. 下载 `ModDeck-2.0.0-win-x64.zip`
+1. 下载 `ModDeck-2.0.1-win-x64.zip`
 2. 完整解压到任意目录（不要在压缩包里直接运行）
 3. 双击 `ModDeck.cmd` 启动
 4. 打开“设置”，为对应游戏选择 `Mods` 目录
@@ -100,7 +106,8 @@ exe 同目录的 `ModDeck-data/`。
 | --- | --- |
 | `settings.json` | 游戏路径、启动参数、导入选项、筛选/排序、自定义顺序、快捷键 |
 | `characters.json` | 角色显示名、别名、封面、排序、基线 |
-| `covers/` | 用户设置的封面副本 |
+| `covers/` | 旧版通过对话框设置的封面副本 |
+| `Mods/<角色>/.preview.png` | 新编辑流程保存的默认封面；旧的 `_cover.*` 兼容读取 |
 | `backups/` | 覆盖导入前的备份 |
 | `logs/` | 运行日志 |
 
@@ -118,7 +125,7 @@ ModDeck 不写游戏目录；只对用户选择的 `Mods` 目录做启停、导�
 
 更多实现细节见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-## 已知限制（V2.0）
+## 已知限制（V2.0.1）
 
 - 仅 Windows x64。
 - 不包含 Mod 注入、游戏内 overlay、市场或账号功能；启动游戏/XXMI 只是调用外部程序。

@@ -19,7 +19,8 @@ export function LibraryView({
   onOpenSettings,
   onLaunchGame,
   onLaunchLoader,
-  onReorderCharacters
+  onReorderCharacters,
+  onAdd
 }: {
   game: GameDef
   snapshot: GameSnapshot
@@ -37,6 +38,7 @@ export function LibraryView({
   onLaunchGame: () => void
   onLaunchLoader: () => void
   onReorderCharacters: (folders: string[]) => void
+  onAdd: () => void
 }) {
   const [dragFolder, setDragFolder] = useState<string | null>(null)
 
@@ -103,6 +105,10 @@ export function LibraryView({
           <button className="btn ghost" onClick={onRefresh}>
             <Icon name="refresh" size={16} />
             刷新
+          </button>
+          <button className="btn ghost" onClick={onAdd}>
+            <Icon name="userPlus" size={16} />
+            新增目录
           </button>
           <button className="btn ghost" onClick={onImportFolder}>
             <Icon name="folder" size={16} />

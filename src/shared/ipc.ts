@@ -2,12 +2,14 @@ import type {
   AppInfo,
   Bootstrap,
   CharacterMeta,
+  CreateCharacterInput,
   GameId,
   GameSnapshot,
   ImportRequest,
   ImportResult,
   ModDetails,
   ModInfo,
+  OverlayDetailRequest,
   Settings,
   SettingsPatch,
   SimpleResult,
@@ -36,13 +38,21 @@ export const IPC = {
   updateCharacterMeta: 'character:update-meta',
   setCharacterCover: 'character:set-cover',
   resetCharacterMeta: 'character:reset-meta',
+  createCharacter: 'character:create',
+  saveCharacterCoverData: 'character:save-cover-data',
+  clearCharacterCover: 'character:clear-cover',
   getModDetails: 'mods:details',
+  setModsEnabled: 'mods:set-enabled',
   reorderCharacters: 'character:reorder',
   reorderMods: 'mods:reorder',
   launchGame: 'launch:game',
   launchLoader: 'launch:loader',
   getOverlayHotkey: 'overlay:get-hotkey',
   setOverlayHotkey: 'overlay:set-hotkey',
+  setOverlayPinned: 'overlay:set-pinned',
+  showOverlayDetail: 'overlay:show-detail',
+  hideOverlayDetail: 'overlay:hide-detail',
+  sendModHotkey: 'overlay:send-hotkey',
   overlayHide: 'overlay:hide',
   overlayOpenManager: 'overlay:open-manager',
   overlayToggle: 'overlay:toggle'
@@ -59,7 +69,8 @@ export interface ModDeckApi {
     gameId: GameId,
     characterFolder: string,
     modFolder: string,
-    enable: boolean
+    enable: boolean,
+    exclusive?: boolean
   ): Promise<ToggleResult>
   deleteMod(gameId: GameId, characterFolder: string, modFolder: string): Promise<ToggleResult>
   openModFolder(gameId: GameId, characterFolder: string, modFolder: string): Promise<ToggleResult>
@@ -79,6 +90,26 @@ export interface ModDeckApi {
   ): Promise<GameSnapshot | null>
   setCharacterCover(gameId: GameId, characterFolder: string): Promise<ToggleResult>
   resetCharacterMeta(gameId: GameId, characterFolder: string): Promise<GameSnapshot | null>
+  createCharacter(
+    gameId: GameId,
+    input: CreateCharacterInput
+  ): Promise<GameSnapshot | null>
+  saveCharacterCoverData(
+    gameId: GameId,
+    characterFolder: string,
+    dataUrl: string
+  ): Promise<GameSnapshot | null>
+  clearCharacterCover(gameId: GameId, characterFolder: string): Promise<GameSnapshot | null>
+  setModsEnabled(
+    gameId: GameId,
+    characterFolder: string,
+    folders: string[],
+    enable: boolean
+  ): Promise<ToggleResult>
+  setOverlayPinned(pinned: boolean): Promise<{ ok: boolean; error?: string }>
+  showOverlayDetail(request: OverlayDetailRequest): Promise<ToggleResult>
+  hideOverlayDetail(): Promise<void>
+  sendModHotkey(key: string): Promise<ToggleResult>
   getModDetails(
     gameId: GameId,
     characterFolder: string,
