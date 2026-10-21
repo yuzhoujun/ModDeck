@@ -155,7 +155,7 @@ export function SettingsView({
               <input
                 className="input hotkey-input"
                 value={hotkeyDraft}
-                placeholder="点击后按下组合键，例如 Alt+F"
+                placeholder="点击后按下组合键，例如 Alt+Shift+F"
                 readOnly
                 onKeyDown={captureHotkey}
                 onFocus={(event) => event.target.select()}

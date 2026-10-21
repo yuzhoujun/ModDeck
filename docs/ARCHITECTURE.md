@@ -117,7 +117,7 @@ src/main/
 
 ## 快捷窗口与全局快捷键
 
-- 主进程用 `globalShortcut` 注册 `settings.ui.overlayHotkey`，默认 `Alt+F`。
+- 主进程用 `globalShortcut` 注册 `settings.ui.overlayHotkey`，默认 `Alt+Shift+F`。
 - 快捷键回调创建/切换一个独立的 `BrowserWindow`，加载同一个渲染入口并带
   `?mode=overlay`，由 `OverlayApp` 渲染紧凑面板。
 - 快捷窗口复用同一套 preload API，启停 Mod、读取角色列表都走正常 IPC。
