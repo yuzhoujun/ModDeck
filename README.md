@@ -30,11 +30,12 @@ V1.0 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck
 
 1. 下载 `ModDeck-1.0.0-win-x64.zip`
 2. 完整解压到任意目录（不要在压缩包里直接运行）
-3. 双击 `Start ModDeck.cmd`（推荐）
+3. 双击 `Start ModDeck.cmd`
 4. 打开“设置”，为对应游戏选择 `Mods` 目录
 
 > 某些安全软件会阻止 Electron 的 Chromium 沙箱，直接双击 `ModDeck.exe` 可能没有窗口。
-> `Start ModDeck.cmd` 会用 `--no-sandbox` 启动；自建快捷方式时请带上这个参数。
+> `Start ModDeck.cmd` 会用 `--no-sandbox` 启动。想要双击图标的话，给 `ModDeck.exe`
+> 建一个快捷方式，并在“目标”末尾加上 ` --no-sandbox`。
 
 系统要求：Windows 10 / 11 x64。
 
