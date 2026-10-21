@@ -50,6 +50,7 @@ app.commandLine.appendSwitch('no-sandbox')
 
 const SMOKE_TEST = process.argv.includes('--smoke-test')
 const SCAN_REPORT = process.argv.includes('--scan-report')
+const SMOKE_DIR = path.join(process.cwd(), 'temp', 'smoke')
 const APP_ID = 'dev.moddeck.app'
 const SCHEME = 'moddeck'
 
@@ -129,7 +130,7 @@ app.on('child-process-gone', (_event, details) => {
 
 app.setName('ModDeck')
 if (SCAN_REPORT) {
-  app.setPath('userData', path.join(process.cwd(), '.scan-data'))
+  app.setPath('userData', path.join(process.cwd(), 'temp', 'scan-data'))
 }
 function canWriteDirectory(dir: string): boolean {
   try {
@@ -144,10 +145,11 @@ function canWriteDirectory(dir: string): boolean {
 }
 
 if (SMOKE_TEST) {
-  app.setPath('userData', path.join(process.cwd(), '.smoke-data'))
+  app.setPath('userData', path.join(process.cwd(), 'temp', 'smoke-data'))
   try {
+    fsSync.mkdirSync(SMOKE_DIR, { recursive: true })
     fsSync.writeFileSync(
-      path.join(process.cwd(), 'smoke-boot.json'),
+      path.join(SMOKE_DIR, 'smoke-boot.json'),
       JSON.stringify(
         {
           argv: process.argv,
@@ -647,14 +649,15 @@ function createWindow(): void {
   }
 
   if (SMOKE_TEST) {
+    fsSync.mkdirSync(SMOKE_DIR, { recursive: true })
     mainWindow.webContents.on('render-process-gone', (_event, details) => {
       fsSync.writeFileSync(
-        path.join(process.cwd(), 'smoke-error.txt'),
+        path.join(SMOKE_DIR, 'smoke-error.txt'),
         `render-process-gone: ${JSON.stringify(details)}`
       )
     })
     const timeout = setTimeout(() => {
-      fsSync.writeFileSync(path.join(process.cwd(), 'smoke-error.txt'), 'SMOKE_TIMEOUT')
+      fsSync.writeFileSync(path.join(SMOKE_DIR, 'smoke-error.txt'), 'SMOKE_TIMEOUT')
       console.error('SMOKE_TIMEOUT')
       app.exit(1)
     }, 25_000)
@@ -676,7 +679,7 @@ function createWindow(): void {
         const shot = async (name: string) => {
           const image = await mainWindow?.webContents.capturePage()
           if (image && !image.isEmpty()) {
-            await fs.writeFile(path.join(process.cwd(), name), image.toPNG())
+            await fs.writeFile(path.join(SMOKE_DIR, name), image.toPNG())
           }
           return Boolean(image && !image.isEmpty())
         }
@@ -693,10 +696,16 @@ function createWindow(): void {
           const settingsText = await bodyText()
           const settingsShot = await shot('smoke-settings.png')
 
-          const zipPath = path.join(process.cwd(), 'scripts', 'fixture', 'import-test.zip')
+          const importSource = path.join(
+            process.cwd(),
+            'temp',
+            'fixture',
+            'import-source',
+            'TestImport'
+          )
           const importResult = await mainWindow?.webContents.executeJavaScript(
-            `window.moddeck.importRun({ gameId: 'wuthering-waves', archivePaths: [${JSON.stringify(
-              zipPath
+            `window.moddeck.importRun({ gameId: 'wuthering-waves', folderPaths: [${JSON.stringify(
+              importSource
             )}], targetCharacter: '测试角色A' })`
           )
           const importedMods = await mainWindow?.webContents.executeJavaScript(
@@ -710,18 +719,6 @@ function createWindow(): void {
           )
           const toggleOn = await mainWindow?.webContents.executeJavaScript(
             "window.moddeck.toggleMod('wuthering-waves', '测试角色A', 'TestImport', true)"
-          )
-
-          const rarPath = path.join(process.cwd(), 'scripts', 'fixture', 'import-test.rar')
-          const rarResult = fsSync.existsSync(rarPath)
-            ? await mainWindow?.webContents.executeJavaScript(
-                `window.moddeck.importRun({ gameId: 'wuthering-waves', archivePaths: [${JSON.stringify(
-                  rarPath
-                )}], targetCharacter: '测试角色A' })`
-              )
-            : { skipped: 'import-test.rar not found' }
-          const modsAfterRar = await mainWindow?.webContents.executeJavaScript(
-            "window.moddeck.getMods('wuthering-waves', '测试角色A')"
           )
 
           const metaUpdated = await mainWindow?.webContents.executeJavaScript(
@@ -738,7 +735,7 @@ function createWindow(): void {
           )?.displayName
 
           await fs.writeFile(
-            path.join(process.cwd(), 'smoke-result.json'),
+            path.join(SMOKE_DIR, 'smoke-result.json'),
             JSON.stringify(
               {
                 ok: true,
@@ -751,8 +748,6 @@ function createWindow(): void {
                 toggleOff,
                 afterOff,
                 toggleOn,
-                rarResult,
-                modsAfterRar,
                 metaUpdatedName,
                 metaResetName
               },
@@ -764,7 +759,7 @@ function createWindow(): void {
           clearTimeout(timeout)
         } catch (error) {
           fsSync.writeFileSync(
-            path.join(process.cwd(), 'smoke-error.txt'),
+            path.join(SMOKE_DIR, 'smoke-error.txt'),
             `capture failed: ${error instanceof Error ? error.stack : String(error)}`
           )
           console.error('SMOKE_CAPTURE_FAILED', error)

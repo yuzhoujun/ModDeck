@@ -30,17 +30,13 @@ V1.0 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck
 
 1. 下载 `ModDeck-1.0.0-win-x64.zip`
 2. 完整解压到任意目录（不要在压缩包里直接运行）
-3. 双击 `Start ModDeck.cmd`
+3. 双击 `ModDeck.cmd` 启动
 4. 打开“设置”，为对应游戏选择 `Mods` 目录
 
-> 某些安全软件会阻止 Electron 的 Chromium 沙箱，直接双击 `ModDeck.exe` 可能没有窗口。
-> `Start ModDeck.cmd` 会用 `--no-sandbox` 启动。想要双击图标的话，给 `ModDeck.exe`
-> 建一个快捷方式，并在“目标”末尾加上 ` --no-sandbox`。
+> 某些安全软件会阻止 Electron 的 Chromium 沙箱，所以启动入口统一使用 `ModDeck.cmd`，
+> 它内部会带 `--no-sandbox`。安装版的快捷方式也会自动带这个参数。
 
 系统要求：Windows 10 / 11 x64。
-
-> 为什么不用安装器：当前构建机的安装器运行环境有问题（NSIS / Inno 都会在临时目录阶段失败），
-> V1.0 先提供验证过的免安装包。安装器会在后续版本恢复。
 
 ## 从源码构建
 
@@ -50,6 +46,8 @@ V1.0 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck
 - Node.js 22 或更新（开发时使用 Node 24）
 - Git
 - VS Code（推荐）
+- 7-Zip（打包免安装 ZIP）
+- Inno Setup 6（仅安装版需要）
 
 ### 在 VS Code 里开始
 
@@ -62,11 +60,11 @@ npm run dev
 
 `npm run dev` 会启动 Electron + Vite 开发窗口，改渲染层代码会自动热更新。
 
-如果 `npm install` 下载 Electron 很慢，可以先设置镜像：
+如果 `npm install` 下载 Electron 很慢：
 
 ```powershell
 $env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
-$env:ELECTRON_CACHE="C:\path\to\electron-cache"
+$env:ELECTRON_CACHE="C:\path\to\temp\electron-cache"
 npm install
 ```
 
@@ -77,34 +75,16 @@ npm install
 | `npm run dev` | 开发模式 |
 | `npm run build` | 构建到 `out/` |
 | `npm run typecheck` | 主进程 + 渲染层类型检查 |
-| `npm run smoke` | 无头冒烟测试（假库，输出截图与 `smoke-result.json`） |
-| `npm run scan:report` | 只读扫描报告（需准备 `.scan-data/settings.json`） |
-| `npm run dist` | electron-builder 打包（NSIS + portable） |
-| `npm run package:portable` | 构建并生成带 README / 启动器的免安装 ZIP |
+| `npm run smoke` | 无头冒烟测试（夹具在 `temp/`，不会碰真实 Mods） |
+| `npm run scan:report` | 只读扫描报告 |
+| `npm run package:portable` | 构建免安装 ZIP（入口 `ModDeck.cmd`） |
+| `npm run package:installer` | 构建 Inno Setup 安装器（可选） |
 
-### 打包免安装 ZIP
+两种发布构建的完整步骤、产物结构和注意事项见 **[docs/BUILD.md](docs/BUILD.md)**。
 
-```bash
-npm run package:portable
-```
-
-脚本会构建、打包 `release/win-unpacked/`、放入 `README.txt` 和 `Start ModDeck.cmd`，
-再生成 `release/ModDeck-<version>-win-x64.zip` 并打印 SHA256。需要本机安装 7-Zip。
-
-只打包目录：
-
-```bash
-npm run build
-npx electron-builder --dir
-```
-
-### 打包 Inno Setup 安装器（可选）
-
-安装 [Inno Setup 6](https://jrsoftware.org/isinfo.php)，然后：
-
-```powershell
-& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\ModDeck.iss
-```
+- **免安装版**：`npm run package:portable` → `release/ModDeck-<version>-win-x64.zip`
+- **安装版（可选）**：先 `npm run package:portable`，再 `npm run package:installer`
+  → `release/ModDeck-<version>-Setup.exe`，快捷方式自动带 `--no-sandbox`
 
 产物在 `release/ModDeck-<version>-Setup.exe`。
 
