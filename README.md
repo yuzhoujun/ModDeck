@@ -53,7 +53,6 @@ V2.0 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck
 - Git
 - VS Code（推荐）
 - 7-Zip（打包免安装 ZIP）
-- Inno Setup 6（仅安装版需要）
 
 ### 在 VS Code 里开始
 
@@ -84,25 +83,28 @@ npm install
 | `npm run smoke` | 无头冒烟测试（夹具在 `temp/`，不会碰真实 Mods） |
 | `npm run scan:report` | 只读扫描报告 |
 | `npm run package:portable` | 构建免安装 ZIP（入口 `ModDeck.cmd`） |
-| `npm run package:installer` | 构建 Inno Setup 安装器（可选） |
 
-两种发布构建的完整步骤、产物结构和注意事项见 **[docs/BUILD.md](docs/BUILD.md)**。
+发布构建的完整步骤、产物结构和注意事项见 **[docs/BUILD.md](docs/BUILD.md)**。
 
-- **免安装版**：`npm run package:portable` → `release/ModDeck-<version>-win-x64.zip`
-- **安装版（可选）**：先 `npm run package:portable`，再 `npm run package:installer`
-  → `release/ModDeck-<version>-Setup.exe`，快捷方式自动带 `--no-sandbox`
-
-产物在 `release/ModDeck-<version>-Setup.exe`。
+- **免安装版（唯一发布方式）**：`npm run package:portable` →
+  `release/ModDeck-<version>-win-x64.zip`，解压后双击 `ModDeck.cmd`。
+- 安装版已放弃：Inno/NSIS 安装器在当前 Windows 安全环境下无法创建临时目录（Error 5），
+  这不是安装器内容的问题；不再提供 `.exe` 安装包。
 
 ## 数据位置
 
+正常情况下使用 `%APPDATA%/ModDeck/`；如果 AppData 被安全软件拦截，ModDeck 会自动改用
+exe 同目录的 `ModDeck-data/`。
+
 | 路径 | 内容 |
 | --- | --- |
-| `%APPDATA%/ModDeck/settings.json` | 游戏路径、导入选项、排序 |
-| `%APPDATA%/ModDeck/characters.json` | 角色显示名、别名、封面、排序、基线 |
-| `%APPDATA%/ModDeck/covers/` | 用户设置的封面副本 |
-| `%APPDATA%/ModDeck/backups/` | 覆盖导入前的备份 |
-| `%APPDATA%/ModDeck/logs/` | 错误日志 |
+| `settings.json` | 游戏路径、启动参数、导入选项、筛选/排序、自定义顺序、快捷键 |
+| `characters.json` | 角色显示名、别名、封面、排序、基线 |
+| `covers/` | 用户设置的封面副本 |
+| `backups/` | 覆盖导入前的备份 |
+| `logs/` | 运行日志 |
+
+> 升级到新版本时，如果换了目录，请把旧的 `ModDeck-data` 文件夹一起复制过去，否则设置会重新开始。
 
 ModDeck 不写游戏目录；只对用户选择的 `Mods` 目录做启停、导入、删除操作，删除走系统回收站。
 
@@ -117,8 +119,8 @@ ModDeck 不写游戏目录；只对用户选择的 `Mods` 目录做启停、导�
 ## 已知限制（V2.0）
 
 - 仅 Windows x64。
-- 不包含游戏启动器、游戏内 overlay、热键编辑、市场或账号功能。
-- 安装器为可选（Inno Setup），主分发仍以免安装 ZIP 为主。
+- 不包含 Mod 注入、游戏内 overlay、市场或账号功能；启动游戏/XXMI 只是调用外部程序。
+- 不提供 `.exe` 安装器；使用免安装 ZIP + `ModDeck.cmd`。
 - 只读验证过 38 个角色 / 61 个 Mod / 约 25.5 GB 的真实库。
 
 ## 参与开发

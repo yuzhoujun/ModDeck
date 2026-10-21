@@ -13,7 +13,6 @@
     "smoke": "node scripts/prepare-smoke.mjs && electron . --smoke-test --no-sandbox",
     "scan:report": "electron . --scan-report --no-sandbox",
     "package:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-portable.ps1",
-    "package:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
   "dependencies": {
