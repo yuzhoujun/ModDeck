@@ -1,6 +1,6 @@
 # 构建与发布
 
-本文档描述 ModDeck 的两种构建方式。日常开发只需要 `npm run dev`；发布时按需选择免安装版或安装版。
+本文档描述 ModDeck 的构建方式。日常开发只需要 `npm run dev`；发布使用免安装 ZIP。
 
 ## 环境
 
@@ -8,7 +8,6 @@
 - Node.js 22+（开发时使用 24）
 - Git
 - 7-Zip（生成免安装 ZIP 需要）
-- Inno Setup 6（仅安装版需要，可选）
 
 ```bash
 git clone https://github.com/yuzhoujun/ModDeck.git
@@ -33,9 +32,9 @@ $env:MODDECK_BUILD_ROOT = "release-build"
 npm run package:portable
 ```
 
-ZIP 仍然输出到 `release/`；安装器用 `MODDECK_APP_DIR` 指向 `release-build\win-unpacked`。
+ZIP 仍然输出到 `release/`。
 
-## 方式一：免安装版（推荐）
+## 免安装版
 
 ```bash
 npm run package:portable
@@ -69,52 +68,22 @@ locales/
 用户双击 `ModDeck.cmd` 启动。部分安全软件会拦截 Electron 的 Chromium 沙箱，所以启动入口
 必须带 `--no-sandbox`；`ModDeck.cmd` 已经处理。
 
-## 方式二：安装版（可选）
+## 安装版：已放弃
 
-安装版使用 Inno Setup，生成单文件安装器，并在开始菜单/桌面快捷方式里自动带
-`--no-sandbox` 参数。
+V2 不再提供 `.exe` 安装器。
 
-先构建免安装目录：
+原因是环境限制，不是安装器内容：Inno Setup 和 NSIS 在启动阶段都需要在
+`%TEMP%` 创建临时目录，而这台机器上的安全策略会直接返回
+`Error 5: 拒绝访问`，即使把 TEMP 指向其他可写目录也一样。MSI 同样依赖临时目录，
+换打包工具解决不了。
 
-```bash
-npm run package:portable
-```
+因此安装方式统一为：
 
-再编译安装器：
+1. 解压 `ModDeck-<version>-win-x64.zip`
+2. 双击 `ModDeck.cmd`
 
-```bash
-npm run package:installer
-```
-
-或者手动：
-
-```powershell
-& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" installer\ModDeck.iss
-```
-
-产物：
-
-```
-release/ModDeck-<version>-Setup.exe
-```
-
-安装器行为：
-
-- 默认按当前用户安装到 `%LOCALAPPDATA%\Programs\ModDeck`
-- 创建开始菜单快捷方式，参数 `--no-sandbox`
-- 可选桌面快捷方式，参数 `--no-sandbox`
-- 额外创建一个指向 `ModDeck.cmd` 的开始菜单项
-
-### 为什么不选 MSI
-
-MSI（WiX）同样可以通过快捷方式传参数，但需要额外安装 WiX、维护 `.wxs`，对当前项目收益很低。
-Inno Setup 更简单，且能直接控制快捷方式参数；如果以后需要企业部署，再补 MSI。
-
-### 安装版的已知限制
-
-- 安装器本身仍未签名，Windows 可能提示未知发布者
-- 当前开发机的安全环境会阻止安装器写临时目录；如果安装器无法运行，直接用免安装版
-- 安装器需要在正常 Windows 环境构建/验证；不要把它当作唯一分发方式
+如果以后要做安装器，前置条件是：代码签名证书，或在目标机器上把安装器加入安全软件信任区，
+并实际验证安装/卸载流程。
 
 ## 开发与验证
 
@@ -130,8 +99,7 @@ npm run smoke      # 无头冒烟测试
 
 ## 版本号
 
-版本号在 `package.json` 的 `version`，安装器在 `installer/ModDeck.iss` 的
-`MyAppVersion` 也要同步修改。
+版本号在 `package.json` 的 `version`；产物文件名会自动带上这个版本。
 
 ## 发布检查清单
 
@@ -141,4 +109,3 @@ npm run smoke      # 无头冒烟测试
 - [ ] 解压 ZIP，双击 `ModDeck.cmd` 能打开
 - [ ] 检查 `resources/app.asar` 存在
 - [ ] 记录 ZIP 的 SHA256
-- [ ] 需要安装版时再跑 `npm run package:installer`
