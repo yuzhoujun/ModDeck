@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { CharacterInfo, GameDef, GameSnapshot, UiSettings } from '../../../shared/types'
 import { CharacterCard } from '../components/CharacterCard'
 import { Icon } from '../components/Icon'
@@ -10,11 +10,16 @@ export function LibraryView({
   onQuery,
   sort,
   onSort,
+  filter,
+  onFilter,
   onOpenCharacter,
   onImport,
   onImportFolder,
   onRefresh,
-  onOpenSettings
+  onOpenSettings,
+  onLaunchGame,
+  onLaunchLoader,
+  onReorderCharacters
 }: {
   game: GameDef
   snapshot: GameSnapshot
@@ -22,26 +27,46 @@ export function LibraryView({
   onQuery: (value: string) => void
   sort: UiSettings['sortCharacters']
   onSort: (value: UiSettings['sortCharacters']) => void
+  filter: UiSettings['characterFilter']
+  onFilter: (value: UiSettings['characterFilter']) => void
   onOpenCharacter: (character: CharacterInfo) => void
   onImport: () => void
   onImportFolder: () => void
   onRefresh: () => void
   onOpenSettings: () => void
+  onLaunchGame: () => void
+  onLaunchLoader: () => void
+  onReorderCharacters: (folders: string[]) => void
 }) {
+  const [dragFolder, setDragFolder] = useState<string | null>(null)
+
   const characters = useMemo(() => {
     const value = query.trim().toLowerCase()
-    if (!value) return snapshot.characters
     return snapshot.characters.filter((character) => {
-      const haystack = [
-        character.displayName,
-        character.folder,
-        ...character.aliases
-      ]
+      if (filter === 'withMods' && character.modCount === 0) return false
+      if (filter === 'empty' && character.modCount > 0) return false
+      if (!value) return true
+      const haystack = [character.displayName, character.folder, ...character.aliases]
         .join(' ')
         .toLowerCase()
       return haystack.includes(value)
     })
-  }, [query, snapshot.characters])
+  }, [filter, query, snapshot.characters])
+
+  function handleDrop(targetFolder: string) {
+    if (!dragFolder || dragFolder === targetFolder) return
+    const folders = snapshot.characters.map((character) => character.folder)
+    const from = folders.indexOf(dragFolder)
+    const to = folders.indexOf(targetFolder)
+    if (from < 0 || to < 0) return
+    const [moved] = folders.splice(from, 1)
+    folders.splice(to, 0, moved)
+    onReorderCharacters(folders)
+    setDragFolder(null)
+  }
+
+  const canLaunchGame = Boolean(snapshot.settings.gamePath)
+  const canLaunchLoader = Boolean(snapshot.settings.loaderPath)
 
   return (
     <div className="view">
@@ -57,6 +82,24 @@ export function LibraryView({
           </p>
         </div>
         <div className="actions">
+          <button
+            className="btn ghost"
+            onClick={onLaunchGame}
+            disabled={!canLaunchGame}
+            title={canLaunchGame ? '启动游戏' : '请先在设置里配置游戏程序'}
+          >
+            <Icon name="external" size={16} />
+            启动游戏
+          </button>
+          <button
+            className="btn ghost"
+            onClick={onLaunchLoader}
+            disabled={!canLaunchLoader}
+            title={canLaunchLoader ? '启动 XXMI / 加载器' : '请先在设置里配置启动器'}
+          >
+            <Icon name="external" size={16} />
+            启动 {game.loader}
+          </button>
           <button className="btn ghost" onClick={onRefresh}>
             <Icon name="refresh" size={16} />
             刷新
@@ -104,6 +147,15 @@ export function LibraryView({
             </div>
             <select
               className="select"
+              value={filter}
+              onChange={(event) => onFilter(event.target.value as UiSettings['characterFilter'])}
+            >
+              <option value="all">全部角色</option>
+              <option value="withMods">仅有 Mod</option>
+              <option value="empty">仅无 Mod</option>
+            </select>
+            <select
+              className="select"
               value={sort}
               onChange={(event) => onSort(event.target.value as UiSettings['sortCharacters'])}
             >
@@ -111,6 +163,7 @@ export function LibraryView({
               <option value="name">按名称</option>
               <option value="count">按 Mod 数量</option>
             </select>
+            {sort === 'custom' ? <span className="hint">拖动卡片排序</span> : null}
             <button
               className="path-chip"
               title={snapshot.settings.modsPath}
@@ -123,11 +176,17 @@ export function LibraryView({
 
           {characters.length === 0 ? (
             <div className="empty-panel">
-              <h2>{query ? '没有匹配的角色' : 'Mods 目录是空的'}</h2>
-              <p className="muted">
+              <h2>
                 {query
-                  ? '换个关键词试试。'
-                  : '把 Mod 压缩包拖进对应角色，或直接导入，ModDeck 会自动识别角色目录。'}
+                  ? '没有匹配的角色'
+                  : filter === 'withMods'
+                    ? '没有带 Mod 的角色'
+                    : filter === 'empty'
+                      ? '所有角色都已有 Mod'
+                      : 'Mods 目录是空的'}
+              </h2>
+              <p className="muted">
+                {query ? '换个关键词试试。' : '可以切换筛选条件，或导入新的 Mod。'}
               </p>
             </div>
           ) : (
@@ -138,6 +197,22 @@ export function LibraryView({
                   character={character}
                   accent={game.accent}
                   onOpen={() => onOpenCharacter(character)}
+                  draggable={sort === 'custom'}
+                  dragging={dragFolder === character.folder}
+                  onDragStart={(event) => {
+                    setDragFolder(character.folder)
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData('text/plain', character.folder)
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    handleDrop(character.folder)
+                  }}
+                  onDragEnd={() => setDragFolder(null)}
                 />
               ))}
             </div>

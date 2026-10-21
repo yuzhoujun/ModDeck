@@ -1,10 +1,13 @@
+import { useEffect, useState } from 'react'
 import type {
   CharacterInfo,
   GameDef,
+  ModDetails,
   ModInfo,
   UiSettings
 } from '../../../shared/types'
 import { Icon } from '../components/Icon'
+import { ModDetailsPanel } from '../components/ModDetailsPanel'
 import { ModRow } from '../components/ModRow'
 import { displayNameOf, initialOf, modMatches } from '../utils'
 
@@ -26,6 +29,7 @@ export function CharacterView({
   onEdit,
   onCover,
   onOpenCharacterFolder,
+  onReorderMods,
   onRefresh
 }: {
   game: GameDef
@@ -37,18 +41,72 @@ export function CharacterView({
   sort: UiSettings['sortMods']
   onSort: (value: UiSettings['sortMods']) => void
   onBack: () => void
-  onToggle: (mod: ModInfo) => void
+  onToggle: (mod: ModInfo) => Promise<void> | void
   onOpen: (mod: ModInfo) => void
-  onDelete: (mod: ModInfo) => void
+  onDelete: (mod: ModInfo) => Promise<void> | void
   onImport: () => void
   onImportFolder: () => void
   onEdit: () => void
   onCover: () => void
   onOpenCharacterFolder: () => void
+  onReorderMods: (folders: string[]) => void
   onRefresh: () => void
 }) {
+  const [selectedName, setSelectedName] = useState<string | null>(null)
+  const [details, setDetails] = useState<ModDetails | null>(null)
+  const [detailsLoading, setDetailsLoading] = useState(false)
+  const [detailsError, setDetailsError] = useState<string | null>(null)
+  const [dragName, setDragName] = useState<string | null>(null)
+
   const name = displayNameOf(character)
   const visible = mods.filter((mod) => modMatches(mod, query))
+  const selectedMod = selectedName ? mods.find((mod) => mod.name === selectedName) ?? null : null
+
+  useEffect(() => {
+    if (!selectedName) return
+    if (!mods.some((mod) => mod.name === selectedName)) {
+      setSelectedName(null)
+      setDetails(null)
+    }
+  }, [mods, selectedName])
+
+  async function loadDetails(mod: ModInfo) {
+    setSelectedName(mod.name)
+    setDetailsLoading(true)
+    setDetailsError(null)
+    try {
+      setDetails(await window.moddeck.getModDetails(game.id, character.folder, mod.folderName))
+    } catch (error) {
+      setDetailsError(error instanceof Error ? error.message : String(error))
+      setDetails(null)
+    } finally {
+      setDetailsLoading(false)
+    }
+  }
+
+  async function toggleAndRefresh(mod: ModInfo) {
+    const nextFolder = mod.enabled ? `DISABLED_${mod.name}` : mod.name
+    await onToggle(mod)
+    if (selectedName === mod.name) {
+      try {
+        setDetails(await window.moddeck.getModDetails(game.id, character.folder, nextFolder))
+      } catch {
+        // 下次点击会重新读取
+      }
+    }
+  }
+
+  function handleDrop(targetName: string) {
+    if (!dragName || dragName === targetName) return
+    const names = mods.map((mod) => mod.name)
+    const from = names.indexOf(dragName)
+    const to = names.indexOf(targetName)
+    if (from < 0 || to < 0) return
+    const [moved] = names.splice(from, 1)
+    names.splice(to, 0, moved)
+    onReorderMods(names)
+    setDragName(null)
+  }
 
   return (
     <div className="view">
@@ -118,7 +176,9 @@ export function CharacterView({
           <option value="name">按名称</option>
           <option value="recent">按更新时间</option>
           <option value="enabled">启用的优先</option>
+          <option value="custom">自定义顺序</option>
         </select>
+        {sort === 'custom' ? <span className="hint">拖动 Mod 排序</span> : null}
         <button className="btn ghost" onClick={onRefresh}>
           <Icon name="refresh" size={15} />
           刷新
@@ -129,34 +189,86 @@ export function CharacterView({
         </button>
       </div>
 
-      {loading ? (
-        <div className="empty-panel">
-          <div className="spinner" />
-          <p className="muted">正在扫描 Mod…</p>
+      <div className={`char-body${selectedName ? ' has-detail' : ''}`}>
+        <div className="char-main">
+          {loading ? (
+            <div className="empty-panel">
+              <div className="spinner" />
+              <p className="muted">正在扫描 Mod…</p>
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="empty-panel">
+              <div className="empty-icon">
+                <Icon name="box" size={28} />
+              </div>
+              <h2>{query ? '没有匹配的 Mod' : '这个角色还没有 Mod'}</h2>
+              <p className="muted">
+                {query ? '换个关键词试试。' : '点右上角“导入到该角色”，或把压缩包拖进来。'}
+              </p>
+            </div>
+          ) : (
+            <div className="mod-list">
+              {visible.map((mod) => (
+                <ModRow
+                  key={mod.folderName}
+                  mod={mod}
+                  selected={selectedName === mod.name}
+                  draggable={sort === 'custom'}
+                  dragging={dragName === mod.name}
+                  onSelect={() => void loadDetails(mod)}
+                  onToggle={() => void toggleAndRefresh(mod)}
+                  onOpen={() => onOpen(mod)}
+                  onDelete={() => {
+                    void onDelete(mod)
+                    if (selectedName === mod.name) {
+                      setSelectedName(null)
+                      setDetails(null)
+                    }
+                  }}
+                  onDragStart={(event) => {
+                    setDragName(mod.name)
+                    event.dataTransfer.effectAllowed = 'move'
+                    event.dataTransfer.setData('text/plain', mod.name)
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    handleDrop(mod.name)
+                  }}
+                  onDragEnd={() => setDragName(null)}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      ) : visible.length === 0 ? (
-        <div className="empty-panel">
-          <div className="empty-icon">
-            <Icon name="box" size={28} />
-          </div>
-          <h2>{query ? '没有匹配的 Mod' : '这个角色还没有 Mod'}</h2>
-          <p className="muted">
-            {query ? '换个关键词试试。' : '点右上角“导入到该角色”，或把压缩包拖进来。'}
-          </p>
-        </div>
-      ) : (
-        <div className="mod-list">
-          {visible.map((mod) => (
-            <ModRow
-              key={mod.folderName}
-              mod={mod}
-              onToggle={() => onToggle(mod)}
-              onOpen={() => onOpen(mod)}
-              onDelete={() => onDelete(mod)}
-            />
-          ))}
-        </div>
-      )}
+
+        {selectedName ? (
+          <ModDetailsPanel
+            details={details}
+            loading={detailsLoading}
+            error={detailsError}
+            onClose={() => {
+              setSelectedName(null)
+              setDetails(null)
+            }}
+            onToggle={() => {
+              if (selectedMod) void toggleAndRefresh(selectedMod)
+            }}
+            onOpen={() => {
+              if (selectedMod) onOpen(selectedMod)
+            }}
+            onDelete={() => {
+              if (!selectedMod) return
+              void onDelete(selectedMod)
+              setSelectedName(null)
+              setDetails(null)
+            }}
+          />
+        ) : null}
+      </div>
     </div>
   )
 }

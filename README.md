@@ -10,25 +10,31 @@ ModDeck 只做一件事：把 `Mods` 目录里的角色和 Mod 管好。注入�
 ModDeck 不会修改游戏本体的任何文件。
 
 ![角色库](docs/screenshot-library.png)
-![角色详情](docs/screenshot-character.png)
+![角色详情与 Mod 详情](docs/screenshot-details.png)
+![快捷窗口](docs/screenshot-overlay.png)
 
 ## 功能
 
 - **5 个游戏**：鸣潮、崩坏：星穹铁道、绝区零、明日方舟：终末地、异环
 - **磁盘即真相**：角色 = `Mods` 下的任意文件夹，不需要内置名单
 - **新角色基线**：第一次连接现有库时，当前角色会被登记为“已有”；此后新增的目录才会标“新”
+- **角色筛选**：全部 / 仅有 Mod / 仅无 Mod；`.` 和 `_` 开头的目录自动隐藏
+- **自定义排序**：角色卡片、Mod 列表都可以拖动排序，顺序保存在本机
+- **快捷启动**：顶部直接启动游戏或 XXMI / 加载器，不做注入
+- **快捷窗口**：全局快捷键（默认 `Alt+F`，可改）呼出紧凑 Mod 开关面板
+- **Mod 详情**：点击 Mod 在右侧查看预览、大小、文件数、ini、热键，并可启停/打开/删除
 - **启停**：用 `DISABLED_` 前缀重命名，失败自动重试并提示占用
 - **导入**：zip / 7z / rar / 文件夹，自动识别 `Mods/<角色>/<Mod>`、`<角色>/<Mod>`、单个 `<Mod>`
 - **不覆盖**：同名自动生成 `名字 (2)`；开启覆盖时先把旧目录移到 `backups/`
 - **角色元数据**：显示名、别名、封面、排序保存在本机，可随游戏更新自行维护
-- **搜索 / 排序 / 回收站删除**
+- **设置分页**：通用（快捷键/数据）、配置（游戏路径）、导入、关于
 - **完全离线**：不发起任何网络请求
 
 ## 下载与运行
 
-V1.0 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck/releases/latest)
+V2.0 提供免安装 ZIP：[下载 Release](https://github.com/yuzhoujun/ModDeck/releases/latest)
 
-1. 下载 `ModDeck-1.0.0-win-x64.zip`
+1. 下载 `ModDeck-2.0.0-win-x64.zip`
 2. 完整解压到任意目录（不要在压缩包里直接运行）
 3. 双击 `ModDeck.cmd` 启动
 4. 打开“设置”，为对应游戏选择 `Mods` 目录
@@ -108,11 +114,11 @@ ModDeck 不写游戏目录；只对用户选择的 `Mods` 目录做启停、导�
 
 更多实现细节见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-## 已知限制（V1.0）
+## 已知限制（V2.0）
 
 - 仅 Windows x64。
 - 不包含游戏启动器、游戏内 overlay、热键编辑、市场或账号功能。
-- 安装器暂未提供，使用免安装 ZIP。
+- 安装器为可选（Inno Setup），主分发仍以免安装 ZIP 为主。
 - 只读验证过 38 个角色 / 61 个 Mod / 约 25.5 GB 的真实库。
 
 ## 参与开发

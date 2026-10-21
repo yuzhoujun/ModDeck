@@ -327,6 +327,60 @@ export default function App() {
     }
   }
 
+  async function changeCharacterFilter(value: UiSettings['characterFilter']) {
+    try {
+      const next = await window.moddeck.saveSettings({ ui: { characterFilter: value } })
+      setBoot((current) => (current ? { ...current, settings: next } : current))
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    }
+  }
+
+  async function launchConfigured(kind: 'game' | 'loader') {
+    if (!snapshot) return
+    try {
+      const result =
+        kind === 'game'
+          ? await window.moddeck.launchGame(snapshot.game.id)
+          : await window.moddeck.launchLoader(snapshot.game.id)
+      if (!result.ok) notify(result.error || '启动失败', 'err')
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    }
+  }
+
+  async function reorderCharacters(folders: string[]) {
+    if (!snapshot) return
+    try {
+      const result = await window.moddeck.reorderCharacters(snapshot.game.id, folders)
+      if (!result.ok) {
+        notify(result.error || '排序保存失败', 'err')
+        return
+      }
+      await refreshSnapshot(snapshot.game.id)
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    }
+  }
+
+  async function reorderMods(folders: string[]) {
+    if (!snapshot || !selected) return
+    try {
+      const result = await window.moddeck.reorderMods(
+        snapshot.game.id,
+        selected.folder,
+        folders
+      )
+      if (!result.ok) {
+        notify(result.error || '排序保存失败', 'err')
+        return
+      }
+      setMods(await window.moddeck.getMods(snapshot.game.id, selected.folder))
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    }
+  }
+
   async function openCharacterFolder() {
     if (!selected || !snapshot) return
     const result = await window.moddeck.openCharacterFolder(
@@ -432,6 +486,7 @@ export default function App() {
             onEdit={() => setEditing(selected)}
             onCover={changeCover}
             onOpenCharacterFolder={openCharacterFolder}
+            onReorderMods={reorderMods}
             onRefresh={() =>
               void (async () => {
                 const snap = await refreshSnapshot(snapshot.game.id)
@@ -447,11 +502,16 @@ export default function App() {
             onQuery={setCharQuery}
             sort={boot.settings.ui.sortCharacters}
             onSort={changeCharacterSort}
+            filter={boot.settings.ui.characterFilter}
+            onFilter={changeCharacterFilter}
             onOpenCharacter={openCharacter}
             onImport={() => void runImport('files')}
             onImportFolder={() => void runImport('folder')}
             onRefresh={() => void refreshSnapshot(snapshot.game.id)}
             onOpenSettings={() => setView('settings')}
+            onLaunchGame={() => void launchConfigured('game')}
+            onLaunchLoader={() => void launchConfigured('loader')}
+            onReorderCharacters={reorderCharacters}
           />
         )}
       </main>
