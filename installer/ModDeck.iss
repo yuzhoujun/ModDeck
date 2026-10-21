@@ -1,6 +1,6 @@
 #define MyAppName "ModDeck"
 #ifndef MyAppVersion
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "2.0.0"
 #endif
 #define MyAppPublisher "ModDeck contributors"
 #define MyAppExeName "ModDeck.exe"

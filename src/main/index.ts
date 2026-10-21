@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
@@ -6,6 +7,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  globalShortcut,
   ipcMain,
   net,
   protocol,
@@ -37,6 +39,7 @@ import {
 } from './services/metadata'
 import {
   buildSnapshot,
+  getModDetails,
   listCharacterFolderNames,
   listMods,
   resolveCharacterDir
@@ -223,6 +226,7 @@ protocol.registerSchemesAsPrivileged([
 let settings: Settings
 let metadata: MetadataStore
 let mainWindow: BrowserWindow | null = null
+let overlayWindow: BrowserWindow | null = null
 
 function baseDir(): string {
   return app.getPath('userData')
@@ -274,7 +278,8 @@ async function makeSnapshot(gameId: GameId) {
       return absolute ? assetUrl(absolute) : null
     },
     showHidden: settings.ui.showHidden,
-    sortCharacters: settings.ui.sortCharacters
+    sortCharacters: settings.ui.sortCharacters,
+    characterOrder: settings.characterOrders[gameId] ?? []
   })
 }
 
@@ -290,7 +295,8 @@ async function writeScanReport(): Promise<void> {
         return absolute ? assetUrl(absolute) : null
       },
       showHidden: settings.ui.showHidden,
-      sortCharacters: settings.ui.sortCharacters
+      sortCharacters: settings.ui.sortCharacters,
+      characterOrder: settings.characterOrders[game.id] ?? []
     })
     games.push({
       id: game.id,
@@ -354,6 +360,127 @@ async function openInShell(target: string): Promise<ToggleResult> {
   return error ? { ok: false, error } : { ok: true }
 }
 
+function splitArgs(value: string): string[] {
+  const args: string[] = []
+  const pattern = /"([^"]*)"|'([^']*)'|(\S+)/g
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(value)) !== null) {
+    args.push(match[1] ?? match[2] ?? match[3] ?? '')
+  }
+  return args
+}
+
+async function launchConfigured(
+  gameId: GameId,
+  kind: 'game' | 'loader'
+): Promise<{ ok: boolean; error?: string; path?: string }> {
+  requireGame(gameId)
+  const gameSettings = settings.games[gameId]
+  if (!gameSettings) return { ok: false, error: '未知游戏' }
+  const target = kind === 'game' ? gameSettings.gamePath : gameSettings.loaderPath
+  const label = kind === 'game' ? '游戏程序' : '启动器'
+  if (!target) return { ok: false, error: `未配置${label}` }
+  if (!(await pathExists(target))) return { ok: false, error: `${label}不存在: ${target}` }
+
+  const args = kind === 'game' ? splitArgs(gameSettings.launchArgs || '') : []
+  try {
+    const extension = path.extname(target).toLowerCase()
+    const child =
+      extension === '.cmd' || extension === '.bat'
+        ? spawn(process.env.ComSpec || 'cmd.exe', ['/c', target, ...args], {
+            cwd: path.dirname(target),
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: false
+          })
+        : spawn(target, args, {
+            cwd: path.dirname(target),
+            detached: true,
+            stdio: 'ignore',
+            windowsHide: false
+          })
+    child.on('error', (error) => logError('launch', error))
+    child.unref()
+    return { ok: true, path: target }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+function createOverlayWindow(): BrowserWindow {
+  if (overlayWindow && !overlayWindow.isDestroyed()) return overlayWindow
+
+  overlayWindow = new BrowserWindow({
+    width: 460,
+    height: 640,
+    minWidth: 380,
+    minHeight: 420,
+    show: false,
+    frame: false,
+    resizable: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: '#0b0d12',
+    title: 'ModDeck Quick',
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  })
+
+  overlayWindow.setAlwaysOnTop(true, 'floating')
+  overlayWindow.on('closed', () => {
+    overlayWindow = null
+  })
+  overlayWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape') {
+      overlayWindow?.hide()
+      _event.preventDefault()
+    }
+  })
+
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  if (devUrl) {
+    overlayWindow.loadURL(`${devUrl}?mode=overlay`).catch((error) => logError('overlay', error))
+  } else {
+    overlayWindow
+      .loadFile(path.join(__dirname, '../renderer/index.html'), { query: { mode: 'overlay' } })
+      .catch((error) => logError('overlay', error))
+  }
+  return overlayWindow
+}
+
+function toggleOverlay(): void {
+  const win = createOverlayWindow()
+  if (win.isVisible()) {
+    win.hide()
+    return
+  }
+  win.center()
+  win.show()
+  win.focus()
+}
+
+function applyOverlayHotkey(value: string): { ok: boolean; error?: string } {
+  globalShortcut.unregisterAll()
+  const hotkey = String(value || '').trim()
+  if (!hotkey) return { ok: true }
+  try {
+    const registered = globalShortcut.register(hotkey, () => toggleOverlay())
+    if (!registered) {
+      return { ok: false, error: '快捷键注册失败，可能被其他程序占用或格式无效' }
+    }
+    return { ok: true }
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
+    }
+  }
+}
+
 function registerIpc(): void {
   register(IPC.bootstrap, async () => ({
     settings,
@@ -399,7 +526,8 @@ function registerIpc(): void {
       gameId,
       characterFolder,
       assetUrl,
-      settings.ui.sortMods
+      settings.ui.sortMods,
+      settings.modOrders[`${gameId}:${characterFolder}`] ?? []
     )
   })
 
@@ -593,6 +721,81 @@ function registerIpc(): void {
     return makeSnapshot(gameId)
   })
 
+  register(
+    IPC.getModDetails,
+    async (gameId: GameId, characterFolder: string, modFolder: string) => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath) throw new Error('未配置 Mods 目录')
+      return getModDetails(gameSettings.modsPath, characterFolder, modFolder, assetUrl)
+    }
+  )
+
+  register(IPC.reorderCharacters, async (gameId: GameId, folders: string[]) => {
+    requireGame(gameId)
+    const clean = (Array.isArray(folders) ? folders : []).filter(
+      (folder) => typeof folder === 'string' && isSafeSegment(folder)
+    )
+    settings = {
+      ...settings,
+      characterOrders: { ...settings.characterOrders, [gameId]: clean }
+    }
+    await saveSettings(baseDir(), settings)
+    return { ok: true }
+  })
+
+  register(
+    IPC.reorderMods,
+    async (gameId: GameId, characterFolder: string, folders: string[]) => {
+      requireGame(gameId)
+      if (!isSafeSegment(characterFolder)) return { ok: false, error: '角色目录名不合法' }
+      const clean = (Array.isArray(folders) ? folders : []).filter(
+        (folder) => typeof folder === 'string' && isSafeSegment(folder)
+      )
+      const key = `${gameId}:${characterFolder}`
+      settings = {
+        ...settings,
+        modOrders: { ...settings.modOrders, [key]: clean }
+      }
+      await saveSettings(baseDir(), settings)
+      return { ok: true }
+    }
+  )
+
+  register(IPC.launchGame, async (gameId: GameId) => launchConfigured(gameId, 'game'))
+  register(IPC.launchLoader, async (gameId: GameId) => launchConfigured(gameId, 'loader'))
+
+  register(IPC.getOverlayHotkey, async () => settings.ui.overlayHotkey)
+
+  register(IPC.setOverlayHotkey, async (hotkey: string) => {
+    const value = String(hotkey || '').trim()
+    const previous = settings.ui.overlayHotkey
+    const result = applyOverlayHotkey(value)
+    if (!result.ok) {
+      applyOverlayHotkey(previous)
+      return result
+    }
+    settings = mergeSettings(settings, { ui: { overlayHotkey: value } })
+    await saveSettings(baseDir(), settings)
+    return { ok: true, hotkey: value }
+  })
+
+  register(IPC.overlayHide, async () => {
+    overlayWindow?.hide()
+  })
+
+  register(IPC.overlayToggle, async () => {
+    toggleOverlay()
+  })
+
+  register(IPC.overlayOpenManager, async () => {
+    overlayWindow?.hide()
+    if (!mainWindow) return
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+  })
+
 }
 
 function createWindow(): void {
@@ -691,10 +894,26 @@ function createWindow(): void {
           const characterText = await bodyText()
           const characterShot = await shot('smoke-character.png')
 
+          await click('.mod-row')
+          const detailText = await bodyText()
+          const detailShot = await shot('smoke-details.png')
+
           await click('.back-link')
           await click('.side-action')
           const settingsText = await bodyText()
           const settingsShot = await shot('smoke-settings.png')
+
+          await mainWindow?.webContents.executeJavaScript('window.moddeck.toggleOverlay()')
+          await delay(1200)
+          let overlayShot = false
+          if (overlayWindow && !overlayWindow.isDestroyed()) {
+            const image = await overlayWindow.webContents.capturePage()
+            if (image && !image.isEmpty()) {
+              await fs.writeFile(path.join(SMOKE_DIR, 'smoke-overlay.png'), image.toPNG())
+              overlayShot = true
+            }
+          }
+          await mainWindow?.webContents.executeJavaScript('window.moddeck.toggleOverlay()')
 
           const importSource = path.join(
             process.cwd(),
@@ -742,7 +961,14 @@ function createWindow(): void {
                 libraryText,
                 characterText,
                 settingsText,
-                images: { library: true, character: characterShot, settings: settingsShot },
+                detailText,
+                images: {
+                  library: true,
+                  character: characterShot,
+                  details: detailShot,
+                  settings: settingsShot,
+                  overlay: overlayShot
+                },
                 importResult,
                 importedMods,
                 toggleOff,
@@ -782,6 +1008,10 @@ async function bootstrap(): Promise<void> {
   settings = await loadSettings(baseDir())
   metadata = await loadMetadata(baseDir())
   startupLog('bootstrap', `settings-loaded userData=${baseDir()}`)
+  const hotkeyResult = applyOverlayHotkey(settings.ui.overlayHotkey)
+  if (!hotkeyResult.ok) {
+    startupLog('hotkey', hotkeyResult.error || 'registration failed')
+  }
 
   protocol.handle(SCHEME, async (request) => {
     try {
@@ -835,6 +1065,10 @@ app.whenReady().then(() => {
     logError('bootstrap', error)
     if (SMOKE_TEST) app.exit(1)
   })
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })
 
 app.on('window-all-closed', () => {

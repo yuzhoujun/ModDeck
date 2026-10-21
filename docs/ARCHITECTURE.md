@@ -115,6 +115,24 @@ src/main/
 - 图片通过自定义协议 `moddeck://asset/?p=...` 读取，只允许 `covers/` 与已配置的 `Mods` 目录，且只允许图片扩展名。
 - 删除操作走系统回收站。
 
+## 快捷窗口与全局快捷键
+
+- 主进程用 `globalShortcut` 注册 `settings.ui.overlayHotkey`，默认 `Alt+F`。
+- 快捷键回调创建/切换一个独立的 `BrowserWindow`，加载同一个渲染入口并带
+  `?mode=overlay`，由 `OverlayApp` 渲染紧凑面板。
+- 快捷窗口复用同一套 preload API，启停 Mod、读取角色列表都走正常 IPC。
+- 注册失败时会回退到上一个可用快捷键，并在启动日志里记录。
+- `Escape` 或标题栏按钮隐藏窗口；关闭主窗口不会影响已注册的全局快捷键。
+
+## 排序与筛选
+
+- 角色顺序保存在 `settings.characterOrders[gameId]`，值是角色目录名数组。
+- Mod 顺序保存在 `settings.modOrders["gameId:characterFolder"]`，值是去掉
+  `DISABLED_` 前缀后的 Mod 名数组，启停不会破坏顺序。
+- 自定义排序只影响 `sortCharacters/sortMods = "custom"`；其他排序仍按名称/时间/启用状态。
+- 角色筛选（全部 / 有 Mod / 无 Mod）是纯前端过滤，不改变磁盘扫描结果。
+- `.`、`_` 开头的目录在扫描阶段就被忽略，不会出现在角色或 Mod 列表里。
+
 ## 诊断
 
 - `npm run smoke`：在 `temp/fixture` 的假库上启动应用，自动验证扫描、角色页、

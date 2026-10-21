@@ -1,18 +1,40 @@
+import type { DragEvent } from 'react'
 import type { CharacterInfo } from '../../../shared/types'
 import { displayNameOf, initialOf } from '../utils'
 
 export function CharacterCard({
   character,
   accent,
-  onOpen
+  onOpen,
+  draggable = false,
+  dragging = false,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd
 }: {
   character: CharacterInfo
   accent: string
   onOpen: () => void
+  draggable?: boolean
+  dragging?: boolean
+  onDragStart?: (event: DragEvent<HTMLButtonElement>) => void
+  onDragOver?: (event: DragEvent<HTMLButtonElement>) => void
+  onDrop?: (event: DragEvent<HTMLButtonElement>) => void
+  onDragEnd?: () => void
 }) {
   const name = displayNameOf(character)
   return (
-    <button className="char-card" onClick={onOpen} title={character.folder}>
+    <button
+      className={`char-card${dragging ? ' is-dragging' : ''}`}
+      onClick={onOpen}
+      title={draggable ? `${character.folder}（拖动排序）` : character.folder}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+    >
       <div className="char-cover" style={{ background: `linear-gradient(145deg, ${accent}33, #141a25)` }}>
         {character.coverUrl ? (
           <img src={character.coverUrl} alt="" loading="lazy" />

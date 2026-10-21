@@ -26,6 +26,15 @@ npm install
 
 构建缓存、冒烟产物、测试夹具统一放在仓库外的 `..\temp\` 或仓库内被忽略的 `temp\`。
 
+如果 `release\win-unpacked` 被占用（杀毒/资源管理器锁定），可以换一个构建目录：
+
+```powershell
+$env:MODDECK_BUILD_ROOT = "release-build"
+npm run package:portable
+```
+
+ZIP 仍然输出到 `release/`；安装器用 `MODDECK_APP_DIR` 指向 `release-build\win-unpacked`。
+
 ## 方式一：免安装版（推荐）
 
 ```bash
@@ -43,7 +52,7 @@ npm run package:portable
 产物：
 
 ```
-release/ModDeck-1.0.0-win-x64.zip
+release/ModDeck-<version>-win-x64.zip
 ```
 
 ZIP 根目录：
@@ -86,7 +95,7 @@ npm run package:installer
 产物：
 
 ```
-release/ModDeck-1.0.0-Setup.exe
+release/ModDeck-<version>-Setup.exe
 ```
 
 安装器行为：

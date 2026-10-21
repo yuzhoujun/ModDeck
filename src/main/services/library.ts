@@ -7,6 +7,8 @@ import type {
   GameSettings,
   GameSnapshot,
   MetadataStore,
+  ModDetails,
+  ModHotkey,
   ModInfo
 } from '../../shared/types'
 import { isDirectory, pathExists, readdirSafe } from '../core/fsx'
@@ -119,10 +121,22 @@ async function findPreview(dir: string): Promise<string | null> {
   return value
 }
 
-function sortCharacters(entries: CharacterInfo[], mode: 'custom' | 'name' | 'count'): CharacterInfo[] {
+function sortCharacters(
+  entries: CharacterInfo[],
+  mode: 'custom' | 'name' | 'count',
+  customOrder: string[] = []
+): CharacterInfo[] {
+  const orderIndex = new Map(customOrder.map((folder, index) => [folder, index]))
   return [...entries].sort((left, right) => {
     if (mode === 'count' && right.modCount !== left.modCount) return right.modCount - left.modCount
     if (mode === 'custom') {
+      const leftCustom = orderIndex.get(left.folder)
+      const rightCustom = orderIndex.get(right.folder)
+      if (leftCustom !== undefined && rightCustom !== undefined && leftCustom !== rightCustom) {
+        return leftCustom - rightCustom
+      }
+      if (leftCustom !== undefined && rightCustom === undefined) return -1
+      if (leftCustom === undefined && rightCustom !== undefined) return 1
       const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER
       const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER
       if (leftOrder !== rightOrder) return leftOrder - rightOrder
@@ -135,6 +149,7 @@ export interface ScanOptions {
   coverUrlFor: (meta: ReturnType<typeof getCharacterMeta>) => string | null
   showHidden: boolean
   sortCharacters: 'custom' | 'name' | 'count'
+  characterOrder?: string[]
 }
 
 export async function scanCharacters(
@@ -182,7 +197,7 @@ export async function scanCharacters(
     })
   }
 
-  return sortCharacters(characters, options.sortCharacters)
+  return sortCharacters(characters, options.sortCharacters, options.characterOrder)
 }
 
 export async function listMods(
@@ -190,7 +205,8 @@ export async function listMods(
   gameId: GameId,
   characterFolder: string,
   assetUrl: (absolutePath: string) => string,
-  sortMode: 'name' | 'recent' | 'enabled'
+  sortMode: 'name' | 'recent' | 'enabled' | 'custom',
+  customOrder: string[] = []
 ): Promise<ModInfo[]> {
   const characterPath = await resolveCharacterDir(modsPath, characterFolder)
   const entries = await readdirSafe(characterPath)
@@ -229,6 +245,18 @@ export async function listMods(
       if (left.enabled !== right.enabled) return left.enabled ? -1 : 1
       return left.name.localeCompare(right.name, 'zh-Hans-CN')
     })
+  } else if (sortMode === 'custom') {
+    const orderIndex = new Map(customOrder.map((name, index) => [name, index]))
+    mods.sort((left, right) => {
+      const leftIndex = orderIndex.get(left.name)
+      const rightIndex = orderIndex.get(right.name)
+      if (leftIndex !== undefined && rightIndex !== undefined && leftIndex !== rightIndex) {
+        return leftIndex - rightIndex
+      }
+      if (leftIndex !== undefined && rightIndex === undefined) return -1
+      if (leftIndex === undefined && rightIndex !== undefined) return 1
+      return left.name.localeCompare(right.name, 'zh-Hans-CN')
+    })
   } else {
     mods.sort((left, right) => left.name.localeCompare(right.name, 'zh-Hans-CN'))
   }
@@ -263,6 +291,88 @@ export async function buildSnapshot(
     totalMods: characters.reduce((sum, entry) => sum + entry.modCount, 0),
     enabledMods: characters.reduce((sum, entry) => sum + entry.enabledCount, 0),
     modsPathExists: true
+  }
+}
+
+export async function getModDetails(
+  modsPath: string,
+  characterFolder: string,
+  modFolder: string,
+  assetUrl: (absolutePath: string) => string
+): Promise<ModDetails> {
+  if (!isSafeSegment(modFolder)) throw new Error('Mod 名称不合法')
+  const characterPath = await resolveCharacterDir(modsPath, characterFolder)
+  const modPath = path.join(characterPath, modFolder)
+  if (!isInside(characterPath, modPath)) throw new Error('Mod 路径越界')
+  if (!(await isDirectory(modPath))) throw new Error('Mod 目录不存在')
+
+  let fileCount = 0
+  let sizeBytes = 0
+  const iniFiles: string[] = []
+
+  const walk = async (current: string, relative: string): Promise<void> => {
+    const entries = await readdirSafe(current)
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+      const full = path.join(current, entry.name)
+      const nextRelative = relative ? path.join(relative, entry.name) : entry.name
+      if (entry.isDirectory()) {
+        await walk(full, nextRelative)
+        continue
+      }
+      fileCount += 1
+      try {
+        sizeBytes += (await fs.stat(full)).size
+      } catch {
+        // ignore
+      }
+      if (entry.name.toLowerCase().endsWith('.ini')) iniFiles.push(nextRelative)
+    }
+  }
+  await walk(modPath, '')
+
+  const hotkeys: ModHotkey[] = []
+  for (const iniFile of iniFiles.slice(0, 20)) {
+    try {
+      const full = path.join(modPath, iniFile)
+      const stat = await fs.stat(full)
+      if (stat.size > 2 * 1024 * 1024) continue
+      const text = await fs.readFile(full, 'utf8')
+      let section = ''
+      for (const rawLine of text.split(/\r?\n/)) {
+        const sectionMatch = rawLine.match(/^\s*\[([^\]]+)\]/)
+        if (sectionMatch) {
+          section = sectionMatch[1].trim()
+          continue
+        }
+        const keyMatch = rawLine.match(/^\s*key\s*=\s*(.+?)\s*$/i)
+        if (keyMatch && section) hotkeys.push({ section, key: keyMatch[1] })
+      }
+    } catch {
+      // ignore unreadable ini
+    }
+  }
+
+  const preview = await findPreview(modPath)
+  let updatedAt = 0
+  try {
+    updatedAt = (await fs.stat(modPath)).mtimeMs
+  } catch {
+    // ignore
+  }
+
+  return {
+    characterFolder,
+    folderName: modFolder,
+    name: modFolder.replace(/^DISABLED_/i, ''),
+    path: modPath,
+    enabled: !/^DISABLED_/i.test(modFolder),
+    fileCount,
+    sizeBytes,
+    updatedAt,
+    iniFiles,
+    hotkeys,
+    previewUrl: preview ? assetUrl(preview) : null
   }
 }
 

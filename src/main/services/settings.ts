@@ -16,12 +16,16 @@ export function defaultSettings(): Settings {
       language: 'zh-CN',
       sortCharacters: 'custom',
       sortMods: 'name',
-      showHidden: false
+      showHidden: false,
+      characterFilter: 'all',
+      overlayHotkey: 'Alt+F'
     },
     import: {
       deleteArchiveAfter: false,
       overwriteExisting: false
-    }
+    },
+    characterOrders: {},
+    modOrders: {}
   }
 }
 
@@ -33,8 +37,20 @@ function normalizeGameSettings(raw: Partial<GameSettings> | undefined): GameSett
   return {
     modsPath: asString(raw?.modsPath),
     gamePath: asString(raw?.gamePath),
-    loaderPath: asString(raw?.loaderPath)
+    loaderPath: asString(raw?.loaderPath),
+    launchArgs: asString(raw?.launchArgs)
   }
+}
+
+function normalizeOrders(raw: unknown): Record<string, string[]> {
+  if (!raw || typeof raw !== 'object') return {}
+  const orders: Record<string, string[]> = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(value)) continue
+    const list = value.map((item) => String(item || '').trim()).filter(Boolean)
+    if (list.length > 0) orders[key] = list
+  }
+  return orders
 }
 
 export function normalizeSettings(raw: Partial<Settings> | null | undefined): Settings {
@@ -59,15 +75,27 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
           ? source.ui.sortCharacters
           : 'custom',
       sortMods:
-        source.ui?.sortMods === 'recent' || source.ui?.sortMods === 'enabled'
+        source.ui?.sortMods === 'recent' ||
+        source.ui?.sortMods === 'enabled' ||
+        source.ui?.sortMods === 'custom'
           ? source.ui.sortMods
           : 'name',
-      showHidden: source.ui?.showHidden === true
+      showHidden: source.ui?.showHidden === true,
+      characterFilter:
+        source.ui?.characterFilter === 'withMods' || source.ui?.characterFilter === 'empty'
+          ? source.ui.characterFilter
+          : 'all',
+      overlayHotkey:
+        typeof source.ui?.overlayHotkey === 'string'
+          ? source.ui.overlayHotkey.trim()
+          : 'Alt+F'
     },
     import: {
       deleteArchiveAfter: source.import?.deleteArchiveAfter === true,
       overwriteExisting: source.import?.overwriteExisting === true
-    }
+    },
+    characterOrders: normalizeOrders(source.characterOrders),
+    modOrders: normalizeOrders(source.modOrders)
   }
 }
 
@@ -88,7 +116,9 @@ export function mergeSettings(current: Settings, patch: SettingsPatch): Settings
     ...current,
     games: { ...current.games },
     ui: { ...current.ui },
-    import: { ...current.import }
+    import: { ...current.import },
+    characterOrders: { ...current.characterOrders },
+    modOrders: { ...current.modOrders }
   }
 
   if (isGameId(patch.activeGameId)) next.activeGameId = patch.activeGameId

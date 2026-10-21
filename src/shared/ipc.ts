@@ -6,6 +6,7 @@ import type {
   GameSnapshot,
   ImportRequest,
   ImportResult,
+  ModDetails,
   ModInfo,
   Settings,
   SettingsPatch,
@@ -34,7 +35,17 @@ export const IPC = {
   importRun: 'import:run',
   updateCharacterMeta: 'character:update-meta',
   setCharacterCover: 'character:set-cover',
-  resetCharacterMeta: 'character:reset-meta'
+  resetCharacterMeta: 'character:reset-meta',
+  getModDetails: 'mods:details',
+  reorderCharacters: 'character:reorder',
+  reorderMods: 'mods:reorder',
+  launchGame: 'launch:game',
+  launchLoader: 'launch:loader',
+  getOverlayHotkey: 'overlay:get-hotkey',
+  setOverlayHotkey: 'overlay:set-hotkey',
+  overlayHide: 'overlay:hide',
+  overlayOpenManager: 'overlay:open-manager',
+  overlayToggle: 'overlay:toggle'
 } as const
 
 export interface ModDeckApi {
@@ -68,6 +79,24 @@ export interface ModDeckApi {
   ): Promise<GameSnapshot | null>
   setCharacterCover(gameId: GameId, characterFolder: string): Promise<ToggleResult>
   resetCharacterMeta(gameId: GameId, characterFolder: string): Promise<GameSnapshot | null>
+  getModDetails(
+    gameId: GameId,
+    characterFolder: string,
+    modFolder: string
+  ): Promise<ModDetails>
+  reorderCharacters(gameId: GameId, folders: string[]): Promise<ToggleResult>
+  reorderMods(
+    gameId: GameId,
+    characterFolder: string,
+    folders: string[]
+  ): Promise<ToggleResult>
+  launchGame(gameId: GameId): Promise<SimpleResult>
+  launchLoader(gameId: GameId): Promise<SimpleResult>
+  getOverlayHotkey(): Promise<string>
+  setOverlayHotkey(hotkey: string): Promise<{ ok: boolean; hotkey?: string; error?: string }>
+  overlayHide(): Promise<void>
+  overlayOpenManager(): Promise<void>
+  toggleOverlay(): Promise<void>
 }
 
 export type { Settings }

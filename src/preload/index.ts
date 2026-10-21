@@ -31,7 +31,20 @@ const api: ModDeckApi = {
   setCharacterCover: (gameId, characterFolder) =>
     ipcRenderer.invoke(IPC.setCharacterCover, gameId, characterFolder),
   resetCharacterMeta: (gameId, characterFolder) =>
-    ipcRenderer.invoke(IPC.resetCharacterMeta, gameId, characterFolder)
+    ipcRenderer.invoke(IPC.resetCharacterMeta, gameId, characterFolder),
+  getModDetails: (gameId, characterFolder, modFolder) =>
+    ipcRenderer.invoke(IPC.getModDetails, gameId, characterFolder, modFolder),
+  reorderCharacters: (gameId, folders) =>
+    ipcRenderer.invoke(IPC.reorderCharacters, gameId, folders),
+  reorderMods: (gameId, characterFolder, folders) =>
+    ipcRenderer.invoke(IPC.reorderMods, gameId, characterFolder, folders),
+  launchGame: (gameId) => ipcRenderer.invoke(IPC.launchGame, gameId),
+  launchLoader: (gameId) => ipcRenderer.invoke(IPC.launchLoader, gameId),
+  getOverlayHotkey: () => ipcRenderer.invoke(IPC.getOverlayHotkey),
+  setOverlayHotkey: (hotkey) => ipcRenderer.invoke(IPC.setOverlayHotkey, hotkey),
+  overlayHide: () => ipcRenderer.invoke(IPC.overlayHide),
+  overlayOpenManager: () => ipcRenderer.invoke(IPC.overlayOpenManager),
+  toggleOverlay: () => ipcRenderer.invoke(IPC.overlayToggle)
 }
 
 contextBridge.exposeInMainWorld('moddeck', api)

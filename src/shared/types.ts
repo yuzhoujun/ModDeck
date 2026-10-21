@@ -18,13 +18,16 @@ export interface GameSettings {
   modsPath: string
   gamePath?: string
   loaderPath?: string
+  launchArgs?: string
 }
 
 export interface UiSettings {
   language: 'zh-CN' | 'en'
   sortCharacters: 'custom' | 'name' | 'count'
-  sortMods: 'name' | 'recent' | 'enabled'
+  sortMods: 'name' | 'recent' | 'enabled' | 'custom'
   showHidden: boolean
+  characterFilter: 'all' | 'withMods' | 'empty'
+  overlayHotkey: string
 }
 
 export interface ImportSettings {
@@ -38,6 +41,8 @@ export interface Settings {
   games: Record<string, GameSettings>
   ui: UiSettings
   import: ImportSettings
+  characterOrders: Record<string, string[]>
+  modOrders: Record<string, string[]>
 }
 
 export interface CharacterMeta {
@@ -79,6 +84,25 @@ export interface ModInfo {
   previewUrl: string | null
   updatedAt: number
   fileCount?: number
+}
+
+export interface ModHotkey {
+  section: string
+  key: string
+}
+
+export interface ModDetails {
+  characterFolder: string
+  folderName: string
+  name: string
+  path: string
+  enabled: boolean
+  fileCount: number
+  sizeBytes: number
+  updatedAt: number
+  iniFiles: string[]
+  hotkeys: ModHotkey[]
+  previewUrl: string | null
 }
 
 export interface GameSnapshot {
