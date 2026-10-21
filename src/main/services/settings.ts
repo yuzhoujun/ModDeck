@@ -18,7 +18,7 @@ export function defaultSettings(): Settings {
       sortMods: 'name',
       showHidden: false,
       characterFilter: 'all',
-      overlayHotkey: 'Alt+F'
+      overlayHotkey: 'Alt+Shift+F'
     },
     import: {
       deleteArchiveAfter: false,
@@ -88,7 +88,7 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
       overlayHotkey:
         typeof source.ui?.overlayHotkey === 'string'
           ? source.ui.overlayHotkey.trim()
-          : 'Alt+F'
+          : 'Alt+Shift+F'
     },
     import: {
       deleteArchiveAfter: source.import?.deleteArchiveAfter === true,
