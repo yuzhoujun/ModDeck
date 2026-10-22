@@ -150,7 +150,7 @@ src/main/
 ## 角色封面与新建目录
 
 - 角色封面优先级：元数据 `coverFile`（旧的数据目录封面）→ 角色目录
-  `.preview.png/jpg/jpeg/webp` → 旧命名 `_cover.png/jpg/jpeg/webp`。
+  `.preview.png/jpg/jpeg/webp`。
 - 新保存的封面统一写到角色目录的 `.preview.png`，800×800 PNG，卡片按 1:1 填充。
 - 新建角色/功能目录由主进程在 `resolveCharacterBase()` 下创建，拒绝 `.`/`_` 开头、
   兼容保留名和重复目录；`kind = "utility"` 在卡片上显示“功能”标记。
