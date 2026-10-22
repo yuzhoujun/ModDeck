@@ -1,4 +1,4 @@
-﻿# ModDeck
+# ModDeck
 
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck)](https://github.com/yuzhoujun/ModDeck/releases/latest)
@@ -131,7 +131,7 @@ ModDeck 不写游戏目录；只对用户选择的 `Mods` 目录做启停、导�
 
 ## 兼容性
 
-- 选择 EFMI 根目录（例如 `D:\Game-D\XXMI\XXMI\EFMI`）或它的 `Mods` 目录都可以，
+- 选择 EFMI 根目录（例如 `.../XXMI/XXMI/EFMI`）或它的 `Mods` 目录都可以，
   ModDeck 会统一落到 `Mods`。
 - EFMI 自带的 `d3dx.ini` 默认包含 `include_recursive = Mods` 和
   `exclude_recursive = DISABLED*`，所以 `DISABLED_` 前缀是 EFMI/3DMigoto 的加载规则，
