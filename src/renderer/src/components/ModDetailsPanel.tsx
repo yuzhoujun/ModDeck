@@ -60,8 +60,8 @@ export function ModDetailsPanel({
               {details.enabled ? '已启用' : '已禁用'}
             </span>
           </div>
-          <div className="detail-path" title={details.path}>
-            {details.path}
+          <div className="detail-path" title={details.folderName}>
+            .../{details.characterFolder}/{details.folderName}
           </div>
 
           <div className="detail-stats">

@@ -75,7 +75,7 @@ ModDeck 只管理 `Mods` 目录：扫描角色和 Mod、启停、导入、排序
 
 ## EFMI 集成
 
-- 设置里可以直接选择 EFMI 根目录（如 `D:\Game-D\XXMI\XXMI\EFMI`），ModDeck 会自动落到 `Mods`
+- 设置里可以直接选择 EFMI 根目录（如 `.../XXMI/XXMI/EFMI`），ModDeck 会自动落到 `Mods`
 - 启动时检查 `d3dx.ini` 是否包含 `exclude_recursive = DISABLED*`
 - 缺失时页面顶部提示，可以在设置里关闭检查或设置“不再提示”
 - 快捷窗口提供“重载 F10”按钮

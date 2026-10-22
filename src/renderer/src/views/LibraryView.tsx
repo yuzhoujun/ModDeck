@@ -3,6 +3,11 @@ import type { CharacterInfo, GameDef, GameSnapshot, UiSettings } from '../../../
 import { CharacterCard } from '../components/CharacterCard'
 import { Icon } from '../components/Icon'
 
+function shortPath(value: string): string {
+  const parts = value.split(/[\\/]/).filter(Boolean)
+  return parts.length <= 2 ? value : `.../${parts.slice(-2).join('/')}`
+}
+
 export function LibraryView({
   game,
   snapshot,
@@ -129,7 +134,7 @@ export function LibraryView({
           <h2>{snapshot.settings.modsPath ? 'Mods 目录不存在' : '还没有配置 Mods 目录'}</h2>
           <p className="muted">
             {snapshot.settings.modsPath
-              ? snapshot.settings.modsPath
+              ? shortPath(snapshot.settings.modsPath)
               : `选择 ${game.name} 的 Mods 文件夹后，ModDeck 会自动扫描角色和 Mod。`}
           </p>
           <div className="actions center">
@@ -176,7 +181,7 @@ export function LibraryView({
               onClick={onOpenSettings}
             >
               <Icon name="folder" size={14} />
-              {snapshot.settings.modsPath}
+              {shortPath(snapshot.settings.modsPath)}
             </button>
           </div>
 

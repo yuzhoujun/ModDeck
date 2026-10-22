@@ -352,7 +352,7 @@ export function SettingsView({
                       <input
                         className="input"
                         value={value?.modsPath ?? ''}
-                        placeholder="例如 D:\\Game-D\\XXMI\\XXMI\\EFMI"
+                        placeholder="例如 .../XXMI/XXMI/EFMI"
                         onChange={(event) =>
                           updateGame(game.id, { modsPath: event.target.value })
                         }
