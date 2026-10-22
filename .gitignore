@@ -23,3 +23,7 @@ smoke*.txt
 .DS_Store
 Thumbs.db
 .npm-cache/
+
+temp/
+release-build/
+
