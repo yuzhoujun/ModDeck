@@ -238,9 +238,6 @@ export function CharacterView({
           </>
         ) : null}
         {sort === 'custom' ? <span className="hint">拖动 Mod 排序</span> : null}
-        {selectMode === 'single' ? (
-          <span className="hint">单选：启用一个会关闭其他</span>
-        ) : null}
         <button className="btn ghost" onClick={onRefresh}>
           <Icon name="refresh" size={15} />
           刷新

@@ -29,8 +29,12 @@ Mods/
 ```
 
 - 角色 = `Mods` 下的任意文件夹（`Characters/Characters` 容器也兼容）。
+- 设置里的路径可以是 EFMI 根目录（含 `d3dx.ini`）或 `Mods` 目录；保存时
+  `normalizeModsPath()` 会统一落到 `Mods`。
 - Mod = 角色目录下的文件夹。
 - 禁用 = 目录名前缀 `DISABLED_`，启用 = 去掉前缀。
+- EFMI 的 `d3dx.ini` 默认有 `include_recursive = Mods` 和 `exclude_recursive = DISABLED*`，
+  因此禁用前缀由引擎加载规则生效，不依赖外部管理器；若该行被移除则要另行处理。
 - 以 `.` 或 `_` 开头的目录不参与扫描（例如 `_efmi_ini_tools`）。
 
 ## 数据文件
@@ -123,8 +127,11 @@ src/main/
 - 点击快捷窗口里的 Mod 会创建一个相邻的 `?mode=overlay-detail` 窗口，按屏幕
   左右剩余空间选择贴左侧或右侧；窗口内容是该 Mod 的热键列表。
 - 快捷窗口复用同一套 preload API，启停 Mod、读取角色列表都走正常 IPC。
-- 热键按钮会先隐藏面板，再通过 PowerShell `SendKeys` 把按键发送到当前前台窗口；
-  游戏需要是前台窗口，复杂/不支持的键会返回错误。
+- 热键按钮会先隐藏面板，再通过 PowerShell 发送到当前前台窗口；游戏需要是前台窗口。
+  `toInputPlan()` 支持 `no_*`、修饰键、F1-F24、字母数字、常见符号、`VK_OEM_*`、
+  小键盘和鼠标键；通过 `SendKeys` 发键盘、`mouse_event` 发鼠标。
+- `settings.ui.allowHotkeySend` 是总开关；关闭后热键只展示不发送。
+  多主键、Win 键和未识别的表达式会返回明确错误。
 - `settings.ui.overlayPinned` 控制置顶；快捷窗口和热键侧栏一起切换。
 - 注册失败时会回退到上一个可用快捷键，并在启动日志里记录。
 - `Escape` 或标题栏按钮隐藏窗口；关闭主窗口不会影响已注册的全局快捷键。

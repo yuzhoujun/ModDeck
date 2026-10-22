@@ -60,7 +60,11 @@ export function SettingsView({
     setSaving(true)
     setMessage(null)
     try {
-      await onSave({ games: draft.games, import: draft.import })
+      await onSave({
+        games: draft.games,
+        import: draft.import,
+        ui: { allowHotkeySend: draft.ui.allowHotkeySend }
+      })
       setMessage('已保存')
       onNotify('设置已保存')
     } catch (error) {
@@ -120,7 +124,7 @@ export function SettingsView({
           <p className="muted">通用、游戏路径、导入行为和本地数据。所有配置只保存在本机。</p>
         </div>
         <div className="actions">
-          <button className="btn primary" onClick={save} disabled={saving || tab === 'general'}>
+          <button className="btn primary" onClick={save} disabled={saving}>
             <Icon name="check" size={16} />
             {saving ? '保存中…' : '保存设置'}
           </button>
@@ -174,6 +178,19 @@ export function SettingsView({
             <div className="muted small">
               当前：{settings.ui.overlayHotkey || '未设置'} · 按 Esc 隐藏快捷窗口
             </div>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={draft.ui.allowHotkeySend}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    ui: { ...current.ui, allowHotkeySend: event.target.checked }
+                  }))
+                }
+              />
+              <span>允许点击热键发送到游戏（游戏需要在前台）</span>
+            </label>
           </section>
 
           <section className="section">
@@ -215,12 +232,12 @@ export function SettingsView({
                   </div>
 
                   <label className="field">
-                    <span>Mods 目录</span>
+                    <span>EFMI 根目录或 Mods 目录</span>
                     <div className="field-row">
                       <input
                         className="input"
                         value={value?.modsPath ?? ''}
-                        placeholder="例如 D:\\Game-D\\XXMI\\XXMI\\EFMI\\Mods"
+                        placeholder="例如 D:\\Game-D\\XXMI\\XXMI\\EFMI"
                         onChange={(event) =>
                           updateGame(game.id, { modsPath: event.target.value })
                         }
