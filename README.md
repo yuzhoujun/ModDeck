@@ -1,4 +1,4 @@
-# ModDeck
+﻿# ModDeck
 
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck)](https://github.com/yuzhoujun/ModDeck/releases/latest)
@@ -38,9 +38,9 @@ ModDeck 不会修改游戏本体的任何文件。
 
 ## 下载与运行
 
-V2.0.2 本地构建提供免安装 ZIP（GitHub Release 只发 1.0.0 / 2.0.0 这类大版本）：
+V2.1 提供免安装 ZIP（GitHub Release 只发 1.0.0 / 2.0.0 / 2.1.0 这类大版本）：
 
-1. 下载 `ModDeck-2.0.2-win-x64.zip`
+1. 下载 `ModDeck-2.1.0-win-x64.zip`
 2. 完整解压到任意目录（不要在压缩包里直接运行）
 3. 双击 `ModDeck.cmd` 启动
 4. 打开“设置”，为对应游戏选择 EFMI 根目录或 `Mods` 目录
@@ -137,7 +137,7 @@ ModDeck 不写游戏目录；只对用户选择的 `Mods` 目录做启停、导�
   `exclude_recursive = DISABLED*`，所以 `DISABLED_` 前缀是 EFMI/3DMigoto 的加载规则，
   不依赖某个外部管理器；如果该配置被改掉，禁用前缀会失效。
 
-## 已知限制（V2.0.2）
+## 已知限制（V2.1.0）
 
 - 仅 Windows x64。
 - 不包含 Mod 注入、游戏内 overlay、市场或账号功能；启动游戏/XXMI 只是调用外部程序。
@@ -158,3 +158,4 @@ npm run smoke
 
 MIT。ModDeck 是 clean-room 实现，不包含任何第三方管理器的代码、图标、文案或游戏素材。
 游戏名称、角色名称及相关素材版权归各自权利人所有。
+
