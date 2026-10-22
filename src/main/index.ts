@@ -179,6 +179,15 @@ if (SMOKE_TEST) {
   }
 }
 
+function userDataFallbacks(): string[] {
+  const list = [
+    path.join(path.dirname(process.execPath), 'ModDeck-data'),
+    path.join(process.cwd(), 'ModDeck-data')
+  ]
+  if (process.env.PUBLIC) list.splice(1, 0, path.join(process.env.PUBLIC, 'ModDeck-data'))
+  return list
+}
+
 function configureUserData(): void {
   if (SMOKE_TEST || SCAN_REPORT) return
   try {
@@ -191,12 +200,7 @@ function configureUserData(): void {
     startupLog('userData', `default-path-failed ${String(error)}`)
   }
 
-  const fallbacks = [
-    path.join(path.dirname(process.execPath), 'ModDeck-data'),
-    path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'ModDeck-data'),
-    path.join(process.cwd(), 'ModDeck-data')
-  ]
-  for (const candidate of fallbacks) {
+  for (const candidate of userDataFallbacks()) {
     if (!canWriteDirectory(candidate)) continue
     app.setPath('userData', candidate)
     startupLog('userData', `fallback ${candidate}`)
@@ -211,12 +215,7 @@ function prepareUserData(): void {
   const defaultDir = appData ? path.join(appData, 'ModDeck') : ''
   if (defaultDir && canWriteDirectory(defaultDir)) return
 
-  const fallbacks = [
-    path.join(path.dirname(process.execPath), 'ModDeck-data'),
-    path.join(process.env.PUBLIC || 'C:\\Users\\Public', 'ModDeck-data'),
-    path.join(process.cwd(), 'ModDeck-data')
-  ]
-  for (const candidate of fallbacks) {
+  for (const candidate of userDataFallbacks()) {
     if (!canWriteDirectory(candidate)) continue
     app.setPath('userData', candidate)
     startupLog('userData', `early-fallback ${candidate}`)

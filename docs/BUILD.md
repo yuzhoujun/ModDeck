@@ -19,7 +19,7 @@ npm install
 
 ```powershell
 $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
-$env:ELECTRON_CACHE = "C:\path\to\temp\electron-cache"
+$env:ELECTRON_CACHE = ".../temp/electron-cache"
 npm install
 ```
 
