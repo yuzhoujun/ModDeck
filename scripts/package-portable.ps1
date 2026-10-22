@@ -27,12 +27,16 @@ if ($LASTEXITCODE -ne 0) { throw 'electron-builder --dir failed' }
 Copy-Item 'packaging\README-portable.txt' (Join-Path $appDir 'README.txt') -Force
 Copy-Item 'packaging\ModDeck.cmd' (Join-Path $appDir 'ModDeck.cmd') -Force
 
-$sevenZip = 'C:\Program Files\7-Zip\7z.exe'
-if (-not (Test-Path $sevenZip)) {
+$sevenZipCandidates = @()
+if ($env:ProgramFiles) { $sevenZipCandidates += Join-Path $env:ProgramFiles '7-Zip\7z.exe' }
+if (${env:ProgramFiles(x86)}) { $sevenZipCandidates += Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe' }
+if ($env:LOCALAPPDATA) { $sevenZipCandidates += Join-Path $env:LOCALAPPDATA 'Programs\7-Zip\7z.exe' }
+$sevenZip = $sevenZipCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $sevenZip) {
   $found = Get-Command 7z -ErrorAction SilentlyContinue
   if ($found) { $sevenZip = $found.Source }
 }
-if (-not (Test-Path $sevenZip)) {
+if (-not $sevenZip) {
   throw '7-Zip not found. Install 7-Zip or add 7z.exe to PATH.'
 }
 
