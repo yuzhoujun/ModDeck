@@ -134,7 +134,7 @@ export function EditCharacterModal({
             <strong>角色封面</strong>
             <p className="muted small">
               拖入图片，或点击选择；会裁剪成 1:1 并保存为角色目录下的
-              <code>.preview.png</code>。旧的 <code>_cover.png</code> 会作为兜底读取。
+              <code>.preview.png</code>。
             </p>
             <div className="row">
               <button
