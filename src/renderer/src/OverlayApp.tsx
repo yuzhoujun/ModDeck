@@ -205,9 +205,6 @@ export function OverlayApp() {
             多选
           </button>
         </div>
-        <span className="muted small">
-          {selectMode === 'single' ? '启用一个会关闭其他' : '可以同时启用多个'}
-        </span>
       </div>
 
       <div className="overlay-list">

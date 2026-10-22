@@ -29,7 +29,12 @@ import { IPC } from '../shared/ipc'
 import { GAMES, requireGame } from './core/games'
 import { ensureDir, pathExists } from './core/fsx'
 import { isInside, isSafeSegment } from './core/safe-path'
-import { loadSettings, mergeSettings, saveSettings } from './services/settings'
+import {
+  loadSettings,
+  mergeSettings,
+  normalizeModsPath,
+  saveSettings
+} from './services/settings'
 import {
   coverPath,
   getCharacterMeta,
@@ -562,10 +567,86 @@ function hideOverlayDetail(): void {
   overlayDetailWindow?.hide()
 }
 
-function toSendKeys(value: string): string | null {
+type MouseButton = 'left' | 'right' | 'middle' | 'x1' | 'x2'
+type InputPlan = { sequence: string } | { mouse: MouseButton }
+
+const MOUSE_KEYS: Record<string, MouseButton> = {
+  LBUTTON: 'left',
+  RBUTTON: 'right',
+  MBUTTON: 'middle',
+  XBUTTON1: 'x1',
+  XBUTTON2: 'x2'
+}
+
+const PUNCTUATION_KEYS: Record<string, string> = {
+  '/': '/',
+  '.': '.',
+  ',': ',',
+  ';': ';',
+  '[': '{[}',
+  ']': '{]}',
+  '-': '-',
+  '=': '=',
+  '\\': '\\',
+  '`': '`'
+}
+
+const NAMED_KEYS: Record<string, string> = {
+  SPACE: '{SPACE}',
+  TAB: '{TAB}',
+  ENTER: '{ENTER}',
+  RETURN: '{ENTER}',
+  ESC: '{ESC}',
+  ESCAPE: '{ESC}',
+  BACKSPACE: '{BACKSPACE}',
+  BACK: '{BACKSPACE}',
+  DELETE: '{DELETE}',
+  DEL: '{DELETE}',
+  INSERT: '{INSERT}',
+  HOME: '{HOME}',
+  END: '{END}',
+  PAGEUP: '{PGUP}',
+  PRIOR: '{PGUP}',
+  PAGEDOWN: '{PGDN}',
+  NEXT: '{PGDN}',
+  UP: '{UP}',
+  DOWN: '{DOWN}',
+  LEFT: '{LEFT}',
+  RIGHT: '{RIGHT}',
+  NUMPAD0: '{NUMPAD0}',
+  NUMPAD1: '{NUMPAD1}',
+  NUMPAD2: '{NUMPAD2}',
+  NUMPAD3: '{NUMPAD3}',
+  NUMPAD4: '{NUMPAD4}',
+  NUMPAD5: '{NUMPAD5}',
+  NUMPAD6: '{NUMPAD6}',
+  NUMPAD7: '{NUMPAD7}',
+  NUMPAD8: '{NUMPAD8}',
+  NUMPAD9: '{NUMPAD9}',
+  ADD: '{ADD}',
+  SUBTRACT: '{SUBTRACT}',
+  MULTIPLY: '{MULTIPLY}',
+  DIVIDE: '{DIVIDE}',
+  DECIMAL: '{DECIMAL}'
+}
+
+const OEM_KEYS: Record<string, string> = {
+  OEM_1: ';',
+  OEM_PLUS: '=',
+  OEM_COMMA: ',',
+  OEM_MINUS: '-',
+  OEM_PERIOD: '.',
+  OEM_2: '/',
+  OEM_3: '`',
+  OEM_4: '{[}',
+  OEM_5: '\\',
+  OEM_6: '{]}'
+}
+
+function toInputPlan(value: string): InputPlan | null {
   const tokens = String(value || '')
     .trim()
-    .split(/[+\s]+/)
+    .split(/\s+/)
     .filter(Boolean)
   if (tokens.length === 0) return null
 
@@ -579,6 +660,9 @@ function toSendKeys(value: string): string | null {
       prefix += '%'
     } else if (lower === 'shift') {
       prefix += '+'
+    } else if (lower === 'win') {
+      // SendKeys 没有 Win 前缀，交给 VK 发送器或拒绝。
+      return null
     } else if (lower.startsWith('no_')) {
       continue
     } else if (!keyToken) {
@@ -590,35 +674,27 @@ function toSendKeys(value: string): string | null {
   if (!keyToken) return null
 
   const rawKey = keyToken.replace(/^VK_/i, '')
-  if (/^[A-Za-z0-9]$/.test(rawKey)) return `${prefix}${rawKey}`
   const key = rawKey.toUpperCase()
-  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) return `${prefix}{${key}}`
+  if (MOUSE_KEYS[key]) return { mouse: MOUSE_KEYS[key] }
+  if (/^[A-Za-z0-9]$/.test(rawKey)) return { sequence: `${prefix}${rawKey}` }
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) return { sequence: `${prefix}{${key}}` }
+  if (PUNCTUATION_KEYS[rawKey]) return { sequence: `${prefix}${PUNCTUATION_KEYS[rawKey]}` }
+  if (OEM_KEYS[key]) return { sequence: `${prefix}${OEM_KEYS[key]}` }
+  if (NAMED_KEYS[key]) return { sequence: `${prefix}${NAMED_KEYS[key]}` }
+  return null
+}
 
-  const named: Record<string, string> = {
-    SPACE: '{SPACE}',
-    TAB: '{TAB}',
-    ENTER: '{ENTER}',
-    RETURN: '{ENTER}',
-    ESC: '{ESC}',
-    ESCAPE: '{ESC}',
-    BACKSPACE: '{BACKSPACE}',
-    BACK: '{BACKSPACE}',
-    DELETE: '{DELETE}',
-    DEL: '{DELETE}',
-    INSERT: '{INSERT}',
-    HOME: '{HOME}',
-    END: '{END}',
-    PAGEUP: '{PGUP}',
-    PRIOR: '{PGUP}',
-    PAGEDOWN: '{PGDN}',
-    NEXT: '{PGDN}',
-    UP: '{UP}',
-    DOWN: '{DOWN}',
-    LEFT: '{LEFT}',
-    RIGHT: '{RIGHT}'
-  }
-  const sequence = named[key]
-  return sequence ? `${prefix}${sequence}` : null
+function mouseScript(mouse: MouseButton): string {
+  const flags = {
+    left: [0x0002, 0x0004, 0],
+    right: [0x0008, 0x0010, 0],
+    middle: [0x0020, 0x0040, 0],
+    x1: [0x0080, 0x0100, 1],
+    x2: [0x0080, 0x0100, 2]
+  }[mouse]
+  const csharp =
+    'using System; using System.Runtime.InteropServices; public static class ModDeckMouse { [DllImport("user32.dll")] public static extern void mouse_event(uint f,uint dx,uint dy,uint d,UIntPtr e); public static void Click(uint d,uint u,uint x){ mouse_event(d,0,0,x,UIntPtr.Zero); mouse_event(u,0,0,x,UIntPtr.Zero); } }'
+  return `Add-Type -TypeDefinition '${csharp}'; [ModDeckMouse]::Click(${flags[0]}, ${flags[1]}, ${flags[2]})`
 }
 
 function applyOverlayHotkey(value: string): { ok: boolean; error?: string } {
@@ -899,9 +975,13 @@ function registerIpc(): void {
     return { ok: false, error: '未知路径类型' }
   })
 
-  register(IPC.pickModsFolder, async () =>
-    openDialog({ title: '选择 Mods 目录', properties: ['openDirectory', 'createDirectory'] })
-  )
+  register(IPC.pickModsFolder, async () => {
+    const picked = await openDialog({
+      title: '选择 EFMI 根目录或 Mods 目录',
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return picked ? normalizeModsPath(picked) : null
+  })
 
   register(IPC.pickGameExe, async () =>
     openDialog({
@@ -1124,13 +1204,22 @@ function registerIpc(): void {
   })
 
   register(IPC.sendModHotkey, async (key: string) => {
-    const sequence = toSendKeys(key)
-    if (!sequence) return { ok: false, error: '暂不支持这个热键格式' }
+    if (!settings.ui.allowHotkeySend) {
+      return { ok: false, error: '设置中已关闭“允许点击热键发送”' }
+    }
+    const plan = toInputPlan(key)
+    if (!plan) return { ok: false, error: '暂不支持这个热键格式' }
     overlayWindow?.hide()
     overlayDetailWindow?.hide()
     await new Promise((resolve) => setTimeout(resolve, 180))
     try {
-      const script = `Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${sequence}')`
+      let script: string
+      if ('mouse' in plan) {
+        script = mouseScript(plan.mouse)
+      } else {
+        const encoded = Buffer.from(plan.sequence, 'utf8').toString('base64')
+        script = `Add-Type -AssemblyName System.Windows.Forms; $s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')); [System.Windows.Forms.SendKeys]::SendWait($s)`
+      }
       const child = spawn(
         'powershell.exe',
         ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script],
@@ -1364,6 +1453,13 @@ function createWindow(): void {
               (entry: { folder: string }) => entry.folder === '冒烟新建'
             )?.coverUrl
           )
+          const fixtureRoot = path.join(process.cwd(), 'temp', 'fixture')
+          const normalizedSettings = await mainWindow?.webContents.executeJavaScript(
+            `window.moddeck.saveSettings({ games: { 'wuthering-waves': { modsPath: ${JSON.stringify(
+              fixtureRoot
+            )} } } })`
+          )
+          const normalizedModsPath = normalizedSettings?.games?.['wuthering-waves']?.modsPath
 
           await fs.writeFile(
             path.join(SMOKE_DIR, 'smoke-result.json'),
@@ -1392,7 +1488,8 @@ function createWindow(): void {
                 metaUpdatedName,
                 metaResetName,
                 createdCharacter,
-                savedCover
+                savedCover,
+                normalizedModsPath
               },
               null,
               2

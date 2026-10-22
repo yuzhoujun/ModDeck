@@ -32,6 +32,7 @@ export interface UiSettings {
   overlayHotkey: string
   overlayPinned: boolean
   modSelectMode: 'single' | 'multi'
+  allowHotkeySend: boolean
 }
 
 export interface ImportSettings {

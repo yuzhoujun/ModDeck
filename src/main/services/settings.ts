@@ -1,3 +1,4 @@
+import fsSync from 'node:fs'
 import path from 'node:path'
 import type { GameId, GameSettings, Settings, SettingsPatch } from '../../shared/types'
 import { GAMES, isGameId } from '../core/games'
@@ -20,7 +21,8 @@ export function defaultSettings(): Settings {
       characterFilter: 'all',
       overlayHotkey: 'Alt+Shift+M',
       overlayPinned: true,
-      modSelectMode: 'multi'
+      modSelectMode: 'multi',
+      allowHotkeySend: true
     },
     import: {
       deleteArchiveAfter: false,
@@ -35,9 +37,25 @@ function asString(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+/** 允许用户选择 EFMI 根目录；内部统一落到它的 Mods 子目录。 */
+export function normalizeModsPath(value: string): string {
+  const trimmed = value.trim().replace(/[\\/]+$/, '')
+  if (!trimmed) return ''
+  if (path.basename(trimmed).toLowerCase() === 'mods') return trimmed
+
+  const modsPath = path.join(trimmed, 'Mods')
+  try {
+    if (fsSync.statSync(modsPath).isDirectory()) return modsPath
+  } catch {
+    // ignore
+  }
+  if (fsSync.existsSync(path.join(trimmed, 'd3dx.ini'))) return modsPath
+  return trimmed
+}
+
 function normalizeGameSettings(raw: Partial<GameSettings> | undefined): GameSettings {
   return {
-    modsPath: asString(raw?.modsPath),
+    modsPath: normalizeModsPath(asString(raw?.modsPath)),
     gamePath: asString(raw?.gamePath),
     loaderPath: asString(raw?.loaderPath),
     launchArgs: asString(raw?.launchArgs)
@@ -92,7 +110,8 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
           ? source.ui.overlayHotkey.trim()
           : 'Alt+Shift+M',
       overlayPinned: source.ui?.overlayPinned !== false,
-      modSelectMode: source.ui?.modSelectMode === 'single' ? 'single' : 'multi'
+      modSelectMode: source.ui?.modSelectMode === 'single' ? 'single' : 'multi',
+      allowHotkeySend: source.ui?.allowHotkeySend !== false
     },
     import: {
       deleteArchiveAfter: source.import?.deleteArchiveAfter === true,

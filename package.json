@@ -1,6 +1,6 @@
 {
   "name": "moddeck",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "private": true,
   "description": "Open-source local mod manager for 3DMigoto / XXMI games",
   "author": "ModDeck contributors",

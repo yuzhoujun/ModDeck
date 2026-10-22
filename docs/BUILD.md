@@ -97,9 +97,15 @@ npm run smoke      # 无头冒烟测试
 `npm run smoke` 会在 `temp/fixture` 生成假 Mod 库，在 `temp/smoke-data` 生成独立配置，
 截图与结果输出到 `temp/smoke/`。它不会接触真实 Mods 目录。
 
-## 版本号
+## 版本号与发布
 
 版本号在 `package.json` 的 `version`；产物文件名会自动带上这个版本。
+
+发布规则：
+
+- GitHub Release 只发 `1.0.0`、`2.0.0` 这类大版本。
+- `2.0.1`、`2.0.2` 这类小版本只在本地构建和验证，不单独发 Release。
+- 每次构建前更新根目录 [CHANGELOG.md](../CHANGELOG.md)，写清本地小版本内容。
 
 ## 发布检查清单
 
