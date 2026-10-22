@@ -1,7 +1,7 @@
 # ModDeck
 
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v2.1.0-brightgreen)](https://github.com/yuzhoujun/ModDeck/releases/latest)
+[![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck?label=release&cacheSeconds=300)](https://github.com/yuzhoujun/ModDeck/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#系统要求)
 
