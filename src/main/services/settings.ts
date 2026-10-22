@@ -1,6 +1,12 @@
 import fsSync from 'node:fs'
 import path from 'node:path'
-import type { GameId, GameSettings, Settings, SettingsPatch } from '../../shared/types'
+import type {
+  GameId,
+  GameSettings,
+  RecentMod,
+  Settings,
+  SettingsPatch
+} from '../../shared/types'
 import { GAMES, isGameId } from '../core/games'
 import { readJsonSafe, writeJsonAtomic } from '../core/fsx'
 
@@ -22,14 +28,19 @@ export function defaultSettings(): Settings {
       overlayHotkey: 'Alt+Shift+M',
       overlayPinned: true,
       modSelectMode: 'multi',
-      allowHotkeySend: true
+      allowHotkeySend: true,
+      envCheckEnabled: true,
+      envCheckNeverPrompt: false,
+      autoReloadF10: false,
+      recentModCount: 8
     },
     import: {
       deleteArchiveAfter: false,
       overwriteExisting: false
     },
     characterOrders: {},
-    modOrders: {}
+    modOrders: {},
+    recentMods: []
   }
 }
 
@@ -73,6 +84,27 @@ function normalizeOrders(raw: unknown): Record<string, string[]> {
   return orders
 }
 
+function normalizeRecentMods(raw: unknown, limit: number): RecentMod[] {
+  if (!Array.isArray(raw) || limit <= 0) return []
+  const result: RecentMod[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const entry = item as Partial<RecentMod>
+    if (!isGameId(entry.gameId)) continue
+    if (typeof entry.characterFolder !== 'string' || !entry.characterFolder) continue
+    if (typeof entry.modFolder !== 'string' || !entry.modFolder) continue
+    if (typeof entry.name !== 'string' || !entry.name) continue
+    result.push({
+      gameId: entry.gameId,
+      characterFolder: entry.characterFolder,
+      modFolder: entry.modFolder,
+      name: entry.name,
+      at: typeof entry.at === 'number' ? entry.at : 0
+    })
+  }
+  return result.slice(0, Math.min(15, limit))
+}
+
 export function normalizeSettings(raw: Partial<Settings> | null | undefined): Settings {
   const defaults = defaultSettings()
   const source = raw ?? {}
@@ -83,6 +115,10 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
   const activeGameId: GameId = isGameId(source.activeGameId)
     ? source.activeGameId
     : defaults.activeGameId
+  const recentModCount =
+    typeof source.ui?.recentModCount === 'number' && Number.isFinite(source.ui.recentModCount)
+      ? Math.max(0, Math.min(15, Math.floor(source.ui.recentModCount)))
+      : 8
 
   return {
     schemaVersion: 1,
@@ -111,14 +147,19 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
           : 'Alt+Shift+M',
       overlayPinned: source.ui?.overlayPinned !== false,
       modSelectMode: source.ui?.modSelectMode === 'single' ? 'single' : 'multi',
-      allowHotkeySend: source.ui?.allowHotkeySend !== false
+      allowHotkeySend: source.ui?.allowHotkeySend !== false,
+      envCheckEnabled: source.ui?.envCheckEnabled !== false,
+      envCheckNeverPrompt: source.ui?.envCheckNeverPrompt === true,
+      autoReloadF10: source.ui?.autoReloadF10 === true,
+      recentModCount
     },
     import: {
       deleteArchiveAfter: source.import?.deleteArchiveAfter === true,
       overwriteExisting: source.import?.overwriteExisting === true
     },
     characterOrders: normalizeOrders(source.characterOrders),
-    modOrders: normalizeOrders(source.modOrders)
+    modOrders: normalizeOrders(source.modOrders),
+    recentMods: normalizeRecentMods(source.recentMods, recentModCount)
   }
 }
 
@@ -141,7 +182,8 @@ export function mergeSettings(current: Settings, patch: SettingsPatch): Settings
     ui: { ...current.ui },
     import: { ...current.import },
     characterOrders: { ...current.characterOrders },
-    modOrders: { ...current.modOrders }
+    modOrders: { ...current.modOrders },
+    recentMods: [...current.recentMods]
   }
 
   if (isGameId(patch.activeGameId)) next.activeGameId = patch.activeGameId

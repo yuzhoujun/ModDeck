@@ -30,6 +30,12 @@ if (fs.existsSync(coverSource)) {
   fs.copyFileSync(coverSource, path.join(modsPath, '新角色B', '_cover.png'))
 }
 
+fs.writeFileSync(
+  path.join(fixture, 'd3dx.ini'),
+  '[Loader]\ninclude_recursive = Mods\nexclude_recursive = DISABLED*\n',
+  'utf8'
+)
+
 fs.mkdirSync(importSource, { recursive: true })
 fs.writeFileSync(path.join(importSource, 'mod.ini'), '[TextureOverrideImport]\nhash = 87654321\n', 'utf8')
 

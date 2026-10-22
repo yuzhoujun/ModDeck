@@ -1,4 +1,4 @@
-﻿# ModDeck
+# ModDeck
 
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck)](https://github.com/yuzhoujun/ModDeck/releases/latest)
@@ -28,6 +28,9 @@ ModDeck 不会修改游戏本体的任何文件。
 - **快捷启动**：顶部直接启动游戏或 XXMI / 加载器，不做注入
 - **快捷窗口**：全局快捷键（默认 `Alt+Shift+M`，可改）呼出紧凑 Mod 开关面板，可置顶/取消置顶
 - **热键侧栏**：点击快捷窗口里的 Mod，在旁边展开 ini 热键列表；点击热键会先隐藏面板再发送到游戏
+- **环境检查**：检查 EFMI 的 `d3dx.ini` 是否包含 `exclude_recursive = DISABLED*`，缺失时启动提示
+- **重载 F10**：快捷窗口提供显式重载按钮；可选自动重载（800ms 防抖、仅当前台是游戏）
+- **最近使用**：记录最近打开/切换的 Mod，独立于 F10 预设缓存
 - **Mod 详情**：点击 Mod 在右侧查看预览、大小、文件数、ini、热键，并可启停/打开/删除
 - **启停**：用 `DISABLED_` 前缀重命名，失败自动重试并提示占用
 - **导入**：zip / 7z / rar / 文件夹，自动识别 `Mods/<角色>/<Mod>`、`<角色>/<Mod>`、单个 `<Mod>`
@@ -38,9 +41,10 @@ ModDeck 不会修改游戏本体的任何文件。
 
 ## 下载与运行
 
-V2.1 提供免安装 ZIP（GitHub Release 只发 1.0.0 / 2.0.0 / 2.1.0 这类大版本）：
+V2.1.1 是本地测试版，不推送 GitHub Release；正式版 V2.1.0 见
+[GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases)。
 
-1. 下载 `ModDeck-2.1.0-win-x64.zip`
+1. 本地构建 `ModDeck-2.1.1-win-x64.zip`（或使用 V2.1.0 正式包）
 2. 完整解压到任意目录（不要在压缩包里直接运行）
 3. 双击 `ModDeck.cmd` 启动
 4. 打开“设置”，为对应游戏选择 EFMI 根目录或 `Mods` 目录
@@ -137,7 +141,7 @@ ModDeck 不写游戏目录；只对用户选择的 `Mods` 目录做启停、导�
   `exclude_recursive = DISABLED*`，所以 `DISABLED_` 前缀是 EFMI/3DMigoto 的加载规则，
   不依赖某个外部管理器；如果该配置被改掉，禁用前缀会失效。
 
-## 已知限制（V2.1.0）
+## 已知限制（V2.1.1）
 
 - 仅 Windows x64。
 - 不包含 Mod 注入、游戏内 overlay、市场或账号功能；启动游戏/XXMI 只是调用外部程序。

@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
@@ -18,6 +18,7 @@ import type {
   AppInfo,
   CharacterMeta,
   CreateCharacterInput,
+  EnvironmentCheck,
   GameId,
   ImportRequest,
   OverlayDetailRequest,
@@ -237,6 +238,7 @@ let metadata: MetadataStore
 let mainWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
 let overlayDetailWindow: BrowserWindow | null = null
+let autoReloadTimer: NodeJS.Timeout | null = null
 
 function baseDir(): string {
   return app.getPath('userData')
@@ -773,6 +775,189 @@ async function clearCharacterCoverFiles(
   await saveMetadata(baseDir(), metadata)
 }
 
+async function recordRecentMod(
+  gameId: GameId,
+  characterFolder: string,
+  modFolder: string,
+  name: string
+): Promise<void> {
+  const limit = settings.ui.recentModCount
+  if (limit <= 0) return
+  const entry = {
+    gameId,
+    characterFolder,
+    modFolder,
+    name,
+    at: Date.now()
+  }
+  settings = {
+    ...settings,
+    recentMods: [
+      entry,
+      ...settings.recentMods.filter(
+        (item) =>
+          !(
+            item.gameId === gameId &&
+            item.characterFolder === characterFolder &&
+            item.name === name
+          )
+      )
+    ].slice(0, limit)
+  }
+  await saveSettings(baseDir(), settings)
+}
+
+async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
+  const targets = gameId ? [gameId] : GAMES.map((game) => game.id)
+  const result: EnvironmentCheck[] = []
+  for (const target of targets) {
+    const gameSettings = settings.games[target]
+    const modsPath = gameSettings?.modsPath ?? ''
+    if (!modsPath) {
+      result.push({
+        gameId: target,
+        modsPath,
+        root: '',
+        d3dxPath: '',
+        status: 'no-root',
+        detail: '未配置 Mods 目录'
+      })
+      continue
+    }
+    const root = path.dirname(modsPath)
+    const d3dxPath = path.join(root, 'd3dx.ini')
+    if (!(await pathExists(d3dxPath))) {
+      result.push({
+        gameId: target,
+        modsPath,
+        root,
+        d3dxPath,
+        status: 'missing-file',
+        detail: '没有找到 EFMI 根目录下的 d3dx.ini'
+      })
+      continue
+    }
+
+    try {
+      const text = await fs.readFile(d3dxPath, 'utf8')
+      let ok = false
+      for (const rawLine of text.split(/\r?\n/)) {
+        const line = rawLine.split(';')[0].trim()
+        const match = line.match(/^exclude_recursive\s*=\s*(.+)$/i)
+        if (!match) continue
+        if (match[1].split(/\s+/).some((item) => /^DISABLED\*?$/i.test(item))) {
+          ok = true
+          break
+        }
+      }
+      result.push({
+        gameId: target,
+        modsPath,
+        root,
+        d3dxPath,
+        status: ok ? 'ok' : 'missing-line',
+        detail: ok ? undefined : 'd3dx.ini 缺少 exclude_recursive = DISABLED*'
+      })
+    } catch (error) {
+      result.push({
+        gameId: target,
+        modsPath,
+        root,
+        d3dxPath,
+        status: 'missing-file',
+        detail: error instanceof Error ? error.message : String(error)
+      })
+    }
+  }
+  return result
+}
+
+function sendKeysScript(sequence: string): string {
+  const encoded = Buffer.from(sequence, 'utf8').toString('base64')
+  return `Add-Type -AssemblyName System.Windows.Forms; $s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')); [System.Windows.Forms.SendKeys]::SendWait($s)`
+}
+
+function foregroundProcessPath(): Promise<string | null> {
+  const csharp =
+    'using System; using System.Runtime.InteropServices; public static class ModDeckForeground { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p); }'
+  const script = `Add-Type -TypeDefinition '${csharp}'; $h=[ModDeckForeground]::GetForegroundWindow(); [uint32]$p=0; [ModDeckForeground]::GetWindowThreadProcessId($h,[ref]$p)|Out-Null; (Get-Process -Id $p -ErrorAction Stop).Path`
+  return new Promise((resolve) => {
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script],
+      { windowsHide: true, timeout: 2500 },
+      (error, stdout) => {
+        if (error) resolve(null)
+        else resolve(String(stdout || '').trim() || null)
+      }
+    )
+  })
+}
+
+async function reloadF10(): Promise<ToggleResult> {
+  const wasOverlayVisible = Boolean(overlayWindow?.isVisible())
+  if (!wasOverlayVisible) {
+    return { ok: false, error: '请先从快捷窗口点击重载，游戏需要在前台' }
+  }
+  overlayWindow?.hide()
+  overlayDetailWindow?.hide()
+  await new Promise((resolve) => setTimeout(resolve, 220))
+
+  const gameId = settings.activeGameId
+  const gamePath = settings.games[gameId]?.gamePath
+  if (gamePath) {
+    const foreground = await foregroundProcessPath()
+    if (!foreground || path.basename(foreground).toLowerCase() !== path.basename(gamePath).toLowerCase()) {
+      if (wasOverlayVisible) {
+        overlayWindow?.show()
+        overlayWindow?.focus()
+      }
+      return { ok: false, error: '当前前台不是游戏窗口，已取消重载' }
+    }
+  }
+
+  try {
+    const child = spawn(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-WindowStyle',
+        'Hidden',
+        '-Command',
+        sendKeysScript('{F10}')
+      ],
+      { detached: true, stdio: 'ignore', windowsHide: true }
+    )
+    child.on('error', (error) => logError('reload-f10', error))
+    child.unref()
+  } catch (error) {
+    if (wasOverlayVisible) {
+      overlayWindow?.show()
+      overlayWindow?.focus()
+    }
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
+
+  setTimeout(() => {
+    if (overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.isVisible()) {
+      overlayWindow.show()
+      overlayWindow.focus()
+    }
+  }, 700)
+  return { ok: true }
+}
+
+function scheduleAutoReload(): void {
+  if (!settings.ui.autoReloadF10) return
+  if (!overlayWindow?.isVisible()) return
+  if (autoReloadTimer) clearTimeout(autoReloadTimer)
+  autoReloadTimer = setTimeout(() => {
+    autoReloadTimer = null
+    void reloadF10().catch((error) => logError('auto-reload', error))
+  }, 800)
+}
+
 async function renameModAt(
   characterDir: string,
   modFolder: string,
@@ -900,7 +1085,15 @@ function registerIpc(): void {
         }
       }
 
-      return renameModAt(characterDir, modFolder, enable)
+      const result = await renameModAt(characterDir, modFolder, enable)
+      if (result.ok) {
+        const recentFolder = enable ? baseName : `DISABLED_${baseName}`
+        await recordRecentMod(gameId, characterFolder, recentFolder, baseName).catch((error) =>
+          logError('recent', error)
+        )
+        scheduleAutoReload()
+      }
+      return result
     }
   )
 
@@ -920,6 +1113,7 @@ function registerIpc(): void {
         const result = await renameModAt(characterDir, folder, enable)
         if (!result.ok) return result
       }
+      scheduleAutoReload()
       return { ok: true }
     }
   )
@@ -1128,7 +1322,16 @@ function registerIpc(): void {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
       if (!gameSettings?.modsPath) throw new Error('未配置 Mods 目录')
-      return getModDetails(gameSettings.modsPath, characterFolder, modFolder, assetUrl)
+      const details = await getModDetails(
+        gameSettings.modsPath,
+        characterFolder,
+        modFolder,
+        assetUrl
+      )
+      await recordRecentMod(gameId, characterFolder, modFolder, details.name).catch((error) =>
+        logError('recent', error)
+      )
+      return details
     }
   )
 
@@ -1232,6 +1435,23 @@ function registerIpc(): void {
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
+
+  register(IPC.checkEnvironment, async (gameId?: GameId) => {
+    if (gameId) requireGame(gameId)
+    return checkEnvironment(gameId)
+  })
+
+  register(IPC.openEnvironmentFolder, async (gameId: GameId) => {
+    requireGame(gameId)
+    const gameSettings = settings.games[gameId]
+    if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+    const root = path.dirname(gameSettings.modsPath)
+    if (!(await pathExists(root))) return { ok: false, error: 'EFMI 根目录不存在' }
+    const error = await shell.openPath(root)
+    return error ? { ok: false, error } : { ok: true, path: root }
+  })
+
+  register(IPC.reloadF10, async () => reloadF10())
 
   register(IPC.overlayHide, async () => {
     overlayWindow?.hide()
@@ -1460,6 +1680,13 @@ function createWindow(): void {
             )} } } })`
           )
           const normalizedModsPath = normalizedSettings?.games?.['wuthering-waves']?.modsPath
+          const environment = await mainWindow?.webContents.executeJavaScript(
+            "window.moddeck.checkEnvironment('wuthering-waves')"
+          )
+          const bootAfter = await mainWindow?.webContents.executeJavaScript(
+            'window.moddeck.bootstrap()'
+          )
+          const recentCount = bootAfter?.settings?.recentMods?.length ?? 0
 
           await fs.writeFile(
             path.join(SMOKE_DIR, 'smoke-result.json'),
@@ -1489,7 +1716,9 @@ function createWindow(): void {
                 metaResetName,
                 createdCharacter,
                 savedCover,
-                normalizedModsPath
+                normalizedModsPath,
+                environment,
+                recentCount
               },
               null,
               2

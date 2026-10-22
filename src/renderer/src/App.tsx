@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type {
   Bootstrap,
   CharacterInfo,
+  EnvironmentCheck,
   GameId,
   GameSnapshot,
   ModInfo,
@@ -39,6 +40,7 @@ export default function App() {
   const [modQuery, setModQuery] = useState('')
   const [editing, setEditing] = useState<CharacterInfo | null>(null)
   const [creating, setCreating] = useState(false)
+  const [envWarning, setEnvWarning] = useState<EnvironmentCheck | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -64,6 +66,43 @@ export default function App() {
     const timer = setTimeout(() => setToast(null), 4500)
     return () => clearTimeout(timer)
   }, [toast])
+
+  useEffect(() => {
+    if (!boot || !snapshot) return
+    if (!boot.settings.ui.envCheckEnabled || boot.settings.ui.envCheckNeverPrompt) {
+      setEnvWarning(null)
+      return
+    }
+    let cancelled = false
+    window.moddeck
+      .checkEnvironment(snapshot.game.id)
+      .then((list) => {
+        if (cancelled) return
+        const active = list.find((item) => item.gameId === snapshot.game.id)
+        setEnvWarning(active?.status === 'missing-line' ? active : null)
+      })
+      .catch(() => {
+        if (!cancelled) setEnvWarning(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    boot?.settings.ui.envCheckEnabled,
+    boot?.settings.ui.envCheckNeverPrompt,
+    snapshot?.game.id
+  ])
+
+  async function dismissEnvWarning(never: boolean) {
+    setEnvWarning(null)
+    if (!never) return
+    try {
+      const next = await window.moddeck.saveSettings({ ui: { envCheckNeverPrompt: true } })
+      setBoot((current) => (current ? { ...current, settings: next } : current))
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    }
+  }
 
   function notify(text: string, kind: ToastKind = 'ok') {
     setToast({ kind, text })
@@ -542,6 +581,50 @@ export default function App() {
       </aside>
 
       <main className="main">
+        {envWarning ? (
+          <div className="env-banner">
+            <div className="env-banner-main">
+              <Icon name="box" size={18} />
+              <div>
+                <strong>EFMI 配置检查</strong>
+                <span>
+                  {envWarning.detail || 'd3dx.ini 缺少 DISABLED_ 排除规则，禁用 Mod 可能不会生效。'}
+                </span>
+              </div>
+            </div>
+            <div className="env-banner-actions">
+              <button
+                className="btn ghost small-btn"
+                onClick={() => void window.moddeck.openEnvironmentFolder(envWarning.gameId)}
+              >
+                打开目录
+              </button>
+              <button
+                className="btn ghost small-btn"
+                onClick={() => {
+                  setEnvWarning(null)
+                  setView('settings')
+                }}
+              >
+                设置
+              </button>
+              <button
+                className="btn ghost small-btn"
+                onClick={() => void dismissEnvWarning(true)}
+                title="写入设置，以后启动不再提示"
+              >
+                不再提示
+              </button>
+              <button
+                className="icon-btn"
+                onClick={() => void dismissEnvWarning(false)}
+                title="本次关闭"
+              >
+                <Icon name="close" size={15} />
+              </button>
+            </div>
+          </div>
+        ) : null}
         {view === 'settings' ? (
           <SettingsView
             games={boot.games}

@@ -55,7 +55,10 @@ const api: ModDeckApi = {
   sendModHotkey: (key) => ipcRenderer.invoke(IPC.sendModHotkey, key),
   overlayHide: () => ipcRenderer.invoke(IPC.overlayHide),
   overlayOpenManager: () => ipcRenderer.invoke(IPC.overlayOpenManager),
-  toggleOverlay: () => ipcRenderer.invoke(IPC.overlayToggle)
+  toggleOverlay: () => ipcRenderer.invoke(IPC.overlayToggle),
+  checkEnvironment: (gameId) => ipcRenderer.invoke(IPC.checkEnvironment, gameId),
+  openEnvironmentFolder: (gameId) => ipcRenderer.invoke(IPC.openEnvironmentFolder, gameId),
+  reloadF10: () => ipcRenderer.invoke(IPC.reloadF10)
 }
 
 contextBridge.exposeInMainWorld('moddeck', api)
