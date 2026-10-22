@@ -1,5 +1,11 @@
 import { useEffect, useState, type KeyboardEvent } from 'react'
-import type { AppInfo, GameDef, Settings, SettingsPatch } from '../../../shared/types'
+import type {
+  AppInfo,
+  EnvironmentCheck,
+  GameDef,
+  Settings,
+  SettingsPatch
+} from '../../../shared/types'
 import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
 import { errorMessage } from '../utils'
@@ -24,6 +30,8 @@ export function SettingsView({
   const [message, setMessage] = useState<string | null>(null)
   const [hotkeyMessage, setHotkeyMessage] = useState<string | null>(null)
   const [info, setInfo] = useState<AppInfo | null>(null)
+  const [envResults, setEnvResults] = useState<EnvironmentCheck[]>([])
+  const [envChecking, setEnvChecking] = useState(false)
 
   useEffect(() => {
     setDraft(settings)
@@ -36,6 +44,33 @@ export function SettingsView({
       .then(setInfo)
       .catch(() => undefined)
   }, [])
+
+  async function refreshEnvironment() {
+    setEnvChecking(true)
+    try {
+      setEnvResults(await window.moddeck.checkEnvironment())
+    } catch {
+      setEnvResults([])
+    } finally {
+      setEnvChecking(false)
+    }
+  }
+
+  useEffect(() => {
+    if (settings.ui.envCheckEnabled) void refreshEnvironment()
+  }, [settings.ui.envCheckEnabled])
+
+  function updateUi(patch: Partial<Settings['ui']>) {
+    setDraft((current) => ({ ...current, ui: { ...current.ui, ...patch } }))
+  }
+
+  function envStatusText(status: EnvironmentCheck['status'] | undefined): string {
+    if (status === 'ok') return '规则存在，DISABLED_ 会生效'
+    if (status === 'missing-line') return '缺少 exclude_recursive = DISABLED*'
+    if (status === 'missing-file') return '找不到 EFMI 根目录的 d3dx.ini'
+    if (status === 'no-root') return '还没有配置 EFMI 目录'
+    return '尚未检测'
+  }
 
   function updateGame(gameId: string, patch: Partial<Settings['games'][string]>) {
     setDraft((current) => ({
@@ -63,7 +98,13 @@ export function SettingsView({
       await onSave({
         games: draft.games,
         import: draft.import,
-        ui: { allowHotkeySend: draft.ui.allowHotkeySend }
+        ui: {
+          allowHotkeySend: draft.ui.allowHotkeySend,
+          envCheckEnabled: draft.ui.envCheckEnabled,
+          envCheckNeverPrompt: draft.ui.envCheckNeverPrompt,
+          autoReloadF10: draft.ui.autoReloadF10,
+          recentModCount: draft.ui.recentModCount
+        }
       })
       setMessage('已保存')
       onNotify('设置已保存')
@@ -107,6 +148,8 @@ export function SettingsView({
       setHotkeyMessage(errorMessage(error))
     }
   }
+
+  const activeEnv = envResults.find((item) => item.gameId === settings.activeGameId)
 
   const tabs: Array<{ id: SettingsTab; label: string; icon: IconName }> = [
     { id: 'general', label: '通用', icon: 'settings' },
@@ -190,6 +233,78 @@ export function SettingsView({
                 }
               />
               <span>允许点击热键发送到游戏（游戏需要在前台）</span>
+            </label>
+          </section>
+
+          <section className="section">
+            <div className="section-head">
+              <h2>EFMI 环境</h2>
+              <p className="muted">
+                EFMI 的 d3dx.ini 需要包含 exclude_recursive = DISABLED*，否则
+                DISABLED_ 前缀不会阻止 Mod 加载。
+              </p>
+            </div>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={draft.ui.envCheckEnabled}
+                onChange={(event) => {
+                  updateUi({ envCheckEnabled: event.target.checked })
+                  if (event.target.checked) void refreshEnvironment()
+                }}
+              />
+              <span>启动时检查 DISABLED 规则（默认开启）</span>
+            </label>
+            <div className="env-status-row">
+              <span className={`chip ${activeEnv?.status === 'ok' ? 'ok' : ''}`}>
+                {envChecking
+                  ? '检测中…'
+                  : envStatusText(
+                      envResults.find((item) => item.gameId === settings.activeGameId)?.status
+                    )}
+              </span>
+              <button
+                className="btn ghost small-btn"
+                onClick={() => void refreshEnvironment()}
+                disabled={envChecking}
+              >
+                <Icon name="refresh" size={14} />
+                重新检测
+              </button>
+              {draft.ui.envCheckNeverPrompt ? (
+                <button
+                  className="btn ghost small-btn"
+                  onClick={() => updateUi({ envCheckNeverPrompt: false })}
+                >
+                  恢复启动提示
+                </button>
+              ) : null}
+            </div>
+            <div className="muted small">
+              当前游戏：
+              {games.find((game) => game.id === settings.activeGameId)?.name || settings.activeGameId}
+              {draft.ui.envCheckNeverPrompt ? ' · 已设置不再提示' : ''}
+            </div>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={draft.ui.autoReloadF10}
+                onChange={(event) => updateUi({ autoReloadF10: event.target.checked })}
+              />
+              <span>
+                切换 Mod 后自动发送 F10（仅快捷窗口、800ms 防抖、前台是游戏时）
+              </span>
+            </label>
+            <label className="field">
+              <span>最近使用 Mod 数量：{draft.ui.recentModCount}</span>
+              <input
+                type="range"
+                min="0"
+                max="15"
+                step="1"
+                value={draft.ui.recentModCount}
+                onChange={(event) => updateUi({ recentModCount: Number(event.target.value) })}
+              />
             </label>
           </section>
 

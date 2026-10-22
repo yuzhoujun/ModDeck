@@ -33,6 +33,29 @@ export interface UiSettings {
   overlayPinned: boolean
   modSelectMode: 'single' | 'multi'
   allowHotkeySend: boolean
+  envCheckEnabled: boolean
+  envCheckNeverPrompt: boolean
+  autoReloadF10: boolean
+  recentModCount: number
+}
+
+export interface RecentMod {
+  gameId: GameId
+  characterFolder: string
+  modFolder: string
+  name: string
+  at: number
+}
+
+export type EnvironmentStatus = 'ok' | 'missing-line' | 'missing-file' | 'no-root'
+
+export interface EnvironmentCheck {
+  gameId: GameId
+  modsPath: string
+  root: string
+  d3dxPath: string
+  status: EnvironmentStatus
+  detail?: string
 }
 
 export interface ImportSettings {
@@ -48,6 +71,7 @@ export interface Settings {
   import: ImportSettings
   characterOrders: Record<string, string[]>
   modOrders: Record<string, string[]>
+  recentMods: RecentMod[]
 }
 
 export interface CharacterMeta {

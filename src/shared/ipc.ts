@@ -3,6 +3,7 @@ import type {
   Bootstrap,
   CharacterMeta,
   CreateCharacterInput,
+  EnvironmentCheck,
   GameId,
   GameSnapshot,
   ImportRequest,
@@ -55,7 +56,10 @@ export const IPC = {
   sendModHotkey: 'overlay:send-hotkey',
   overlayHide: 'overlay:hide',
   overlayOpenManager: 'overlay:open-manager',
-  overlayToggle: 'overlay:toggle'
+  overlayToggle: 'overlay:toggle',
+  checkEnvironment: 'env:check',
+  openEnvironmentFolder: 'env:open-folder',
+  reloadF10: 'env:reload-f10'
 } as const
 
 export interface ModDeckApi {
@@ -128,6 +132,9 @@ export interface ModDeckApi {
   overlayHide(): Promise<void>
   overlayOpenManager(): Promise<void>
   toggleOverlay(): Promise<void>
+  checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]>
+  openEnvironmentFolder(gameId: GameId): Promise<ToggleResult>
+  reloadF10(): Promise<ToggleResult>
 }
 
 export type { Settings }

@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { Bootstrap, CharacterInfo, GameSnapshot, ModInfo } from '../../shared/types'
+import type {
+  Bootstrap,
+  CharacterInfo,
+  GameSnapshot,
+  ModInfo,
+  RecentMod
+} from '../../shared/types'
 import { Icon } from './components/Icon'
 import { errorMessage } from './utils'
 
@@ -13,6 +19,7 @@ export function OverlayApp() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<CharacterFilter>('all')
   const [selectMode, setSelectMode] = useState<'single' | 'multi'>('multi')
+  const [recent, setRecent] = useState<RecentMod[]>([])
   const [pinned, setPinned] = useState(true)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -28,6 +35,7 @@ export function OverlayApp() {
         setSelectMode(data.settings.ui.modSelectMode)
         setFilter(data.settings.ui.characterFilter)
         setPinned(data.settings.ui.overlayPinned)
+        setRecent(data.settings.recentMods)
         const characters = data.snapshot?.characters ?? []
         const initialFilter = data.settings.ui.characterFilter
         const candidates = characters.filter((character) => {
@@ -63,6 +71,9 @@ export function OverlayApp() {
     if (!value) return mods
     return mods.filter((mod) => mod.name.toLowerCase().includes(value))
   }, [mods, query])
+  const recentForGame = recent
+    .filter((item) => item.gameId === snapshot?.game.id)
+    .slice(0, boot?.settings.ui.recentModCount ?? 8)
 
   async function selectCharacter(folder: string) {
     if (!snapshot) return
@@ -114,10 +125,48 @@ export function OverlayApp() {
         if (!result.ok) setError(result.error || '切换失败')
         setMods(await window.moddeck.getMods(snapshot.game.id, selected))
       }
+      if (result.ok) {
+        const entry: RecentMod = {
+          gameId: snapshot.game.id,
+          characterFolder: selected,
+          modFolder: enable ? mod.name : original,
+          name: mod.name,
+          at: Date.now()
+        }
+        setRecent((current) =>
+          [
+            entry,
+            ...current.filter(
+              (item) =>
+                !(
+                  item.gameId === entry.gameId &&
+                  item.characterFolder === entry.characterFolder &&
+                  item.name === entry.name
+                )
+            )
+          ].slice(0, boot?.settings.ui.recentModCount ?? 8)
+        )
+      }
     } catch (err) {
       setError(errorMessage(err))
       setMods(await window.moddeck.getMods(snapshot.game.id, selected))
     }
+  }
+
+  async function openRecent(item: RecentMod) {
+    if (!snapshot) return
+    await selectCharacter(item.characterFolder)
+    const list = await window.moddeck.getMods(snapshot.game.id, item.characterFolder)
+    const mod = list.find((entry) => entry.name === item.name)
+    if (!mod) {
+      setError('这个 Mod 已经不在目录里')
+      return
+    }
+    void window.moddeck.showOverlayDetail({
+      gameId: snapshot.game.id,
+      characterFolder: item.characterFolder,
+      modFolder: mod.folderName
+    })
   }
 
   async function setPinnedState(value: boolean) {
@@ -207,6 +256,24 @@ export function OverlayApp() {
         </div>
       </div>
 
+      {recentForGame.length > 0 ? (
+        <div className="overlay-recent">
+          <span className="muted small">最近</span>
+          <div className="overlay-recent-list">
+            {recentForGame.map((item) => (
+              <button
+                key={`${item.characterFolder}:${item.modFolder}`}
+                className="recent-chip"
+                onClick={() => void openRecent(item)}
+                title={`${item.characterFolder} / ${item.name}`}
+              >
+                {item.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="overlay-list">
         {loading ? (
           <div className="overlay-empty">
@@ -258,9 +325,26 @@ export function OverlayApp() {
         <span className="muted">
           快捷键 {boot?.settings.ui.overlayHotkey || '未设置'} · Esc 隐藏
         </span>
-        <button className="btn ghost small-btn" onClick={() => window.moddeck.overlayOpenManager()}>
-          打开管理器
-        </button>
+        <div className="overlay-foot-actions">
+          <button
+            className="btn ghost small-btn"
+            onClick={() => {
+              void (async () => {
+                const result = await window.moddeck.reloadF10()
+                if (!result.ok) setError(result.error || '重载失败')
+              })()
+            }}
+            title="发送 F10 重载 EFMI 配置"
+          >
+            重载 F10
+          </button>
+          <button
+            className="btn ghost small-btn"
+            onClick={() => window.moddeck.overlayOpenManager()}
+          >
+            打开管理器
+          </button>
+        </div>
       </footer>
     </div>
   )
