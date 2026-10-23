@@ -36,8 +36,10 @@ export function defaultSettings(): Settings {
       closeBehavior: 'quit'
     },
     import: {
+      mode: 'copy',
       deleteArchiveAfter: false,
-      overwriteExisting: false
+      overwriteExisting: false,
+      rosterRemoteUrl: 'https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/roster.json'
     },
     characterOrders: {},
     modOrders: {},
@@ -156,8 +158,16 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
       closeBehavior: source.ui?.closeBehavior === 'minimize' ? 'minimize' : 'quit'
     },
     import: {
+      mode: source.import?.mode === 'move' ? 'move' : 'copy',
       deleteArchiveAfter: source.import?.deleteArchiveAfter === true,
-      overwriteExisting: source.import?.overwriteExisting === true
+      overwriteExisting: source.import?.overwriteExisting === true,
+      rosterRemoteUrl:
+        typeof source.import?.rosterRemoteUrl === 'string' &&
+        source.import.rosterRemoteUrl.trim() &&
+        source.import.rosterRemoteUrl.trim() !==
+          'https://raw.githubusercontent.com/moddeck/ModDeck/main/roster.json'
+          ? source.import.rosterRemoteUrl.trim()
+          : defaults.import.rosterRemoteUrl
     },
     characterOrders: normalizeOrders(source.characterOrders),
     modOrders: normalizeOrders(source.modOrders),

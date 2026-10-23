@@ -1,6 +1,6 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { IPC } from '../shared/ipc'
-import type { ModDeckApi } from '../shared/ipc'
+import type { ModDeckApi, StateChangedEvent } from '../shared/ipc'
 
 const api: ModDeckApi = {
   bootstrap: () => ipcRenderer.invoke(IPC.bootstrap),
@@ -24,8 +24,19 @@ const api: ModDeckApi = {
   pickLoader: () => ipcRenderer.invoke(IPC.pickLoader),
   pickImportFiles: () => ipcRenderer.invoke(IPC.pickImportFiles),
   pickImportFolder: () => ipcRenderer.invoke(IPC.pickImportFolder),
+  pickImportFolders: () => ipcRenderer.invoke(IPC.pickImportFolders),
   pickCover: () => ipcRenderer.invoke(IPC.pickCover),
   importRun: (request) => ipcRenderer.invoke(IPC.importRun, request),
+  importParse: (request) => ipcRenderer.invoke(IPC.importParse, request),
+  importCommit: (request) => ipcRenderer.invoke(IPC.importCommit, request),
+  importDiscard: (sessionId) => ipcRenderer.invoke(IPC.importDiscard, sessionId),
+  getPathForFile: (file: File) => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return (file as File & { path?: string }).path || ''
+    }
+  },
   updateCharacterMeta: (gameId, characterFolder, patch) =>
     ipcRenderer.invoke(IPC.updateCharacterMeta, gameId, characterFolder, patch),
   setCharacterCover: (gameId, characterFolder) =>
@@ -39,6 +50,8 @@ const api: ModDeckApi = {
     ipcRenderer.invoke(IPC.clearCharacterCover, gameId, characterFolder),
   getModDetails: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.getModDetails, gameId, characterFolder, modFolder),
+  setModPreview: (gameId, characterFolder, modFolder, sourcePath) =>
+    ipcRenderer.invoke(IPC.setModPreview, gameId, characterFolder, modFolder, sourcePath),
   setModsEnabled: (gameId, characterFolder, folders, enable) =>
     ipcRenderer.invoke(IPC.setModsEnabled, gameId, characterFolder, folders, enable),
   reorderCharacters: (gameId, folders) =>
@@ -58,7 +71,18 @@ const api: ModDeckApi = {
   toggleOverlay: () => ipcRenderer.invoke(IPC.overlayToggle),
   checkEnvironment: (gameId) => ipcRenderer.invoke(IPC.checkEnvironment, gameId),
   openEnvironmentFolder: (gameId) => ipcRenderer.invoke(IPC.openEnvironmentFolder, gameId),
-  reloadF10: () => ipcRenderer.invoke(IPC.reloadF10)
+  reloadF10: () => ipcRenderer.invoke(IPC.reloadF10),
+  getRosterStatus: () => ipcRenderer.invoke(IPC.rosterStatus),
+  syncRemoteRoster: (customUrl) => ipcRenderer.invoke(IPC.rosterSync, customUrl),
+  onStateChanged: (listener) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: StateChangedEvent) => {
+      listener(payload ?? {})
+    }
+    ipcRenderer.on(IPC.stateChanged, wrapped)
+    return () => {
+      ipcRenderer.removeListener(IPC.stateChanged, wrapped)
+    }
+  }
 }
 
 contextBridge.exposeInMainWorld('moddeck', api)

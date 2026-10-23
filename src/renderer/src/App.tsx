@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type DragEvent } from 'react'
 import type {
   Bootstrap,
   CharacterInfo,
   EnvironmentCheck,
   GameId,
   GameSnapshot,
+  ImportCommitItem,
+  ImportParseResult,
   ModInfo,
   SettingsPatch,
   UiSettings
@@ -12,6 +14,7 @@ import type {
 import { CreateCharacterModal } from './components/CreateCharacterModal'
 import { EditCharacterModal } from './components/EditCharacterModal'
 import { Icon } from './components/Icon'
+import { ImportPreviewModal } from './components/ImportPreviewModal'
 import { CharacterView } from './views/CharacterView'
 import { LibraryView } from './views/LibraryView'
 import { SettingsView } from './views/SettingsView'
@@ -41,6 +44,11 @@ export default function App() {
   const [editing, setEditing] = useState<CharacterInfo | null>(null)
   const [creating, setCreating] = useState(false)
   const [envWarning, setEnvWarning] = useState<EnvironmentCheck | null>(null)
+  const [parsedImport, setParsedImport] = useState<{
+    result: ImportParseResult
+    targetCharacter?: string
+  } | null>(null)
+  const [dropActive, setDropActive] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -66,6 +74,46 @@ export default function App() {
     const timer = setTimeout(() => setToast(null), 4500)
     return () => clearTimeout(timer)
   }, [toast])
+
+  useEffect(() => {
+    if (booting) return
+    let active = true
+    const unsubscribe = window.moddeck.onStateChanged(() => {
+      void (async () => {
+        try {
+          const data = await window.moddeck.bootstrap()
+          if (!active || !data.snapshot) return
+          setBoot(data)
+          const prevGameId = snapshot?.game.id
+          setSnapshot(data.snapshot)
+          if (prevGameId && prevGameId !== data.snapshot.game.id) {
+            setSelected(null)
+            setMods([])
+            if (view === 'character') setView('library')
+            return
+          }
+          if (selected) {
+            const updated =
+              data.snapshot.characters.find((entry) => entry.folder === selected.folder) ?? null
+            setSelected(updated)
+            if (updated) {
+              const nextMods = await window.moddeck.getMods(data.snapshot.game.id, updated.folder)
+              if (active) setMods(nextMods)
+            } else {
+              setMods([])
+              if (view === 'character') setView('library')
+            }
+          }
+        } catch {
+          // ignore background sync errors
+        }
+      })()
+    })
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [booting, snapshot?.game.id, selected?.folder, view])
 
   useEffect(() => {
     if (!boot || !snapshot) return
@@ -234,23 +282,56 @@ export default function App() {
     if (!result.ok && result.error) notify(result.error, 'err')
   }
 
+  async function openImportPreview(paths: string[], targetCharacter?: string) {
+    if (!snapshot || paths.length === 0) return
+    if (!snapshot.modsPathExists) {
+      notify('请先在设置里配置当前游戏的 Mods 目录', 'err')
+      return
+    }
+    setBusy(true)
+    try {
+      const parsed = await window.moddeck.importParse({
+        gameId: snapshot.game.id,
+        paths,
+        targetCharacter
+      })
+      if (parsed.candidates.length === 0) {
+        await window.moddeck.importDiscard(parsed.sessionId)
+        const msg = parsed.errors[0]?.message || '未在所选内容中找到可导入的 Mod'
+        notify(msg, 'err')
+        return
+      }
+      setParsedImport({ result: parsed, targetCharacter })
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function runImport(kind: 'files' | 'folder') {
     if (!snapshot) return
-    const gameId = snapshot.game.id
     const paths =
       kind === 'files'
         ? await window.moddeck.pickImportFiles()
-        : [await window.moddeck.pickImportFolder()].filter((item): item is string => Boolean(item))
-    if (paths.length === 0) return
+        : await window.moddeck.pickImportFolders()
+    if (!paths || paths.length === 0) return
+    const targetCharacter = view === 'character' && selected ? selected.folder : undefined
+    await openImportPreview(paths, targetCharacter)
+  }
 
+  async function commitParsedImport(items: ImportCommitItem[]) {
+    if (!snapshot || !parsedImport) return
+    const gameId = snapshot.game.id
+    const sessionId = parsedImport.result.sessionId
     setBusy(true)
     try {
-      const result = await window.moddeck.importRun({
+      const result = await window.moddeck.importCommit({
+        sessionId,
         gameId,
-        ...(kind === 'files' ? { archivePaths: paths } : { folderPaths: paths }),
-        targetCharacter:
-          view === 'character' && selected ? selected.folder : undefined
+        items
       })
+      setParsedImport(null)
       const failed = result.items.filter((item) => !item.ok)
       if (result.importedMods > 0) {
         const created =
@@ -277,6 +358,46 @@ export default function App() {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function cancelParsedImport() {
+    if (!parsedImport) return
+    const sessionId = parsedImport.result.sessionId
+    setParsedImport(null)
+    await window.moddeck.importDiscard(sessionId).catch(() => undefined)
+  }
+
+  function isExternalFileDrag(event: DragEvent<HTMLElement>): boolean {
+    return Array.from(event.dataTransfer.types).includes('Files')
+  }
+
+  function handleMainDragOver(event: DragEvent<HTMLElement>) {
+    if (view === 'settings' || editing || creating || parsedImport) return
+    if (!isExternalFileDrag(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    if (!dropActive) setDropActive(true)
+  }
+
+  function handleMainDragLeave(event: DragEvent<HTMLElement>) {
+    if (!dropActive) return
+    const related = event.relatedTarget as Node | null
+    if (related && event.currentTarget.contains(related)) return
+    setDropActive(false)
+  }
+
+  function handleMainDrop(event: DragEvent<HTMLElement>) {
+    if (view === 'settings' || editing || creating || parsedImport) return
+    if (!isExternalFileDrag(event)) return
+    event.preventDefault()
+    setDropActive(false)
+    const files = Array.from(event.dataTransfer.files)
+    const paths = files
+      .map((file) => window.moddeck.getPathForFile(file))
+      .filter((item): item is string => Boolean(item))
+    if (paths.length === 0) return
+    const targetCharacter = view === 'character' && selected ? selected.folder : undefined
+    void openImportPreview(paths, targetCharacter)
   }
 
   async function saveCharacterMeta(patch: {
@@ -555,6 +676,9 @@ export default function App() {
                 className={`game-nav-item${active ? ' active' : ''}`}
                 onClick={() => void switchGame(game.id)}
                 style={active ? { borderColor: `${game.accent}55` } : undefined}
+                role="radio"
+                aria-checked={active}
+                title={active ? '当前游戏' : `切换到 ${game.name}`}
               >
                 <span className="dot" style={{ background: game.accent }} />
                 <span className="grow">{game.shortName}</span>
@@ -580,7 +704,25 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="main">
+      <main
+        className={`main${dropActive ? ' is-drop-active' : ''}`}
+        onDragOver={handleMainDragOver}
+        onDragLeave={handleMainDragLeave}
+        onDrop={handleMainDrop}
+      >
+        {dropActive ? (
+          <div className="drop-indicator">
+            <div className="drop-indicator-box">
+              <Icon name="upload" size={28} />
+              <strong>
+                {view === 'character' && selected
+                  ? `松开鼠标导入到「${selected.displayName}」`
+                  : `松开鼠标解析并导入 Mod 到「${snapshot.game.shortName}」`}
+              </strong>
+              <span>支持拖入多个 .zip / .7z / .rar 压缩包或已解压的 Mod 文件夹</span>
+            </div>
+          </div>
+        ) : null}
         {envWarning ? (
           <div className="env-banner">
             <div className="env-banner-main">
@@ -661,6 +803,7 @@ export default function App() {
                 await syncSelected(snap)
               })()
             }
+            onNotify={notify}
           />
         ) : (
           <LibraryView
@@ -702,6 +845,18 @@ export default function App() {
           existingFolders={snapshot.characters.map((character) => character.folder)}
           onClose={() => setCreating(false)}
           onCreate={createCharacter}
+        />
+      ) : null}
+
+      {parsedImport && snapshot ? (
+        <ImportPreviewModal
+          game={snapshot.game}
+          parsed={parsedImport.result}
+          characters={snapshot.characters}
+          rosterNames={boot.rosterMap?.[snapshot.game.id]}
+          targetCharacter={parsedImport.targetCharacter}
+          onCancel={() => void cancelParsedImport()}
+          onCommit={commitParsedImport}
         />
       ) : null}
 
