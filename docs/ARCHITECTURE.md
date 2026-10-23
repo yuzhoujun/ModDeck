@@ -132,7 +132,9 @@ src/main/
   小键盘和鼠标键；通过 `SendKeys` 发键盘、`mouse_event` 发鼠标。
 - `settings.ui.allowHotkeySend` 是总开关；关闭后热键只展示不发送。
   多主键、Win 键和未识别的表达式会返回明确错误。
-- `settings.ui.overlayPinned` 控制置顶；快捷窗口和热键侧栏一起切换。
+- `settings.ui.overlayPinned` 控制置顶；快捷窗口和热键侧栏使用 `screen-saver` 级 topmost，
+  并在 focus/show 时重新声明 topmost。两个窗口都在置顶层内，点击哪个就抬升哪个。
+- Windows 独占全屏会绕过桌面合成，普通 topmost 窗口无法稳定覆盖；需要无边框窗口模式。
 - 注册失败时会回退到上一个可用快捷键，并在启动日志里记录。
 - `Escape` 或标题栏按钮隐藏窗口；关闭主窗口不会影响已注册的全局快捷键。
 
