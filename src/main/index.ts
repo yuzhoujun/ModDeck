@@ -420,6 +420,16 @@ async function launchConfigured(
   }
 }
 
+const OVERLAY_TOP_LEVEL = 'screen-saver' as const
+
+function raiseOverlayWindow(win: BrowserWindow | null): void {
+  if (!win || win.isDestroyed() || !settings.ui.overlayPinned) return
+  // 重新声明 topmost，避免游戏切回独占/无边框全屏后 z-order 失效。
+  win.setAlwaysOnTop(false)
+  win.setAlwaysOnTop(true, OVERLAY_TOP_LEVEL)
+  win.moveTop()
+}
+
 function createOverlayWindow(): BrowserWindow {
   if (overlayWindow && !overlayWindow.isDestroyed()) return overlayWindow
 
@@ -432,6 +442,7 @@ function createOverlayWindow(): BrowserWindow {
     frame: false,
     resizable: true,
     alwaysOnTop: settings.ui.overlayPinned,
+    fullscreenable: false,
     skipTaskbar: true,
     backgroundColor: '#0b0d12',
     title: 'ModDeck Quick',
@@ -443,7 +454,9 @@ function createOverlayWindow(): BrowserWindow {
     }
   })
 
-  overlayWindow.setAlwaysOnTop(settings.ui.overlayPinned, 'floating')
+  overlayWindow.setAlwaysOnTop(settings.ui.overlayPinned, OVERLAY_TOP_LEVEL)
+  overlayWindow.on('focus', () => raiseOverlayWindow(overlayWindow))
+  overlayWindow.on('show', () => raiseOverlayWindow(overlayWindow))
   overlayWindow.on('closed', () => {
     overlayDetailWindow?.destroy()
     overlayDetailWindow = null
@@ -471,14 +484,23 @@ function createOverlayWindow(): BrowserWindow {
 function toggleOverlay(): void {
   const win = createOverlayWindow()
   if (win.isVisible()) {
+    const detailFocused = Boolean(overlayDetailWindow?.isFocused())
+    if (!win.isFocused() && !detailFocused) {
+      // 窗口被游戏或其他程序盖住时，先重新抬起，而不是“隐藏”到看不见。
+      win.show()
+      win.focus()
+      raiseOverlayWindow(win)
+      return
+    }
     win.hide()
     overlayDetailWindow?.hide()
     return
   }
-  win.setAlwaysOnTop(settings.ui.overlayPinned, 'floating')
+  win.setAlwaysOnTop(settings.ui.overlayPinned, OVERLAY_TOP_LEVEL)
   win.center()
   win.show()
   win.focus()
+  raiseOverlayWindow(win)
 }
 
 function placeOverlayDetail(): void {
@@ -536,6 +558,7 @@ function showOverlayDetail(request: OverlayDetailRequest): void {
       frame: false,
       resizable: true,
       alwaysOnTop: settings.ui.overlayPinned,
+      fullscreenable: false,
       skipTaskbar: true,
       backgroundColor: '#0b0d12',
       title: 'ModDeck Hotkeys',
@@ -546,7 +569,9 @@ function showOverlayDetail(request: OverlayDetailRequest): void {
         sandbox: false
       }
     })
-    overlayDetailWindow.setAlwaysOnTop(settings.ui.overlayPinned, 'floating')
+    overlayDetailWindow.setAlwaysOnTop(settings.ui.overlayPinned, OVERLAY_TOP_LEVEL)
+    overlayDetailWindow.on('focus', () => raiseOverlayWindow(overlayDetailWindow))
+    overlayDetailWindow.on('show', () => raiseOverlayWindow(overlayDetailWindow))
     overlayDetailWindow.on('closed', () => {
       overlayDetailWindow = null
     })
@@ -562,6 +587,7 @@ function showOverlayDetail(request: OverlayDetailRequest): void {
   placeOverlayDetail()
   overlayDetailWindow.show()
   overlayDetailWindow.focus()
+  raiseOverlayWindow(overlayDetailWindow)
 }
 
 function hideOverlayDetail(): void {
@@ -1386,8 +1412,17 @@ function registerIpc(): void {
   register(IPC.setOverlayPinned, async (pinned: boolean) => {
     settings = mergeSettings(settings, { ui: { overlayPinned: Boolean(pinned) } })
     await saveSettings(baseDir(), settings)
-    overlayWindow?.setAlwaysOnTop(Boolean(pinned), 'floating')
-    overlayDetailWindow?.setAlwaysOnTop(Boolean(pinned), 'floating')
+    const enabled = Boolean(pinned)
+    overlayWindow?.setAlwaysOnTop(enabled, OVERLAY_TOP_LEVEL)
+    overlayDetailWindow?.setAlwaysOnTop(enabled, OVERLAY_TOP_LEVEL)
+    if (enabled) {
+      const active = overlayDetailWindow?.isFocused()
+        ? overlayDetailWindow
+        : overlayWindow?.isFocused()
+          ? overlayWindow
+          : overlayWindow
+      raiseOverlayWindow(active)
+    }
     return { ok: true }
   })
 
