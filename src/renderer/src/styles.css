@@ -1663,6 +1663,40 @@ code {
   margin: 8px 0;
 }
 
+.env-game-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.env-game-card {
+  padding: 12px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 11px;
+  background: var(--panel);
+}
+
+.env-game-card.pending {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.env-game-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.env-game-head strong {
+  font-size: 13px;
+}
+
+.env-game-head .chip {
+  margin-left: auto;
+}
+
 .overlay-recent {
   display: flex;
   align-items: center;

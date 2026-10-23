@@ -37,6 +37,7 @@ export interface UiSettings {
   envCheckNeverPrompt: boolean
   autoReloadF10: boolean
   recentModCount: number
+  closeBehavior: 'quit' | 'minimize'
 }
 
 export interface RecentMod {

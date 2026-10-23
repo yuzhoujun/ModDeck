@@ -10,7 +10,7 @@ import { Icon } from '../components/Icon'
 import type { IconName } from '../components/Icon'
 import { errorMessage } from '../utils'
 
-type SettingsTab = 'general' | 'games' | 'import' | 'about'
+type SettingsTab = 'general' | 'games' | 'environment' | 'import' | 'about'
 
 export function SettingsView({
   games,
@@ -64,6 +64,11 @@ export function SettingsView({
     setDraft((current) => ({ ...current, ui: { ...current.ui, ...patch } }))
   }
 
+  function shortPath(value: string): string {
+    const parts = value.split(/[\\/]/).filter(Boolean)
+    return parts.length <= 2 ? value : `.../${parts.slice(-2).join('/')}`
+  }
+
   function envStatusText(status: EnvironmentCheck['status'] | undefined): string {
     if (status === 'ok') return '规则存在，DISABLED_ 会生效'
     if (status === 'missing-line') return '缺少 exclude_recursive = DISABLED*'
@@ -103,7 +108,8 @@ export function SettingsView({
           envCheckEnabled: draft.ui.envCheckEnabled,
           envCheckNeverPrompt: draft.ui.envCheckNeverPrompt,
           autoReloadF10: draft.ui.autoReloadF10,
-          recentModCount: draft.ui.recentModCount
+          recentModCount: draft.ui.recentModCount,
+          closeBehavior: draft.ui.closeBehavior
         }
       })
       setMessage('已保存')
@@ -149,11 +155,10 @@ export function SettingsView({
     }
   }
 
-  const activeEnv = envResults.find((item) => item.gameId === settings.activeGameId)
-
   const tabs: Array<{ id: SettingsTab; label: string; icon: IconName }> = [
     { id: 'general', label: '通用', icon: 'settings' },
     { id: 'games', label: '配置', icon: 'folder' },
+    { id: 'environment', label: '环境', icon: 'box' },
     { id: 'import', label: '导入', icon: 'download' },
     { id: 'about', label: '关于', icon: 'box' }
   ]
@@ -238,52 +243,8 @@ export function SettingsView({
 
           <section className="section">
             <div className="section-head">
-              <h2>EFMI 环境</h2>
-              <p className="muted">
-                EFMI 的 d3dx.ini 需要包含 exclude_recursive = DISABLED*，否则
-                DISABLED_ 前缀不会阻止 Mod 加载。
-              </p>
-            </div>
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={draft.ui.envCheckEnabled}
-                onChange={(event) => {
-                  updateUi({ envCheckEnabled: event.target.checked })
-                  if (event.target.checked) void refreshEnvironment()
-                }}
-              />
-              <span>启动时检查 DISABLED 规则（默认开启）</span>
-            </label>
-            <div className="env-status-row">
-              <span className={`chip ${activeEnv?.status === 'ok' ? 'ok' : ''}`}>
-                {envChecking
-                  ? '检测中…'
-                  : envStatusText(
-                      envResults.find((item) => item.gameId === settings.activeGameId)?.status
-                    )}
-              </span>
-              <button
-                className="btn ghost small-btn"
-                onClick={() => void refreshEnvironment()}
-                disabled={envChecking}
-              >
-                <Icon name="refresh" size={14} />
-                重新检测
-              </button>
-              {draft.ui.envCheckNeverPrompt ? (
-                <button
-                  className="btn ghost small-btn"
-                  onClick={() => updateUi({ envCheckNeverPrompt: false })}
-                >
-                  恢复启动提示
-                </button>
-              ) : null}
-            </div>
-            <div className="muted small">
-              当前游戏：
-              {games.find((game) => game.id === settings.activeGameId)?.name || settings.activeGameId}
-              {draft.ui.envCheckNeverPrompt ? ' · 已设置不再提示' : ''}
+              <h2>快捷窗口行为</h2>
+              <p className="muted">控制切换 Mod 后的刷新方式和最近使用记录。</p>
             </div>
             <label className="check-row">
               <input
@@ -306,6 +267,36 @@ export function SettingsView({
                 onChange={(event) => updateUi({ recentModCount: Number(event.target.value) })}
               />
             </label>
+          </section>
+
+          <section className="section">
+            <div className="section-head">
+              <h2>关闭行为</h2>
+              <p className="muted">
+                最小化后 ModDeck 会留在托盘，全局快捷键和快捷窗口继续可用。
+              </p>
+            </div>
+            <label className="field">
+              <span>关闭主窗口时</span>
+              <select
+                className="select"
+                value={draft.ui.closeBehavior}
+                onChange={(event) =>
+                  updateUi({
+                    closeBehavior: event.target.value === 'minimize' ? 'minimize' : 'quit'
+                  })
+                }
+              >
+                <option value="quit">直接退出</option>
+                <option value="minimize">最小化到托盘</option>
+              </select>
+            </label>
+            <div className="muted small">
+              当前：{draft.ui.closeBehavior === 'minimize' ? '最小化到托盘' : '直接退出'}
+              {draft.ui.closeBehavior === 'minimize'
+                ? ' · 托盘菜单可打开管理器或退出'
+                : ' · 关闭主窗口会结束进程'}
+            </div>
           </section>
 
           <section className="section">
@@ -426,6 +417,90 @@ export function SettingsView({
                       }
                     />
                   </label>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === 'environment' ? (
+        <section className="section first-section">
+          <div className="section-head">
+            <h2>MI 环境</h2>
+            <p className="muted">
+              当前只接入 EFMI 的环境检查。其他 MI 的配置位置已保留，后续版本补充。
+            </p>
+          </div>
+
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={draft.ui.envCheckEnabled}
+              onChange={(event) => {
+                updateUi({ envCheckEnabled: event.target.checked })
+                if (event.target.checked) void refreshEnvironment()
+              }}
+            />
+            <span>启动时检查 DISABLED 规则（默认开启）</span>
+          </label>
+          <div className="row">
+            <button
+              className="btn ghost small-btn"
+              onClick={() => void refreshEnvironment()}
+              disabled={envChecking}
+            >
+              <Icon name="refresh" size={14} />
+              {envChecking ? '检测中…' : '重新检测全部'}
+            </button>
+            {draft.ui.envCheckNeverPrompt ? (
+              <button
+                className="btn ghost small-btn"
+                onClick={() => updateUi({ envCheckNeverPrompt: false })}
+              >
+                恢复启动提示
+              </button>
+            ) : null}
+          </div>
+
+          <div className="env-game-list">
+            {games.map((game) => {
+              const supported = game.id === 'endfield'
+              const env = envResults.find((item) => item.gameId === game.id)
+              return (
+                <div className={`env-game-card${supported ? '' : ' pending'}`} key={game.id}>
+                  <div className="env-game-head">
+                    <span className="dot" style={{ background: game.accent }} />
+                    <strong>{game.name}</strong>
+                    <span className="muted">{game.loader}</span>
+                    <span className={`chip${supported && env?.status === 'ok' ? ' ok' : ''}`}>
+                      {supported ? envStatusText(env?.status) : '待接入'}
+                    </span>
+                  </div>
+                  {supported ? (
+                    <>
+                      <div className="muted small">
+                        根目录：
+                        {shortPath(env?.root || draft.games[game.id]?.modsPath || '未配置')}
+                      </div>
+                      <p className="muted small">
+                        规则：<code>exclude_recursive = DISABLED*</code>
+                      </p>
+                      <div className="row">
+                        <button
+                          className="btn ghost small-btn"
+                          onClick={() => void window.moddeck.openEnvironmentFolder(game.id)}
+                        >
+                          <Icon name="folder" size={14} />
+                          打开 EFMI 目录
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="muted small">
+                      该 MI 的环境检查尚未接入，配置位置已保留，后续版本补充。
+                    </p>
+                  )}
                 </div>
               )
             })}

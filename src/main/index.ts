@@ -9,10 +9,13 @@ import {
   dialog,
   globalShortcut,
   ipcMain,
+  Menu,
+  nativeImage,
   net,
   protocol,
   screen,
-  shell
+  shell,
+  Tray
 } from 'electron'
 import type {
   AppInfo,
@@ -238,6 +241,8 @@ let mainWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
 let overlayDetailWindow: BrowserWindow | null = null
 let autoReloadTimer: NodeJS.Timeout | null = null
+let tray: Tray | null = null
+let isQuitting = false
 
 function baseDir(): string {
   return app.getPath('userData')
@@ -906,6 +911,26 @@ function sendKeysScript(sequence: string): string {
   return `Add-Type -AssemblyName System.Windows.Forms; $s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')); [System.Windows.Forms.SendKeys]::SendWait($s)`
 }
 
+function focusGamePrefix(gamePath: string): string {
+  if (!gamePath) return ''
+  const encoded = Buffer.from(gamePath, 'utf8').toString('base64')
+  const csharp =
+    'using System; using System.Runtime.InteropServices; public static class ModDeckFocus { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); }'
+  return `Add-Type -TypeDefinition '${csharp}'; $gp=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')); $proc=Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $gp } | Select-Object -First 1; if($proc -and $proc.MainWindowHandle -ne 0){ [ModDeckFocus]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null; Start-Sleep -Milliseconds 250 }`
+}
+
+function restoreOverlayWindows(showOverlay: boolean, showDetail: boolean): void {
+  if (showOverlay && overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.show()
+    overlayWindow.focus()
+    raiseOverlayWindow(overlayWindow)
+  }
+  if (showDetail && overlayDetailWindow && !overlayDetailWindow.isDestroyed()) {
+    overlayDetailWindow.showInactive()
+    raiseOverlayWindow(overlayDetailWindow)
+  }
+}
+
 function foregroundProcessPath(): Promise<string | null> {
   const csharp =
     'using System; using System.Runtime.InteropServices; public static class ModDeckForeground { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p); }'
@@ -1450,17 +1475,16 @@ function registerIpc(): void {
     }
     const plan = toInputPlan(key)
     if (!plan) return { ok: false, error: '暂不支持这个热键格式' }
-    overlayWindow?.hide()
+    const wasOverlayVisible = Boolean(overlayWindow?.isVisible())
+    const wasDetailVisible = Boolean(overlayDetailWindow?.isVisible())
+    // 先关侧栏再关主面板，避免关闭过程中焦点落回正在隐藏的窗口。
     overlayDetailWindow?.hide()
-    await new Promise((resolve) => setTimeout(resolve, 180))
+    overlayWindow?.hide()
+    await new Promise((resolve) => setTimeout(resolve, 220))
     try {
-      let script: string
-      if ('mouse' in plan) {
-        script = mouseScript(plan.mouse)
-      } else {
-        const encoded = Buffer.from(plan.sequence, 'utf8').toString('base64')
-        script = `Add-Type -AssemblyName System.Windows.Forms; $s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')); [System.Windows.Forms.SendKeys]::SendWait($s)`
-      }
+      const gamePath = settings.games[settings.activeGameId]?.gamePath || ''
+      const action = 'mouse' in plan ? mouseScript(plan.mouse) : sendKeysScript(plan.sequence)
+      const script = focusGamePrefix(gamePath) + action
       const child = spawn(
         'powershell.exe',
         ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script],
@@ -1468,8 +1492,11 @@ function registerIpc(): void {
       )
       child.on('error', (error) => logError('send-hotkey', error))
       child.unref()
+      // 发送后恢复面板，避免看起来像“快捷菜单崩掉”。
+      setTimeout(() => restoreOverlayWindows(wasOverlayVisible, wasDetailVisible), 1200)
       return { ok: true }
     } catch (error) {
+      restoreOverlayWindows(wasOverlayVisible, wasDetailVisible)
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })
@@ -1514,6 +1541,41 @@ function registerIpc(): void {
 
 }
 
+function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow()
+    return
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+function createTray(): void {
+  if (tray) return
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.ico')
+    : path.join(__dirname, '../../build/icon.ico')
+  const icon = nativeImage.createFromPath(iconPath)
+  tray = new Tray(icon)
+  tray.setToolTip('ModDeck')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: '打开 ModDeck', click: () => showMainWindow() },
+      { label: '快捷窗口', click: () => toggleOverlay() },
+      { type: 'separator' },
+      {
+        label: '退出 ModDeck',
+        click: () => {
+          isQuitting = true
+          app.quit()
+        }
+      }
+    ])
+  )
+  tray.on('double-click', () => showMainWindow())
+}
+
 function createWindow(): void {
   startupLog('window', 'creating')
   mainWindow = new BrowserWindow({
@@ -1534,6 +1596,13 @@ function createWindow(): void {
   })
 
   startupLog('window', 'created')
+  mainWindow.on('close', (event) => {
+    if (!isQuitting && settings.ui.closeBehavior === 'minimize') {
+      event.preventDefault()
+      mainWindow?.hide()
+      createTray()
+    }
+  })
   mainWindow.on('closed', () => {
     mainWindow = null
     // 主窗口关闭后不要再留下隐藏的快捷窗口，否则进程会驻留但管理器无法打开。
@@ -1860,7 +1929,13 @@ app.whenReady().then(() => {
   })
 })
 
+app.on('before-quit', () => {
+  isQuitting = true
+})
+
 app.on('will-quit', () => {
+  tray?.destroy()
+  tray = null
   if (app.isReady()) globalShortcut.unregisterAll()
 })
 
