@@ -1503,7 +1503,10 @@ function registerIpc(): void {
   register(IPC.overlayOpenManager, async () => {
     overlayWindow?.hide()
     overlayDetailWindow?.hide()
-    if (!mainWindow) return
+    if (!mainWindow) {
+      createWindow()
+      return
+    }
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.show()
     mainWindow.focus()
@@ -1531,6 +1534,15 @@ function createWindow(): void {
   })
 
   startupLog('window', 'created')
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    // 主窗口关闭后不要再留下隐藏的快捷窗口，否则进程会驻留但管理器无法打开。
+    overlayDetailWindow?.destroy()
+    overlayDetailWindow = null
+    overlayWindow?.destroy()
+    overlayWindow = null
+    if (process.platform !== 'darwin') app.quit()
+  })
   mainWindow.once('ready-to-show', () => {
     startupLog('window', 'ready-to-show')
     mainWindow?.show()
@@ -1857,7 +1869,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  if (!mainWindow) createWindow()
 })
 
 const gotLock = SMOKE_TEST || SCAN_REPORT || app.requestSingleInstanceLock()
@@ -1865,9 +1877,12 @@ if (!gotLock) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
+    if (!mainWindow) {
+      createWindow()
+      return
     }
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
   })
 }
