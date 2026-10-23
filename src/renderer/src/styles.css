@@ -34,6 +34,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+body.overlay-body {
+  background: transparent;
+}
+
 button,
 input,
 select {
@@ -1240,6 +1244,7 @@ code {
   flex-direction: column;
   background: var(--bg);
   border: 1px solid var(--line);
+  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -1551,6 +1556,7 @@ code {
   flex-direction: column;
   background: var(--bg);
   border: 1px solid var(--line);
+  border-radius: 12px;
   overflow: hidden;
 }
 
