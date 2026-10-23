@@ -1,6 +1,6 @@
 {
   "name": "moddeck",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "private": true,
   "description": "Open-source local mod manager for 3DMigoto / XXMI games",
   "author": "ModDeck contributors",
@@ -42,6 +42,12 @@
       "out/**/*",
       "package.json",
       "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      }
     ],
     "asarUnpack": [
       "**/node_modules/7zip-bin/**",

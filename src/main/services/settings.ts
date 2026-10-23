@@ -32,7 +32,8 @@ export function defaultSettings(): Settings {
       envCheckEnabled: true,
       envCheckNeverPrompt: false,
       autoReloadF10: false,
-      recentModCount: 8
+      recentModCount: 8,
+      closeBehavior: 'quit'
     },
     import: {
       deleteArchiveAfter: false,
@@ -151,7 +152,8 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
       envCheckEnabled: source.ui?.envCheckEnabled !== false,
       envCheckNeverPrompt: source.ui?.envCheckNeverPrompt === true,
       autoReloadF10: source.ui?.autoReloadF10 === true,
-      recentModCount
+      recentModCount,
+      closeBehavior: source.ui?.closeBehavior === 'minimize' ? 'minimize' : 'quit'
     },
     import: {
       deleteArchiveAfter: source.import?.deleteArchiveAfter === true,
