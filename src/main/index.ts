@@ -585,8 +585,8 @@ function showOverlayDetail(request: OverlayDetailRequest): void {
 
   loadOverlayDetail(overlayDetailWindow, request)
   placeOverlayDetail()
-  overlayDetailWindow.show()
-  overlayDetailWindow.focus()
+  // 不用 show()+focus()：侧栏抢焦点会让全屏游戏/主面板失焦。
+  overlayDetailWindow.showInactive()
   raiseOverlayWindow(overlayDetailWindow)
 }
 
