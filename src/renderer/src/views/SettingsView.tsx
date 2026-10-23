@@ -3,6 +3,7 @@ import type {
   AppInfo,
   EnvironmentCheck,
   GameDef,
+  RosterSyncStatus,
   Settings,
   SettingsPatch
 } from '../../../shared/types'
@@ -32,6 +33,8 @@ export function SettingsView({
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [envResults, setEnvResults] = useState<EnvironmentCheck[]>([])
   const [envChecking, setEnvChecking] = useState(false)
+  const [rosterStatus, setRosterStatus] = useState<RosterSyncStatus | null>(null)
+  const [rosterSyncing, setRosterSyncing] = useState(false)
 
   useEffect(() => {
     setDraft(settings)
@@ -43,7 +46,28 @@ export function SettingsView({
       .appInfo()
       .then(setInfo)
       .catch(() => undefined)
+    window.moddeck
+      .getRosterStatus()
+      .then(setRosterStatus)
+      .catch(() => undefined)
   }, [])
+
+  async function handleSyncRoster() {
+    setRosterSyncing(true)
+    try {
+      const res = await window.moddeck.syncRemoteRoster(draft.import.rosterRemoteUrl)
+      if (res.ok) {
+        if (res.status) setRosterStatus(res.status)
+        onNotify(`角色词库已合并更新（共处理 ${res.addedOrUpdated ?? 0} 条云端记录）`)
+      } else {
+        onNotify(res.error || '同步角色词库失败', 'err')
+      }
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setRosterSyncing(false)
+    }
+  }
 
   async function refreshEnvironment() {
     setEnvChecking(true)
@@ -338,12 +362,12 @@ export function SettingsView({
                   </div>
 
                   <label className="field">
-                    <span>EFMI 根目录或 Mods 目录</span>
+                    <span>{game.loader} 根目录或 Mods 目录</span>
                     <div className="field-row">
                       <input
                         className="input"
                         value={value?.modsPath ?? ''}
-                        placeholder="例如 .../XXMI/XXMI/EFMI"
+                        placeholder={`例如 D:/Games/XXMI/${game.loader} 或 D:/Games/XXMI/${game.loader}/Mods`}
                         onChange={(event) =>
                           updateGame(game.id, { modsPath: event.target.value })
                         }
@@ -509,38 +533,103 @@ export function SettingsView({
       ) : null}
 
       {tab === 'import' ? (
-        <section className="section first-section">
-          <div className="section-head">
-            <h2>导入</h2>
-            <p className="muted">同名 Mod 默认自动改名，避免覆盖已有目录。</p>
-          </div>
-          <label className="check-row">
-            <input
-              type="checkbox"
-              checked={draft.import.deleteArchiveAfter}
-              onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  import: { ...current.import, deleteArchiveAfter: event.target.checked }
-                }))
-              }
-            />
-            <span>导入成功后删除压缩包</span>
-          </label>
-          <label className="check-row">
-            <input
-              type="checkbox"
-              checked={draft.import.overwriteExisting}
-              onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  import: { ...current.import, overwriteExisting: event.target.checked }
-                }))
-              }
-            />
-            <span>同名时覆盖（旧目录会先移动到 backups）</span>
-          </label>
-        </section>
+        <>
+          <section className="section first-section">
+            <div className="section-head">
+              <h2>导入行为</h2>
+              <p className="muted">
+                支持批量选择或拖入 .zip / .7z / .rar 压缩包与已解压的 Mod 文件夹。默认复制不删除原包。
+              </p>
+            </div>
+            <div className="field">
+              <span>导入方式</span>
+              <div className="segmented">
+                <button
+                  type="button"
+                  className={(draft.import.mode ?? (draft.import.deleteArchiveAfter ? 'move' : 'copy')) === 'copy' ? 'active' : ''}
+                  onClick={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      import: { ...current.import, mode: 'copy', deleteArchiveAfter: false }
+                    }))
+                  }
+                >
+                  复制（保留原文件/文件夹）
+                </button>
+                <button
+                  type="button"
+                  className={(draft.import.mode ?? (draft.import.deleteArchiveAfter ? 'move' : 'copy')) === 'move' ? 'active' : ''}
+                  onClick={() =>
+                    setDraft((current) => ({
+                      ...current,
+                      import: { ...current.import, mode: 'move', deleteArchiveAfter: true }
+                    }))
+                  }
+                >
+                  移动（导入成功后删除原压缩包/文件夹）
+                </button>
+              </div>
+            </div>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={draft.import.overwriteExisting}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    import: { ...current.import, overwriteExisting: event.target.checked }
+                  }))
+                }
+              />
+              <span>同名时覆盖（旧目录会先移动到 backups；关闭则自动重命名）</span>
+            </label>
+          </section>
+
+          <section className="section">
+            <div className="section-head">
+              <h2>角色匹配词库（内置离线 + 云端增量合并）</h2>
+              <p className="muted">
+                内置完整离线角色词典（中英文、拼音、别名），开箱即用。点击更新可拉取远程 roster.json 并与内置词典做增量合并，不会丢失任何内置角色。
+              </p>
+            </div>
+            <label className="field">
+              <span>远程词库 JSON 地址（GitHub Raw 或镜像地址）</span>
+              <div className="field-row">
+                <input
+                  className="input"
+                  value={draft.import.rosterRemoteUrl ?? ''}
+                  placeholder="https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/roster.json"
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      import: { ...current.import, rosterRemoteUrl: event.target.value }
+                    }))
+                  }
+                />
+                <button
+                  type="button"
+                  className="btn ghost small-btn"
+                  onClick={() => void handleSyncRoster()}
+                  disabled={rosterSyncing}
+                >
+                  <Icon name="refresh" size={14} />
+                  {rosterSyncing ? '更新中…' : '一键更新词库'}
+                </button>
+              </div>
+            </label>
+            {rosterStatus ? (
+              <div className="muted small">
+                当前词库状态：
+                {games
+                  .map((g) => `${g.shortName} ${rosterStatus.gameCounts[g.id] ?? 0} 项`)
+                  .join(' · ')}
+                {rosterStatus.updatedAt
+                  ? ` · 上次云端同步：${new Date(rosterStatus.updatedAt).toLocaleString()}`
+                  : ' · 当前使用内置离线词库'}
+              </div>
+            ) : null}
+          </section>
+        </>
       ) : null}
 
       {tab === 'about' ? (

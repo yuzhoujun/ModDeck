@@ -654,7 +654,12 @@ code {
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.mod-name-text {
+  flex: 1;
+  min-width: 0;
 }
 
 .mod-sub {
@@ -1079,14 +1084,31 @@ code {
 }
 
 .detail-preview {
+  position: relative;
   aspect-ratio: 16 / 10;
   background: #0e131c;
   border-radius: 10px;
+  border: 1px solid var(--line-soft);
   overflow: hidden;
   display: grid;
   place-items: center;
   color: var(--muted);
   margin-bottom: 12px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.detail-preview.is-interactive {
+  cursor: pointer;
+}
+
+.detail-preview.is-interactive:hover {
+  border-color: #2f7d5f;
+}
+
+.detail-preview.is-drag-over {
+  border-color: #34d399;
+  border-style: dashed;
+  background: #101c19;
 }
 
 .detail-preview img {
@@ -1095,12 +1117,52 @@ code {
   object-fit: cover;
 }
 
+.detail-preview-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.detail-preview-hint {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 6px 10px;
+  background: linear-gradient(180deg, rgba(11, 13, 18, 0.2), rgba(11, 13, 18, 0.88));
+  color: #e2e8f0;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.detail-preview.is-interactive:hover .detail-preview-hint,
+.detail-preview.is-drag-over .detail-preview-hint {
+  opacity: 1;
+}
+
 .detail-title {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 14.5px;
   font-weight: 650;
+  min-width: 0;
+}
+
+.detail-title-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-title .chip {
+  flex-shrink: 0;
 }
 
 .detail-path {
@@ -1252,6 +1314,7 @@ code {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   padding: 12px 14px;
   background: linear-gradient(180deg, #111826, #0d1119);
   border-bottom: 1px solid var(--line-soft);
@@ -1262,23 +1325,59 @@ code {
 .overlay-head-actions {
   -webkit-app-region: no-drag;
   display: flex;
+  align-items: center;
   gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .overlay-brand {
   display: flex;
   align-items: center;
   gap: 9px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
-.overlay-brand strong {
+.overlay-brand > div,
+.overlay-brand-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.overlay-brand strong,
+.overlay-title-marquee {
   display: block;
   font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
 }
 
-.overlay-brand span {
+.overlay-brand > div > span,
+.overlay-brand-text > span {
+  display: block;
   font-size: 10.5px;
   color: var(--muted);
+}
+
+.overlay-game-select {
+  display: block;
+  max-width: 190px;
+  margin-top: 1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10.5px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.overlay-game-select option {
+  background: #111826;
+  color: var(--text);
 }
 
 .brand-mark.small {
@@ -1737,4 +1836,170 @@ code {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* ---------- V2.1.4 Import Preview & Drag-and-Drop ---------- */
+
+.main {
+  position: relative;
+}
+
+.drop-indicator {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 228px;
+  z-index: 45;
+  background: rgba(11, 13, 18, 0.82);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  padding: 28px;
+}
+
+.drop-indicator-box {
+  border: 2px dashed #34d399;
+  background: rgba(16, 28, 25, 0.85);
+  border-radius: 18px;
+  padding: 40px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  color: #6ee7b7;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.drop-indicator-box strong {
+  font-size: 16px;
+  color: var(--text);
+}
+
+.drop-indicator-box span {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.import-parse-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-soft);
+  margin-bottom: 10px;
+}
+
+.import-parse-errors {
+  background: #231215;
+  border: 1px solid #5a2323;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  max-height: 90px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.import-candidate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.import-candidate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #0e131c;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  transition: border-color 0.12s ease;
+}
+
+.import-candidate-row.is-checked {
+  border-color: #24473a;
+  background: #0f181c;
+}
+
+.import-candidate-main {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.import-candidate-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-candidate-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.import-char-select {
+  min-width: 170px;
+  max-width: 210px;
+  flex-shrink: 0;
+}
+
+/* ---------- V2.1.6 Scrolling Marquee Titles ---------- */
+
+.scroll-title-wrap {
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.scroll-title-inner {
+  display: inline-block;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.scroll-title-wrap.is-overflow {
+  text-overflow: clip;
+  mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 16px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 calc(100% - 16px), transparent 100%);
+}
+
+/* 热键侧栏标题栏过长时自动平滑来回滚动；列表项与详情标题在悬停或选中时平滑滚动 */
+.overlay-title-marquee.is-overflow .scroll-title-inner,
+.scroll-title-wrap.is-overflow:hover .scroll-title-inner,
+.mod-row:hover .scroll-title-wrap.is-overflow .scroll-title-inner,
+.mod-row.is-selected .scroll-title-wrap.is-overflow .scroll-title-inner,
+.overlay-mod:hover .scroll-title-wrap.is-overflow .scroll-title-inner {
+  animation: moddeck-marquee var(--marquee-duration, 6s) ease-in-out infinite alternate;
+}
+
+@keyframes moddeck-marquee {
+  0%,
+  18% {
+    transform: translateX(0);
+  }
+  82%,
+  100% {
+    transform: translateX(var(--marquee-shift, -60px));
+  }
 }

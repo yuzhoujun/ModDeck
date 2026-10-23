@@ -2,6 +2,7 @@ import type { DragEvent } from 'react'
 import type { ModInfo } from '../../../shared/types'
 import { formatDate } from '../utils'
 import { Icon } from './Icon'
+import { ScrollTitle } from './ScrollTitle'
 
 export function ModRow({
   mod,
@@ -71,7 +72,7 @@ export function ModRow({
       </div>
       <div className="mod-main">
         <div className="mod-name" title={mod.folderName}>
-          {mod.name}
+          <ScrollTitle text={mod.name} className="mod-name-text" title={mod.folderName} />
           {!mod.hasIni ? <span className="tag warn">缺少 ini</span> : null}
         </div>
         <div className="mod-sub">

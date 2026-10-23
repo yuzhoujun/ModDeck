@@ -60,8 +60,10 @@ export interface EnvironmentCheck {
 }
 
 export interface ImportSettings {
+  mode?: 'copy' | 'move'
   deleteArchiveAfter: boolean
   overwriteExisting: boolean
+  rosterRemoteUrl?: string
 }
 
 export interface Settings {
@@ -159,11 +161,27 @@ export interface GameSnapshot {
   modsPathExists: boolean
 }
 
+export interface RosterSyncStatus {
+  remoteUrl: string
+  updatedAt?: string
+  gameCounts: Record<GameId, number>
+  hasRemoteCache: boolean
+}
+
+export interface RosterSyncResult {
+  ok: boolean
+  updatedAt?: string
+  addedOrUpdated?: number
+  error?: string
+  status?: RosterSyncStatus
+}
+
 export interface Bootstrap {
   settings: Settings
   games: GameDef[]
   snapshot: GameSnapshot | null
   appVersion: string
+  rosterMap?: Record<GameId, string[]>
 }
 
 export interface ImportRequest {
@@ -171,6 +189,41 @@ export interface ImportRequest {
   archivePaths?: string[]
   folderPaths?: string[]
   targetCharacter?: string
+}
+
+export interface ImportCandidate {
+  id: string
+  sourcePath: string
+  sourceName: string
+  modName: string
+  extractedDir: string
+  suggestedCharacter: string
+  matchReason?: string
+  hasIni: boolean
+}
+
+export interface ImportParseRequest {
+  gameId: GameId
+  paths: string[]
+  targetCharacter?: string
+}
+
+export interface ImportParseResult {
+  sessionId: string
+  candidates: ImportCandidate[]
+  errors: Array<{ source: string; message: string }>
+}
+
+export interface ImportCommitItem {
+  id: string
+  characterFolder: string
+  modName?: string
+}
+
+export interface ImportCommitRequest {
+  sessionId: string
+  gameId: GameId
+  items: ImportCommitItem[]
 }
 
 export interface ImportResultItem {

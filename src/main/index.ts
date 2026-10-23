@@ -23,13 +23,15 @@ import type {
   CreateCharacterInput,
   EnvironmentCheck,
   GameId,
+  ImportCommitRequest,
+  ImportParseRequest,
   ImportRequest,
   OverlayDetailRequest,
   Settings,
   SettingsPatch,
   ToggleResult
 } from '../shared/types'
-import { IPC } from '../shared/ipc'
+import { IPC, type StateChangedEvent } from '../shared/ipc'
 import { GAMES, requireGame } from './core/games'
 import { ensureDir, pathExists } from './core/fsx'
 import { isInside, isSafeSegment } from './core/safe-path'
@@ -52,12 +54,24 @@ import {
 import {
   buildSnapshot,
   getModDetails,
+  invalidatePreviewCache,
   listCharacterFolderNames,
   listMods,
   resolveCharacterBase,
   resolveCharacterDir
 } from './services/library'
-import { runImport } from './services/imports'
+import {
+  commitImportSession,
+  discardImportSession,
+  parseImportSources,
+  runImport
+} from './services/imports'
+import {
+  getRosterMap,
+  getRosterStatus,
+  loadRosterCache,
+  syncRemoteRoster
+} from './core/roster'
 import type { MetadataStore } from '../shared/types'
 
 // 部分地区安全软件会阻止 Chromium 沙箱初始化，导致主进程直接退出。
@@ -241,8 +255,69 @@ let mainWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
 let overlayDetailWindow: BrowserWindow | null = null
 let autoReloadTimer: NodeJS.Timeout | null = null
+let modsWatcher: fsSync.FSWatcher | null = null
+let watchedModsPath = ''
+let watchDebounceTimer: NodeJS.Timeout | null = null
+let suppressWatcherUntil = 0
 let tray: Tray | null = null
 let isQuitting = false
+
+function broadcastStateChanged(payload: StateChangedEvent = {}): void {
+  for (const win of [mainWindow, overlayWindow, overlayDetailWindow]) {
+    if (!win || win.isDestroyed()) continue
+    try {
+      win.webContents.send(IPC.stateChanged, payload)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function markInternalFsMutation(): void {
+  suppressWatcherUntil = Date.now() + 500
+}
+
+function refreshModsWatcher(): void {
+  if (SMOKE_TEST || SCAN_REPORT) return
+  const activeGameId = settings?.activeGameId
+  const modsPath = activeGameId ? settings?.games?.[activeGameId]?.modsPath ?? '' : ''
+  if (modsPath === watchedModsPath && modsWatcher) return
+
+  if (modsWatcher) {
+    try {
+      modsWatcher.close()
+    } catch {
+      // ignore
+    }
+    modsWatcher = null
+  }
+  watchedModsPath = ''
+
+  if (!modsPath || !fsSync.existsSync(modsPath)) return
+  try {
+    modsWatcher = fsSync.watch(modsPath, { recursive: false }, () => {
+      if (Date.now() < suppressWatcherUntil) return
+      if (watchDebounceTimer) clearTimeout(watchDebounceTimer)
+      watchDebounceTimer = setTimeout(() => {
+        watchDebounceTimer = null
+        broadcastStateChanged({ gameId: settings?.activeGameId })
+      }, 280)
+    })
+    modsWatcher.on('error', () => {
+      try {
+        modsWatcher?.close()
+      } catch {
+        // ignore
+      }
+      modsWatcher = null
+      watchedModsPath = ''
+    })
+    watchedModsPath = modsPath
+  } catch {
+    modsWatcher = null
+    watchedModsPath = ''
+  }
+}
 
 function baseDir(): string {
   return app.getPath('userData')
@@ -250,7 +325,13 @@ function baseDir(): string {
 
 function assetUrl(absolutePath: string): string {
   const encoded = Buffer.from(absolutePath, 'utf8').toString('base64url')
-  return `${SCHEME}://asset/?p=${encoded}`
+  let stamp = 0
+  try {
+    stamp = Math.floor(fsSync.statSync(absolutePath).mtimeMs)
+  } catch {
+    // ignore
+  }
+  return `${SCHEME}://asset/?p=${encoded}${stamp ? `&t=${stamp}` : ''}`
 }
 
 function mimeFor(filePath: string): string {
@@ -603,134 +684,489 @@ function hideOverlayDetail(): void {
   overlayDetailWindow?.hide()
 }
 
-type MouseButton = 'left' | 'right' | 'middle' | 'x1' | 'x2'
-type InputPlan = { sequence: string } | { mouse: MouseButton }
+type KeyPlan = { modifiers: number[]; keys: number[]; released: number[] }
 
-const MOUSE_KEYS: Record<string, MouseButton> = {
-  LBUTTON: 'left',
-  RBUTTON: 'right',
-  MBUTTON: 'middle',
-  XBUTTON1: 'x1',
-  XBUTTON2: 'x2'
+const MOUSE_KEYS = new Set([
+  'LBUTTON',
+  'RBUTTON',
+  'MBUTTON',
+  'XBUTTON1',
+  'XBUTTON2',
+  'XB1',
+  'XB2'
+])
+
+const VK_KEYS: Record<string, number> = {
+  BACK: 0x08,
+  BACKSPACE: 0x08,
+  TAB: 0x09,
+  RETURN: 0x0d,
+  ENTER: 0x0d,
+  SHIFT: 0x10,
+  CONTROL: 0x11,
+  CTRL: 0x11,
+  MENU: 0x12,
+  ALT: 0x12,
+  PAUSE: 0x13,
+  CAPITAL: 0x14,
+  CAPSLOCK: 0x14,
+  ESCAPE: 0x1b,
+  ESC: 0x1b,
+  SPACE: 0x20,
+  SPACEBAR: 0x20,
+  PRIOR: 0x21,
+  PAGEUP: 0x21,
+  PGUP: 0x21,
+  NEXT: 0x22,
+  PAGEDOWN: 0x22,
+  PGDN: 0x22,
+  END: 0x23,
+  HOME: 0x24,
+  LEFT: 0x25,
+  UP: 0x26,
+  RIGHT: 0x27,
+  DOWN: 0x28,
+  SNAPSHOT: 0x2c,
+  PRINTSCREEN: 0x2c,
+  INSERT: 0x2d,
+  INS: 0x2d,
+  DELETE: 0x2e,
+  DEL: 0x2e,
+  LWIN: 0x5b,
+  RWIN: 0x5c,
+  APPS: 0x5d,
+  NUMPAD0: 0x60,
+  NUMPAD1: 0x61,
+  NUMPAD2: 0x62,
+  NUMPAD3: 0x63,
+  NUMPAD4: 0x64,
+  NUMPAD5: 0x65,
+  NUMPAD6: 0x66,
+  NUMPAD7: 0x67,
+  NUMPAD8: 0x68,
+  NUMPAD9: 0x69,
+  MULTIPLY: 0x6a,
+  ADD: 0x6b,
+  SEPARATOR: 0x6c,
+  SUBTRACT: 0x6d,
+  DECIMAL: 0x6e,
+  DIVIDE: 0x6f,
+  NUMLOCK: 0x90,
+  SCROLL: 0x91,
+  LSHIFT: 0xa0,
+  RSHIFT: 0xa1,
+  LCONTROL: 0xa2,
+  RCONTROL: 0xa3,
+  LCTRL: 0xa2,
+  RCTRL: 0xa3,
+  LMENU: 0xa4,
+  RMENU: 0xa5,
+  LALT: 0xa4,
+  RALT: 0xa5,
+  OEM_1: 0xba,
+  OEM_PLUS: 0xbb,
+  OEM_COMMA: 0xbc,
+  OEM_MINUS: 0xbd,
+  OEM_PERIOD: 0xbe,
+  OEM_2: 0xbf,
+  OEM_3: 0xc0,
+  OEM_4: 0xdb,
+  OEM_5: 0xdc,
+  OEM_6: 0xdd,
+  OEM_7: 0xde,
+  OEM_8: 0xdf,
+  OEM_102: 0xe2,
+  PLUS: 0xbb,
+  COMMA: 0xbc,
+  MINUS: 0xbd,
+  PERIOD: 0xbe
 }
 
-const PUNCTUATION_KEYS: Record<string, string> = {
-  '/': '/',
-  '.': '.',
-  ',': ',',
-  ';': ';',
-  '[': '{[}',
-  ']': '{]}',
-  '-': '-',
-  '=': '=',
-  '\\': '\\',
-  '`': '`'
+const PUNCTUATION_VK: Record<string, number> = {
+  '/': 0xbf,
+  '.': 0xbe,
+  ',': 0xbc,
+  ';': 0xba,
+  "'": 0xde,
+  '[': 0xdb,
+  ']': 0xdd,
+  '-': 0xbd,
+  '=': 0xbb,
+  '\\': 0xdc,
+  '`': 0xc0
 }
 
-const NAMED_KEYS: Record<string, string> = {
-  SPACE: '{SPACE}',
-  TAB: '{TAB}',
-  ENTER: '{ENTER}',
-  RETURN: '{ENTER}',
-  ESC: '{ESC}',
-  ESCAPE: '{ESC}',
-  BACKSPACE: '{BACKSPACE}',
-  BACK: '{BACKSPACE}',
-  DELETE: '{DELETE}',
-  DEL: '{DELETE}',
-  INSERT: '{INSERT}',
-  HOME: '{HOME}',
-  END: '{END}',
-  PAGEUP: '{PGUP}',
-  PRIOR: '{PGUP}',
-  PAGEDOWN: '{PGDN}',
-  NEXT: '{PGDN}',
-  UP: '{UP}',
-  DOWN: '{DOWN}',
-  LEFT: '{LEFT}',
-  RIGHT: '{RIGHT}',
-  NUMPAD0: '{NUMPAD0}',
-  NUMPAD1: '{NUMPAD1}',
-  NUMPAD2: '{NUMPAD2}',
-  NUMPAD3: '{NUMPAD3}',
-  NUMPAD4: '{NUMPAD4}',
-  NUMPAD5: '{NUMPAD5}',
-  NUMPAD6: '{NUMPAD6}',
-  NUMPAD7: '{NUMPAD7}',
-  NUMPAD8: '{NUMPAD8}',
-  NUMPAD9: '{NUMPAD9}',
-  ADD: '{ADD}',
-  SUBTRACT: '{SUBTRACT}',
-  MULTIPLY: '{MULTIPLY}',
-  DIVIDE: '{DIVIDE}',
-  DECIMAL: '{DECIMAL}'
+const SHIFTED_PUNCTUATION_VK: Record<string, number> = {
+  '<': 0xbc,
+  '>': 0xbe,
+  '?': 0xbf,
+  ':': 0xba,
+  '"': 0xde,
+  '{': 0xdb,
+  '}': 0xdd,
+  '|': 0xdc,
+  '~': 0xc0,
+  '_': 0xbd,
+  '+': 0xbb,
+  '!': 0x31,
+  '@': 0x32,
+  '#': 0x33,
+  '$': 0x34,
+  '%': 0x35,
+  '^': 0x36,
+  '&': 0x37,
+  '*': 0x38,
+  '(': 0x39,
+  ')': 0x30
 }
 
-const OEM_KEYS: Record<string, string> = {
-  OEM_1: ';',
-  OEM_PLUS: '=',
-  OEM_COMMA: ',',
-  OEM_MINUS: '-',
-  OEM_PERIOD: '.',
-  OEM_2: '/',
-  OEM_3: '`',
-  OEM_4: '{[}',
-  OEM_5: '\\',
-  OEM_6: '{]}'
-}
-
-function toInputPlan(value: string): InputPlan | null {
-  const tokens = String(value || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-  if (tokens.length === 0) return null
-
-  let prefix = ''
-  let keyToken = ''
-  for (const token of tokens) {
-    const lower = token.toLowerCase()
-    if (lower === 'ctrl' || lower === 'control') {
-      prefix += '^'
-    } else if (lower === 'alt') {
-      prefix += '%'
-    } else if (lower === 'shift') {
-      prefix += '+'
-    } else if (lower === 'win') {
-      // SendKeys 没有 Win 前缀，交给 VK 发送器或拒绝。
-      return null
-    } else if (lower.startsWith('no_')) {
-      continue
-    } else if (!keyToken) {
-      keyToken = token
-    } else {
-      return null
-    }
+function vkForToken(token: string): { vk: number; shift?: boolean } | null {
+  const raw = token.replace(/^VK_/i, '')
+  const key = raw.toUpperCase()
+  if (MOUSE_KEYS.has(key)) return null
+  if (/^0X[0-9A-F]{1,2}$/.test(key)) {
+    const parsed = Number.parseInt(key.slice(2), 16)
+    if (parsed > 0 && parsed <= 0xff) return { vk: parsed }
   }
-  if (!keyToken) return null
-
-  const rawKey = keyToken.replace(/^VK_/i, '')
-  const key = rawKey.toUpperCase()
-  if (MOUSE_KEYS[key]) return { mouse: MOUSE_KEYS[key] }
-  if (/^[A-Za-z0-9]$/.test(rawKey)) return { sequence: `${prefix}${rawKey}` }
-  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) return { sequence: `${prefix}{${key}}` }
-  if (PUNCTUATION_KEYS[rawKey]) return { sequence: `${prefix}${PUNCTUATION_KEYS[rawKey]}` }
-  if (OEM_KEYS[key]) return { sequence: `${prefix}${OEM_KEYS[key]}` }
-  if (NAMED_KEYS[key]) return { sequence: `${prefix}${NAMED_KEYS[key]}` }
+  if (/^[A-Z0-9]$/.test(key)) return { vk: key.charCodeAt(0) }
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) {
+    return { vk: 0x6f + Number(key.slice(1)) }
+  }
+  if (PUNCTUATION_VK[raw]) return { vk: PUNCTUATION_VK[raw] }
+  if (SHIFTED_PUNCTUATION_VK[raw]) return { vk: SHIFTED_PUNCTUATION_VK[raw], shift: true }
+  if (VK_KEYS[key] !== undefined) return { vk: VK_KEYS[key] }
   return null
 }
 
-function mouseScript(mouse: MouseButton): string {
-  const flags = {
-    left: [0x0002, 0x0004, 0],
-    right: [0x0008, 0x0010, 0],
-    middle: [0x0020, 0x0040, 0],
-    x1: [0x0080, 0x0100, 1],
-    x2: [0x0080, 0x0100, 2]
-  }[mouse]
-  const csharp =
-    'using System; using System.Runtime.InteropServices; public static class ModDeckMouse { [DllImport("user32.dll")] public static extern void mouse_event(uint f,uint dx,uint dy,uint d,UIntPtr e); public static void Click(uint d,uint u,uint x){ mouse_event(d,0,0,x,UIntPtr.Zero); mouse_event(u,0,0,x,UIntPtr.Zero); } }'
-  return `Add-Type -TypeDefinition '${csharp}'; [ModDeckMouse]::Click(${flags[0]}, ${flags[1]}, ${flags[2]})`
+function toKeyPlan(value: string): KeyPlan | null {
+  const cleaned = String(value || '')
+    .split(';')[0]
+    .trim()
+  const tokens = cleaned.split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return null
+
+  const modifiers = new Set<number>()
+  const released = new Set<number>()
+  const keys: number[] = []
+  for (const token of tokens) {
+    const lower = token.toLowerCase()
+    if (lower === 'ctrl' || lower === 'control' || lower === 'lctrl' || lower === 'rctrl' || lower === 'vk_ctrl' || lower === 'vk_control') {
+      modifiers.add(0x11)
+    } else if (lower === 'alt' || lower === 'lalt' || lower === 'ralt' || lower === 'menu' || lower === 'vk_alt' || lower === 'vk_menu') {
+      modifiers.add(0x12)
+    } else if (lower === 'shift' || lower === 'lshift' || lower === 'rshift' || lower === 'vk_shift') {
+      modifiers.add(0x10)
+    } else if (lower === 'win' || lower === 'lwin' || lower === 'rwin') {
+      modifiers.add(0x5b)
+    } else if (lower === 'no_modifiers') {
+      released.add(0x10)
+      released.add(0x11)
+      released.add(0x12)
+    } else if (lower === 'no_ctrl' || lower === 'no_control' || lower === 'no_vk_ctrl' || lower === 'no_vk_control') {
+      released.add(0x11)
+    } else if (lower === 'no_alt' || lower === 'no_menu' || lower === 'no_vk_alt' || lower === 'no_vk_menu') {
+      released.add(0x12)
+    } else if (lower === 'no_shift' || lower === 'no_vk_shift') {
+      released.add(0x10)
+    } else if (lower.startsWith('no_')) {
+      continue
+    } else {
+      const resolved = vkForToken(token)
+      if (!resolved) return null
+      if (resolved.shift) modifiers.add(0x10)
+      keys.push(resolved.vk)
+    }
+  }
+  for (const mod of modifiers) {
+    released.delete(mod)
+  }
+  if (keys.length === 0) return null
+  return { modifiers: [...modifiers], keys, released: [...released] }
+}
+
+function gameProcessNamesForActiveGame(): string[] {
+  const names = new Set<string>()
+  const activeId = settings?.activeGameId
+  const gamePath = activeId ? settings?.games?.[activeId]?.gamePath : undefined
+  if (gamePath) {
+    const base = path.basename(gamePath, path.extname(gamePath)).trim()
+    if (base) names.add(base)
+  }
+  names.add('Endfield')
+  names.add('Client-Win64-Shipping')
+  names.add('Wuthering Waves')
+  names.add('StarRail')
+  names.add('ZenlessZoneZero')
+  names.add('NTE')
+  return [...names]
+}
+
+const KEY_HELPER_CS_SOURCE = `using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Threading;
+
+public static class ModDeckKeyHelper {
+  [DllImport("user32.dll")]
+  public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+  [DllImport("user32.dll")]
+  public static extern uint MapVirtualKey(uint code, uint mapType);
+  [DllImport("user32.dll")]
+  public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")]
+  public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")]
+  public static extern bool IsIconic(IntPtr hWnd);
+
+  public const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
+  public const uint KEYEVENTF_KEYUP = 0x0002;
+
+  public static bool IsExtended(byte vk) {
+    return (vk >= 0x21 && vk <= 0x2E) || vk == 0x5B || vk == 0x5C || vk == 0x6F || vk == 0xA3 || vk == 0xA5;
+  }
+
+  public static void Down(byte vk) {
+    byte scan = (byte)MapVirtualKey(vk, 0);
+    uint flags = IsExtended(vk) ? KEYEVENTF_EXTENDEDKEY : 0u;
+    keybd_event(vk, scan, flags, UIntPtr.Zero);
+  }
+
+  public static void Up(byte vk) {
+    byte scan = (byte)MapVirtualKey(vk, 0);
+    uint flags = KEYEVENTF_KEYUP | (IsExtended(vk) ? KEYEVENTF_EXTENDEDKEY : 0u);
+    keybd_event(vk, scan, flags, UIntPtr.Zero);
+  }
+
+  public static byte[] ParseList(string s) {
+    if (string.IsNullOrEmpty(s)) return new byte[0];
+    string[] parts = s.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+    byte[] res = new byte[parts.Length];
+    for (int i = 0; i < parts.Length; i++) {
+      res[i] = byte.Parse(parts[i]);
+    }
+    return res;
+  }
+
+  public static int Main(string[] args) {
+    try {
+      string procArg = args.Length > 0 ? args[0] : "";
+      byte[] released = ParseList(args.Length > 1 ? args[1] : "");
+      byte[] modifiers = ParseList(args.Length > 2 ? args[2] : "");
+      byte[] keys = ParseList(args.Length > 3 ? args[3] : "");
+
+      if (!string.IsNullOrEmpty(procArg)) {
+        string[] names = procArg.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (string name in names) {
+          Process[] procs = Process.GetProcessesByName(name);
+          bool focused = false;
+          foreach (Process p in procs) {
+            if (p.MainWindowHandle != IntPtr.Zero) {
+              IntPtr h = p.MainWindowHandle;
+              if (IsIconic(h)) ShowWindowAsync(h, 9);
+              SetForegroundWindow(h);
+              Thread.Sleep(25);
+              focused = true;
+              break;
+            }
+          }
+          if (focused) break;
+        }
+      }
+
+      foreach (byte vk in released) Up(vk);
+      if (released.Length > 0) Thread.Sleep(10);
+
+      foreach (byte vk in modifiers) {
+        Down(vk);
+        Thread.Sleep(15);
+      }
+      foreach (byte vk in keys) {
+        Down(vk);
+        Thread.Sleep(15);
+      }
+
+      Thread.Sleep(60);
+
+      for (int i = keys.Length - 1; i >= 0; i--) {
+        Up(keys[i]);
+        Thread.Sleep(15);
+      }
+      for (int i = modifiers.Length - 1; i >= 0; i--) {
+        Up(modifiers[i]);
+        Thread.Sleep(15);
+      }
+      return 0;
+    } catch (Exception ex) {
+      Console.Error.WriteLine(ex.Message);
+      return 1;
+    }
+  }
+}
+`
+
+let compiledKeyHelperPath: string | null = null
+let compilingKeyHelperPromise: Promise<string | null> | null = null
+
+async function ensureKeyHelperBinary(): Promise<string | null> {
+  if (compiledKeyHelperPath && (await pathExists(compiledKeyHelperPath))) {
+    return compiledKeyHelperPath
+  }
+  if (compilingKeyHelperPromise) return compilingKeyHelperPromise
+
+  compilingKeyHelperPromise = (async () => {
+    try {
+      const binDir = path.join(baseDir(), 'bin')
+      await ensureDir(binDir)
+      const exePath = path.join(binDir, 'ModDeckKeyHelper-v2.exe')
+      if (await pathExists(exePath)) {
+        compiledKeyHelperPath = exePath
+        return exePath
+      }
+      const csPath = path.join(binDir, 'ModDeckKeyHelper-v2.cs')
+      await fs.writeFile(csPath, KEY_HELPER_CS_SOURCE, 'utf8')
+      const windir = process.env.WINDIR || 'C:\\Windows'
+      const cscCandidates = [
+        path.join(windir, 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe'),
+        path.join(windir, 'Microsoft.NET', 'Framework', 'v4.0.30319', 'csc.exe')
+      ]
+      let cscPath = ''
+      for (const candidate of cscCandidates) {
+        if (await pathExists(candidate)) {
+          cscPath = candidate
+          break
+        }
+      }
+      if (!cscPath) return null
+
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          cscPath,
+          ['/nologo', '/target:exe', `/out:${exePath}`, '/optimize+', csPath],
+          { windowsHide: true },
+          (error, _stdout, stderr) => {
+            if (error) reject(new Error(stderr || error.message))
+            else resolve()
+          }
+        )
+      })
+      if (await pathExists(exePath)) {
+        compiledKeyHelperPath = exePath
+        return exePath
+      }
+      return null
+    } catch (error) {
+      logError('compile-key-helper', error)
+      return null
+    } finally {
+      compilingKeyHelperPromise = null
+    }
+  })()
+
+  return compilingKeyHelperPromise
+}
+
+function keyPlanScript(plan: KeyPlan): string {
+  const procNames = gameProcessNamesForActiveGame()
+    .map((name) => `'${name.replace(/'/g, "''")}'`)
+    .join(',')
+  const csharp = [
+    'using System;',
+    'using System.Runtime.InteropServices;',
+    'public static class ModDeckKey {',
+    '  [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);',
+    '  [DllImport("user32.dll")] public static extern uint MapVirtualKey(uint code, uint mapType);',
+    '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);',
+    '  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);',
+    '  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);',
+    '  public const uint KEYEVENTF_EXTENDEDKEY = 0x0001;',
+    '  public const uint KEYEVENTF_KEYUP = 0x0002;',
+    '  public static bool IsExtended(byte vk) {',
+    '    return (vk >= 0x21 && vk <= 0x2E) || vk == 0x5B || vk == 0x5C || vk == 0x6F || vk == 0xA3 || vk == 0xA5;',
+    '  }',
+    '  public static void Down(byte vk) {',
+    '    byte scan = (byte)MapVirtualKey(vk, 0);',
+    '    uint flags = IsExtended(vk) ? KEYEVENTF_EXTENDEDKEY : 0u;',
+    '    keybd_event(vk, scan, flags, UIntPtr.Zero);',
+    '  }',
+    '  public static void Up(byte vk) {',
+    '    byte scan = (byte)MapVirtualKey(vk, 0);',
+    '    uint flags = KEYEVENTF_KEYUP | (IsExtended(vk) ? KEYEVENTF_EXTENDEDKEY : 0u);',
+    '    keybd_event(vk, scan, flags, UIntPtr.Zero);',
+    '  }',
+    '}'
+  ].join('\n')
+
+  const lines = [
+    "$ProgressPreference = 'SilentlyContinue'",
+    `Add-Type -TypeDefinition @"\n${csharp}\n"@`,
+    `$procs = Get-Process -Name @(${procNames}) -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1`,
+    'if ($procs) { $h = $procs.MainWindowHandle; if ([ModDeckKey]::IsIconic($h)) { [ModDeckKey]::ShowWindowAsync($h, 9) | Out-Null }; [ModDeckKey]::SetForegroundWindow($h) | Out-Null; Start-Sleep -Milliseconds 25 }'
+  ]
+  for (const vk of plan.released) {
+    lines.push(`[ModDeckKey]::Up(${vk})`)
+  }
+  if (plan.released.length > 0) {
+    lines.push('Start-Sleep -Milliseconds 10')
+  }
+  for (const vk of plan.modifiers) {
+    lines.push(`[ModDeckKey]::Down(${vk})`)
+    lines.push('Start-Sleep -Milliseconds 15')
+  }
+  for (const vk of plan.keys) {
+    lines.push(`[ModDeckKey]::Down(${vk})`)
+    lines.push('Start-Sleep -Milliseconds 15')
+  }
+  lines.push('Start-Sleep -Milliseconds 60')
+  for (const vk of [...plan.keys].reverse()) {
+    lines.push(`[ModDeckKey]::Up(${vk})`)
+    lines.push('Start-Sleep -Milliseconds 15')
+  }
+  for (const vk of [...plan.modifiers].reverse()) {
+    lines.push(`[ModDeckKey]::Up(${vk})`)
+    lines.push('Start-Sleep -Milliseconds 15')
+  }
+  return lines.join('\n')
+}
+
+async function executeKeyPlan(plan: KeyPlan): Promise<ToggleResult> {
+  try {
+    const helperExe = await ensureKeyHelperBinary()
+    if (helperExe) {
+      const procArg = gameProcessNamesForActiveGame().join('|')
+      const relArg = plan.released.join(',')
+      const modArg = plan.modifiers.join(',')
+      const keyArg = plan.keys.join(',')
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          helperExe,
+          [procArg, relArg, modArg, keyArg],
+          { windowsHide: true },
+          (error, _stdout, stderr) => {
+            if (error) reject(new Error(stderr || error.message))
+            else resolve()
+          }
+        )
+      })
+      return { ok: true }
+    }
+
+    const encoded = Buffer.from(keyPlanScript(plan), 'utf16le').toString('base64')
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-EncodedCommand', encoded],
+        { windowsHide: true },
+        (error, _stdout, stderr) => {
+          if (error) reject(new Error(stderr || error.message))
+          else resolve()
+        }
+      )
+    })
+    return { ok: true }
+  } catch (error) {
+    logError('execute-key-plan', error)
+    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+  }
 }
 
 function applyOverlayHotkey(value: string): { ok: boolean; error?: string } {
@@ -906,100 +1342,10 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
   return result
 }
 
-function sendKeysScript(sequence: string): string {
-  const encoded = Buffer.from(sequence, 'utf8').toString('base64')
-  return `Add-Type -AssemblyName System.Windows.Forms; $s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')); [System.Windows.Forms.SendKeys]::SendWait($s)`
-}
-
-function focusGamePrefix(gamePath: string): string {
-  if (!gamePath) return ''
-  const encoded = Buffer.from(gamePath, 'utf8').toString('base64')
-  const csharp =
-    'using System; using System.Runtime.InteropServices; public static class ModDeckFocus { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); }'
-  return `Add-Type -TypeDefinition '${csharp}'; $gp=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')); $proc=Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $gp } | Select-Object -First 1; if($proc -and $proc.MainWindowHandle -ne 0){ [ModDeckFocus]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null; Start-Sleep -Milliseconds 250 }`
-}
-
-function restoreOverlayWindows(showOverlay: boolean, showDetail: boolean): void {
-  if (showOverlay && overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.show()
-    overlayWindow.focus()
-    raiseOverlayWindow(overlayWindow)
-  }
-  if (showDetail && overlayDetailWindow && !overlayDetailWindow.isDestroyed()) {
-    overlayDetailWindow.showInactive()
-    raiseOverlayWindow(overlayDetailWindow)
-  }
-}
-
-function foregroundProcessPath(): Promise<string | null> {
-  const csharp =
-    'using System; using System.Runtime.InteropServices; public static class ModDeckForeground { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p); }'
-  const script = `Add-Type -TypeDefinition '${csharp}'; $h=[ModDeckForeground]::GetForegroundWindow(); [uint32]$p=0; [ModDeckForeground]::GetWindowThreadProcessId($h,[ref]$p)|Out-Null; (Get-Process -Id $p -ErrorAction Stop).Path`
-  return new Promise((resolve) => {
-    execFile(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script],
-      { windowsHide: true, timeout: 2500 },
-      (error, stdout) => {
-        if (error) resolve(null)
-        else resolve(String(stdout || '').trim() || null)
-      }
-    )
-  })
-}
-
 async function reloadF10(): Promise<ToggleResult> {
-  const wasOverlayVisible = Boolean(overlayWindow?.isVisible())
-  if (!wasOverlayVisible) {
-    return { ok: false, error: '请先从快捷窗口点击重载，游戏需要在前台' }
-  }
-  overlayWindow?.hide()
-  overlayDetailWindow?.hide()
-  await new Promise((resolve) => setTimeout(resolve, 220))
-
-  const gameId = settings.activeGameId
-  const gamePath = settings.games[gameId]?.gamePath
-  if (gamePath) {
-    const foreground = await foregroundProcessPath()
-    if (!foreground || path.basename(foreground).toLowerCase() !== path.basename(gamePath).toLowerCase()) {
-      if (wasOverlayVisible) {
-        overlayWindow?.show()
-        overlayWindow?.focus()
-      }
-      return { ok: false, error: '当前前台不是游戏窗口，已取消重载' }
-    }
-  }
-
-  try {
-    const child = spawn(
-      'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-WindowStyle',
-        'Hidden',
-        '-Command',
-        sendKeysScript('{F10}')
-      ],
-      { detached: true, stdio: 'ignore', windowsHide: true }
-    )
-    child.on('error', (error) => logError('reload-f10', error))
-    child.unref()
-  } catch (error) {
-    if (wasOverlayVisible) {
-      overlayWindow?.show()
-      overlayWindow?.focus()
-    }
-    return { ok: false, error: error instanceof Error ? error.message : String(error) }
-  }
-
-  setTimeout(() => {
-    if (overlayWindow && !overlayWindow.isDestroyed() && !overlayWindow.isVisible()) {
-      overlayWindow.show()
-      overlayWindow.focus()
-    }
-  }, 700)
-  return { ok: true }
+  const plan = toKeyPlan('F10')
+  if (!plan) return { ok: false, error: '按键生成失败' }
+  return executeKeyPlan(plan)
 }
 
 function scheduleAutoReload(): void {
@@ -1010,6 +1356,37 @@ function scheduleAutoReload(): void {
     autoReloadTimer = null
     void reloadF10().catch((error) => logError('auto-reload', error))
   }, 800)
+}
+
+async function toggleChildIniFiles(modPath: string, enable: boolean): Promise<number> {
+  let count = 0
+  const walk = async (dir: string, depth: number): Promise<void> => {
+    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (depth > 0) await walk(full, depth - 1)
+        continue
+      }
+      if (!entry.isFile()) continue
+      const lower = entry.name.toLowerCase()
+      if (enable) {
+        if (/^disabled_/i.test(entry.name) && lower.endsWith('.ini')) {
+          const restored = entry.name.replace(/^disabled_/i, '')
+          await fs.rename(full, path.join(dir, restored))
+          count += 1
+        }
+      } else {
+        if (lower.endsWith('.ini') && !/^disabled_/i.test(entry.name) && lower !== 'desktop.ini') {
+          await fs.rename(full, path.join(dir, `DISABLED_${entry.name}`))
+          count += 1
+        }
+      }
+    }
+  }
+  await walk(modPath, 3)
+  return count
 }
 
 async function renameModAt(
@@ -1024,9 +1401,19 @@ async function renameModAt(
   const nextName = enable ? baseName : `DISABLED_${baseName}`
   const currentPath = path.join(characterDir, currentName)
   const nextPath = path.join(characterDir, nextName)
+
+  markInternalFsMutation()
+
+  // 如果当前目录名由于之前文件级回退禁用还保持原名（例如启用时 currentPath 不存在而 nextPath 存在）
   if (await pathExists(nextPath)) {
-    if (enable && nextName === baseName) return { ok: true }
-    if (!enable && nextName === `DISABLED_${baseName}`) return { ok: true }
+    if (!(await pathExists(currentPath))) {
+      try {
+        await toggleChildIniFiles(nextPath, enable)
+      } catch {
+        // ignore
+      }
+      return { ok: true }
+    }
     return { ok: false, error: '目标目录已存在' }
   }
   if (!(await pathExists(currentPath))) return { ok: false, error: 'Mod 目录不存在' }
@@ -1035,17 +1422,33 @@ async function renameModAt(
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       await fs.rename(currentPath, nextPath)
+      // 重命名目录成功后，若内部曾有被回退禁用的 .ini，恢复正常名称
+      if (enable) {
+        await toggleChildIniFiles(nextPath, true).catch(() => undefined)
+      }
       return { ok: true }
     } catch (error) {
       lastError = error
-      await new Promise((resolve) => setTimeout(resolve, 80))
+      await new Promise((resolve) => setTimeout(resolve, 60))
     }
   }
+
+  // 当游戏/3DMigoto 持续占用该 Mod 下的子资源（如 GUI 贴图 res/*.png）导致外层目录无法重命名时，
+  // 自动回退为重命名内部的 .ini 配置文件为 DISABLED_*.ini（配合 F10 即可立即生效，无需关游戏）
+  try {
+    const toggledCount = await toggleChildIniFiles(currentPath, enable)
+    if (toggledCount > 0) {
+      return { ok: true }
+    }
+  } catch (fallbackErr) {
+    logError('toggle-ini-fallback', fallbackErr)
+  }
+
   const code = (lastError as NodeJS.ErrnoException)?.code
   return {
     ok: false,
     error:
-      code === 'EPERM' || code === 'EBUSY'
+      code === 'EPERM' || code === 'EBUSY' || code === 'EACCES'
         ? '目录被占用，请关闭游戏或占用的程序后重试'
         : lastError instanceof Error
           ? lastError.message
@@ -1058,7 +1461,8 @@ function registerIpc(): void {
     settings,
     games: GAMES,
     snapshot: await makeSnapshot(settings.activeGameId),
-    appVersion: app.getVersion()
+    appVersion: app.getVersion(),
+    rosterMap: getRosterMap()
   }))
 
   register(IPC.appInfo, async (): Promise<AppInfo> => ({
@@ -1073,6 +1477,8 @@ function registerIpc(): void {
   register(IPC.saveSettings, async (patch: SettingsPatch) => {
     settings = mergeSettings(settings, patch ?? {})
     await saveSettings(baseDir(), settings)
+    refreshModsWatcher()
+    broadcastStateChanged({ gameId: settings.activeGameId })
     return settings
   })
 
@@ -1080,7 +1486,10 @@ function registerIpc(): void {
     requireGame(gameId)
     settings = mergeSettings(settings, { activeGameId: gameId })
     await saveSettings(baseDir(), settings)
-    return makeSnapshot(gameId)
+    refreshModsWatcher()
+    const snapshot = await makeSnapshot(gameId)
+    broadcastStateChanged({ gameId })
+    return snapshot
   })
 
   register(IPC.scanGame, async (gameId: GameId) => {
@@ -1145,6 +1554,7 @@ function registerIpc(): void {
         await recordRecentMod(gameId, characterFolder, recentFolder, baseName).catch((error) =>
           logError('recent', error)
         )
+        broadcastStateChanged({ gameId, characterFolder })
         scheduleAutoReload()
       }
       return result
@@ -1165,8 +1575,12 @@ function registerIpc(): void {
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
       for (const folder of Array.isArray(folders) ? folders : []) {
         const result = await renameModAt(characterDir, folder, enable)
-        if (!result.ok) return result
+        if (!result.ok) {
+          broadcastStateChanged({ gameId, characterFolder })
+          return result
+        }
       }
+      broadcastStateChanged({ gameId, characterFolder })
       scheduleAutoReload()
       return { ok: true }
     }
@@ -1180,10 +1594,29 @@ function registerIpc(): void {
       if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
       if (!isSafeSegment(modFolder)) return { ok: false, error: 'Mod 名称不合法' }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
-      const target = path.join(characterDir, modFolder)
+      const baseName = modFolder.replace(/^DISABLED_/i, '')
+      let target = path.join(characterDir, modFolder)
+      if (!(await pathExists(target))) {
+        const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
+        target = path.join(characterDir, altFolder)
+      }
       if (!isInside(characterDir, target)) return { ok: false, error: '路径越界' }
       if (!(await pathExists(target))) return { ok: false, error: '目录不存在' }
+      markInternalFsMutation()
       await shell.trashItem(target)
+      const filteredRecent = settings.recentMods.filter(
+        (item) =>
+          !(
+            item.gameId === gameId &&
+            item.characterFolder === characterFolder &&
+            item.name === baseName
+          )
+      )
+      if (filteredRecent.length !== settings.recentMods.length) {
+        settings = { ...settings, recentMods: filteredRecent }
+        await saveSettings(baseDir(), settings).catch((error) => logError('recent-clean', error))
+      }
+      broadcastStateChanged({ gameId, characterFolder })
       return { ok: true }
     }
   )
@@ -1196,7 +1629,14 @@ function registerIpc(): void {
       if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
       if (!isSafeSegment(modFolder)) return { ok: false, error: 'Mod 名称不合法' }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
-      return openInShell(path.join(characterDir, modFolder))
+      let target = path.join(characterDir, modFolder)
+      if (!(await pathExists(target))) {
+        const baseName = modFolder.replace(/^DISABLED_/i, '')
+        const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
+        const altPath = path.join(characterDir, altFolder)
+        if (await pathExists(altPath)) target = altPath
+      }
+      return openInShell(target)
     }
   )
 
@@ -1266,6 +1706,19 @@ function registerIpc(): void {
     openDialog({ title: '选择 Mod 文件夹', properties: ['openDirectory'] })
   )
 
+  register(IPC.pickImportFolders, async () => {
+    const result = mainWindow
+      ? await dialog.showOpenDialog(mainWindow, {
+          title: '选择要导入的 Mod 文件夹（可多选，也可选择包含多个 Mod 的总文件夹）',
+          properties: ['openDirectory', 'multiSelections']
+        })
+      : await dialog.showOpenDialog({
+          title: '选择要导入的 Mod 文件夹（可多选，也可选择包含多个 Mod 的总文件夹）',
+          properties: ['openDirectory', 'multiSelections']
+        })
+    return result.canceled ? [] : result.filePaths
+  })
+
   register(IPC.pickCover, async () =>
     openDialog({
       title: '选择角色封面',
@@ -1275,11 +1728,37 @@ function registerIpc(): void {
   )
 
   register(IPC.importRun, async (request: ImportRequest) => {
+    markInternalFsMutation()
+    const snap = await makeSnapshot(request.gameId)
     const result = await runImport(
-      { baseDir: baseDir(), settings, metadata },
+      { baseDir: baseDir(), settings, metadata, existingCharacters: snap.characters },
       request
     )
+    broadcastStateChanged({ gameId: request.gameId, characterFolder: request.targetCharacter ?? undefined })
     return result
+  })
+
+  register(IPC.importParse, async (request: ImportParseRequest) => {
+    const snap = await makeSnapshot(request.gameId)
+    return parseImportSources(
+      { baseDir: baseDir(), settings, metadata, existingCharacters: snap.characters },
+      request
+    )
+  })
+
+  register(IPC.importCommit, async (request: ImportCommitRequest) => {
+    markInternalFsMutation()
+    const snap = await makeSnapshot(request.gameId)
+    const result = await commitImportSession(
+      { baseDir: baseDir(), settings, metadata, existingCharacters: snap.characters },
+      request
+    )
+    broadcastStateChanged({ gameId: request.gameId })
+    return result
+  })
+
+  register(IPC.importDiscard, async (sessionId: string) => {
+    if (sessionId) await discardImportSession(sessionId)
   })
 
   register(
@@ -1293,7 +1772,9 @@ function registerIpc(): void {
         ...(patch as Partial<CharacterMeta>)
       })
       await saveMetadata(baseDir(), metadata)
-      return makeSnapshot(gameId)
+      const snapshot = await makeSnapshot(gameId)
+      broadcastStateChanged({ gameId, characterFolder })
+      return snapshot
     }
   )
 
@@ -1310,6 +1791,7 @@ function registerIpc(): void {
     const current = getCharacterMeta(metadata, gameId, characterFolder)
     metadata = setCharacterMeta(metadata, gameId, characterFolder, { ...current, coverFile })
     await saveMetadata(baseDir(), metadata)
+    broadcastStateChanged({ gameId, characterFolder })
     return { ok: true }
   })
 
@@ -1318,7 +1800,9 @@ function registerIpc(): void {
     if (!isSafeSegment(characterFolder)) throw new Error('角色目录名不合法')
     metadata = removeCharacterMeta(metadata, gameId, characterFolder)
     await saveMetadata(baseDir(), metadata)
-    return makeSnapshot(gameId)
+    const snapshot = await makeSnapshot(gameId)
+    broadcastStateChanged({ gameId, characterFolder })
+    return snapshot
   })
 
   register(
@@ -1343,6 +1827,7 @@ function registerIpc(): void {
       const target = path.join(base, folder)
       if (!isInside(base, target)) throw new Error('目录越界')
       if (await pathExists(target)) throw new Error('同名目录已存在')
+      markInternalFsMutation()
       await fs.mkdir(target)
 
       const current = getCharacterMeta(metadata, gameId, folder)
@@ -1353,21 +1838,29 @@ function registerIpc(): void {
         kind: input.kind === 'utility' ? 'utility' : 'character'
       })
       await saveMetadata(baseDir(), metadata)
-      return makeSnapshot(gameId)
+      const snapshot = await makeSnapshot(gameId)
+      broadcastStateChanged({ gameId, characterFolder: folder })
+      return snapshot
     }
   )
 
   register(
     IPC.saveCharacterCoverData,
     async (gameId: GameId, characterFolder: string, dataUrl: string) => {
+      markInternalFsMutation()
       await saveCharacterCoverData(gameId, characterFolder, dataUrl)
-      return makeSnapshot(gameId)
+      const snapshot = await makeSnapshot(gameId)
+      broadcastStateChanged({ gameId, characterFolder })
+      return snapshot
     }
   )
 
   register(IPC.clearCharacterCover, async (gameId: GameId, characterFolder: string) => {
+    markInternalFsMutation()
     await clearCharacterCoverFiles(gameId, characterFolder)
-    return makeSnapshot(gameId)
+    const snapshot = await makeSnapshot(gameId)
+    broadcastStateChanged({ gameId, characterFolder })
+    return snapshot
   })
 
   register(
@@ -1382,10 +1875,69 @@ function registerIpc(): void {
         modFolder,
         assetUrl
       )
-      await recordRecentMod(gameId, characterFolder, modFolder, details.name).catch((error) =>
-        logError('recent', error)
+      await recordRecentMod(gameId, characterFolder, details.folderName, details.name).catch(
+        (error) => logError('recent', error)
       )
       return details
+    }
+  )
+
+  register(
+    IPC.setModPreview,
+    async (
+      gameId: GameId,
+      characterFolder: string,
+      modFolder: string,
+      sourcePath?: string
+    ): Promise<ToggleResult> => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!isSafeSegment(modFolder)) return { ok: false, error: 'Mod 名称不合法' }
+
+      const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
+      const baseName = modFolder.replace(/^DISABLED_/i, '')
+      let targetModDir = path.join(characterDir, modFolder)
+      if (!(await pathExists(targetModDir))) {
+        const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
+        const altPath = path.join(characterDir, altFolder)
+        if (await pathExists(altPath)) targetModDir = altPath
+      }
+      if (!isInside(characterDir, targetModDir)) return { ok: false, error: 'Mod 路径越界' }
+      if (!(await pathExists(targetModDir))) return { ok: false, error: 'Mod 目录不存在' }
+
+      let picked = sourcePath ? String(sourcePath).trim() : ''
+      if (!picked) {
+        const selectedFile = await openDialog({
+          title: '选择 Mod 预览图',
+          properties: ['openFile'],
+          filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'] }]
+        })
+        if (!selectedFile) return { ok: false, error: '已取消' }
+        picked = selectedFile
+      }
+
+      if (!(await pathExists(picked))) return { ok: false, error: '所选图片文件不存在' }
+      const ext = path.extname(picked).toLowerCase()
+      if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif'].includes(ext)) {
+        return { ok: false, error: '仅支持 .png / .jpg / .jpeg / .webp / .gif / .avif 格式的图片' }
+      }
+
+      markInternalFsMutation()
+      // 清理该 Mod 目录下已有的 .preview.* 专属预览图，保留 Mod 原生资源不误删
+      for (const oldExt of ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif']) {
+        await fs
+          .rm(path.join(targetModDir, `.preview${oldExt}`), { force: true })
+          .catch(() => undefined)
+      }
+
+      const destFile = path.join(targetModDir, `.preview${ext}`)
+      await fs.copyFile(picked, destFile)
+      const now = new Date()
+      await fs.utimes(targetModDir, now, now).catch(() => undefined)
+      invalidatePreviewCache(targetModDir)
+      broadcastStateChanged({ gameId, characterFolder })
+      return { ok: true }
     }
   )
 
@@ -1399,6 +1951,7 @@ function registerIpc(): void {
       characterOrders: { ...settings.characterOrders, [gameId]: clean }
     }
     await saveSettings(baseDir(), settings)
+    broadcastStateChanged({ gameId })
     return { ok: true }
   })
 
@@ -1416,6 +1969,7 @@ function registerIpc(): void {
         modOrders: { ...settings.modOrders, [key]: clean }
       }
       await saveSettings(baseDir(), settings)
+      broadcastStateChanged({ gameId, characterFolder })
       return { ok: true }
     }
   )
@@ -1435,6 +1989,7 @@ function registerIpc(): void {
     }
     settings = mergeSettings(settings, { ui: { overlayHotkey: value } })
     await saveSettings(baseDir(), settings)
+    broadcastStateChanged({ gameId: settings.activeGameId })
     return { ok: true, hotkey: value }
   })
 
@@ -1452,6 +2007,7 @@ function registerIpc(): void {
           : overlayWindow
       raiseOverlayWindow(active)
     }
+    broadcastStateChanged({ gameId: settings.activeGameId })
     return { ok: true }
   })
 
@@ -1473,32 +2029,26 @@ function registerIpc(): void {
     if (!settings.ui.allowHotkeySend) {
       return { ok: false, error: '设置中已关闭“允许点击热键发送”' }
     }
-    const plan = toInputPlan(key)
-    if (!plan) return { ok: false, error: '暂不支持这个热键格式' }
-    const wasOverlayVisible = Boolean(overlayWindow?.isVisible())
-    const wasDetailVisible = Boolean(overlayDetailWindow?.isVisible())
-    // 先关侧栏再关主面板，避免关闭过程中焦点落回正在隐藏的窗口。
-    overlayDetailWindow?.hide()
-    overlayWindow?.hide()
-    await new Promise((resolve) => setTimeout(resolve, 220))
-    try {
-      const gamePath = settings.games[settings.activeGameId]?.gamePath || ''
-      const action = 'mouse' in plan ? mouseScript(plan.mouse) : sendKeysScript(plan.sequence)
-      const script = focusGamePrefix(gamePath) + action
-      const child = spawn(
-        'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script],
-        { detached: true, stdio: 'ignore', windowsHide: true }
-      )
-      child.on('error', (error) => logError('send-hotkey', error))
-      child.unref()
-      // 发送后恢复面板，避免看起来像“快捷菜单崩掉”。
-      setTimeout(() => restoreOverlayWindows(wasOverlayVisible, wasDetailVisible), 1200)
-      return { ok: true }
-    } catch (error) {
-      restoreOverlayWindows(wasOverlayVisible, wasDetailVisible)
-      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    const plan = toKeyPlan(key)
+    if (!plan) {
+      return { ok: false, error: '暂不支持这个热键格式（目前只发送键盘热键）' }
     }
+    return executeKeyPlan(plan)
+  })
+
+  register(IPC.rosterStatus, async () => getRosterStatus(settings.import.rosterRemoteUrl))
+
+  register(IPC.rosterSync, async (customUrl?: string) => {
+    const targetUrl = (customUrl ?? settings.import.rosterRemoteUrl ?? '').trim()
+    if (customUrl && customUrl.trim() && customUrl.trim() !== settings.import.rosterRemoteUrl) {
+      settings = mergeSettings(settings, { import: { rosterRemoteUrl: customUrl.trim() } })
+      await saveSettings(baseDir(), settings)
+    }
+    const res = await syncRemoteRoster(baseDir(), targetUrl, (url) => net.fetch(url))
+    if (res.ok) {
+      broadcastStateChanged({ gameId: settings.activeGameId })
+    }
+    return res
   })
 
   register(IPC.checkEnvironment, async (gameId?: GameId) => {
@@ -1869,7 +2419,10 @@ async function bootstrap(): Promise<void> {
   await ensureDir(path.join(baseDir(), 'covers'))
   settings = await loadSettings(baseDir())
   metadata = await loadMetadata(baseDir())
+  await loadRosterCache(baseDir()).catch((error) => logError('roster-cache', error))
+  void ensureKeyHelperBinary()
   startupLog('bootstrap', `settings-loaded userData=${baseDir()}`)
+  refreshModsWatcher()
   const hotkeyResult = applyOverlayHotkey(settings.ui.overlayHotkey)
   if (!hotkeyResult.ok) {
     startupLog('hotkey', hotkeyResult.error || 'registration failed')
@@ -1934,6 +2487,14 @@ app.on('before-quit', () => {
 })
 
 app.on('will-quit', () => {
+  if (modsWatcher) {
+    try {
+      modsWatcher.close()
+    } catch {
+      // ignore
+    }
+    modsWatcher = null
+  }
   tray?.destroy()
   tray = null
   if (app.isReady()) globalShortcut.unregisterAll()

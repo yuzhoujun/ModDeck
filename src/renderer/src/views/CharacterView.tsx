@@ -33,7 +33,8 @@ export function CharacterView({
   onCover,
   onOpenCharacterFolder,
   onReorderMods,
-  onRefresh
+  onRefresh,
+  onNotify
 }: {
   game: GameDef
   character: CharacterInfo
@@ -57,6 +58,7 @@ export function CharacterView({
   onOpenCharacterFolder: () => void
   onReorderMods: (folders: string[]) => void
   onRefresh: () => void
+  onNotify?: (text: string, kind?: 'ok' | 'err' | 'info') => void
 }) {
   const [selectedName, setSelectedName] = useState<string | null>(null)
   const [details, setDetails] = useState<ModDetails | null>(null)
@@ -75,11 +77,23 @@ export function CharacterView({
 
   useEffect(() => {
     if (!selectedName) return
-    if (!mods.some((mod) => mod.name === selectedName)) {
+    const match = mods.find((mod) => mod.name === selectedName)
+    if (!match) {
       setSelectedName(null)
       setDetails(null)
+      return
     }
-  }, [mods, selectedName])
+    if (
+      details &&
+      details.name === match.name &&
+      (details.enabled !== match.enabled || details.previewUrl !== match.previewUrl)
+    ) {
+      void window.moddeck
+        .getModDetails(game.id, character.folder, match.folderName)
+        .then((next) => setDetails(next))
+        .catch(() => undefined)
+    }
+  }, [mods, selectedName, details, game.id, character.folder])
 
   async function loadDetails(mod: ModInfo) {
     setSelectedName(mod.name)
@@ -104,6 +118,35 @@ export function CharacterView({
       } catch {
         // 下次点击会重新读取
       }
+    }
+  }
+
+  async function handleSetModPreview(sourcePath?: string) {
+    const targetMod = selectedMod || (details ? { folderName: details.folderName, name: details.name } : null)
+    if (!targetMod) return
+    try {
+      const res = await window.moddeck.setModPreview(
+        game.id,
+        character.folder,
+        targetMod.folderName,
+        sourcePath
+      )
+      if (!res.ok) {
+        if (res.error && res.error !== '已取消') {
+          onNotify?.(res.error, 'err')
+        }
+        return
+      }
+      const nextDetails = await window.moddeck.getModDetails(
+        game.id,
+        character.folder,
+        targetMod.folderName
+      )
+      setDetails(nextDetails)
+      onRefresh()
+      onNotify?.('Mod 预览图已更新', 'ok')
+    } catch (error) {
+      onNotify?.(error instanceof Error ? error.message : String(error), 'err')
     }
   }
 
@@ -300,10 +343,12 @@ export function CharacterView({
                     event.dataTransfer.setData('text/plain', mod.name)
                   }}
                   onDragOver={(event) => {
+                    if (!dragName) return
                     event.preventDefault()
                     event.dataTransfer.dropEffect = 'move'
                   }}
                   onDrop={(event) => {
+                    if (!dragName) return
                     event.preventDefault()
                     handleDrop(mod.name)
                   }}
@@ -335,6 +380,7 @@ export function CharacterView({
               setSelectedName(null)
               setDetails(null)
             }}
+            onSetPreview={(sourcePath) => void handleSetModPreview(sourcePath)}
           />
         ) : null}
       </div>

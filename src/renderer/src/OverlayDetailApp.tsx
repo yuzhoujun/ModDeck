@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { GameId, ModDetails } from '../../shared/types'
 import { Icon } from './components/Icon'
+import { ScrollTitle } from './components/ScrollTitle'
 import { errorMessage } from './utils'
 
 export function OverlayDetailApp() {
@@ -14,17 +15,25 @@ export function OverlayDetailApp() {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
+    const fetchDetails = async () => {
       if (!gameId || !characterFolder || !modFolder) return
       try {
         const data = await window.moddeck.getModDetails(gameId, characterFolder, modFolder)
-        if (!cancelled) setDetails(data)
+        if (!cancelled) {
+          setDetails(data)
+          setError(null)
+        }
       } catch (err) {
         if (!cancelled) setError(errorMessage(err))
       }
-    })()
+    }
+    void fetchDetails()
+    const unsubscribe = window.moddeck.onStateChanged(() => {
+      void fetchDetails()
+    })
     return () => {
       cancelled = true
+      unsubscribe()
     }
   }, [gameId, characterFolder, modFolder])
 
@@ -44,8 +53,11 @@ export function OverlayDetailApp() {
       <header className="overlay-head">
         <div className="overlay-brand">
           <span className="brand-mark small">M</span>
-          <div>
-            <strong>{details?.name || 'Mod 热键'}</strong>
+          <div className="overlay-brand-text">
+            <ScrollTitle
+              text={details?.name || 'Mod 热键'}
+              className="overlay-title-marquee"
+            />
             <span>{details ? (details.enabled ? '已启用' : '已禁用') : '读取中…'}</span>
           </div>
         </div>
@@ -74,9 +86,6 @@ export function OverlayDetailApp() {
           </div>
         ) : (
           <>
-            <p className="muted small">
-              点击热键会先隐藏面板，再把按键发送到当前游戏窗口。
-            </p>
             <div className="hotkey-grid">
               {details.hotkeys.map((hotkey, index) => (
                 <button

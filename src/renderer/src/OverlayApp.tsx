@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import type {
   Bootstrap,
   CharacterInfo,
+  GameId,
   GameSnapshot,
   ModInfo,
   RecentMod
 } from '../../shared/types'
 import { Icon } from './components/Icon'
+import { ScrollTitle } from './components/ScrollTitle'
 import { errorMessage } from './utils'
 
 type CharacterFilter = 'all' | 'withMods' | 'empty'
@@ -58,6 +60,51 @@ export function OverlayApp() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (loading) return
+    let active = true
+    const unsubscribe = window.moddeck.onStateChanged(() => {
+      void (async () => {
+        try {
+          const data = await window.moddeck.bootstrap()
+          if (!active || !data.snapshot) return
+          setBoot(data)
+          setSnapshot(data.snapshot)
+          setSelectMode(data.settings.ui.modSelectMode)
+          setFilter(data.settings.ui.characterFilter)
+          setPinned(data.settings.ui.overlayPinned)
+          setRecent(data.settings.recentMods)
+
+          const chars = data.snapshot.characters
+          const nextFilter = data.settings.ui.characterFilter
+          const candidates = chars.filter((character) => {
+            if (nextFilter === 'withMods') return character.modCount > 0
+            if (nextFilter === 'empty') return character.modCount === 0
+            return true
+          })
+          let targetFolder = selected
+          if (!targetFolder || !chars.some((character) => character.folder === targetFolder)) {
+            const first = candidates.find((character) => character.modCount > 0) ?? candidates[0]
+            targetFolder = first?.folder ?? ''
+            setSelected(targetFolder)
+          }
+          if (targetFolder) {
+            const nextMods = await window.moddeck.getMods(data.snapshot.game.id, targetFolder)
+            if (active) setMods(nextMods)
+          } else {
+            setMods([])
+          }
+        } catch {
+          // ignore background sync errors
+        }
+      })()
+    })
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [loading, selected])
 
   const characters: CharacterInfo[] = snapshot?.characters ?? []
   const filteredCharacters = characters.filter((character) => {
@@ -169,6 +216,41 @@ export function OverlayApp() {
     })
   }
 
+  async function changeGame(gameId: GameId) {
+    if (!snapshot || gameId === snapshot.game.id) return
+    setLoading(true)
+    setError(null)
+    try {
+      const next = await window.moddeck.switchGame(gameId)
+      if (!next) {
+        setError('无法切换到这个游戏')
+        return
+      }
+      setSnapshot(next)
+      setBoot((current) =>
+        current
+          ? { ...current, settings: { ...current.settings, activeGameId: gameId } }
+          : current
+      )
+      setSelected('')
+      setMods([])
+      const candidates = next.characters.filter((character) => {
+        if (filter === 'withMods') return character.modCount > 0
+        if (filter === 'empty') return character.modCount === 0
+        return true
+      })
+      const first = candidates.find((character) => character.modCount > 0) ?? candidates[0]
+      if (first) {
+        setSelected(first.folder)
+        setMods(await window.moddeck.getMods(gameId, first.folder))
+      }
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function setPinnedState(value: boolean) {
     setPinned(value)
     await window.moddeck.setOverlayPinned(value)
@@ -186,7 +268,19 @@ export function OverlayApp() {
           <span className="brand-mark small">M</span>
           <div>
             <strong>ModDeck Quick</strong>
-            <span>{snapshot?.game.shortName ?? '未配置游戏'}</span>
+            <select
+              className="overlay-game-select"
+              value={snapshot?.game.id ?? ''}
+              onChange={(event) => void changeGame(event.target.value as GameId)}
+              title="切换当前游戏"
+            >
+              {!snapshot ? <option value="">未配置游戏</option> : null}
+              {boot?.games.map((game) => (
+                <option key={game.id} value={game.id}>
+                  {game.shortName} · {game.loader}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="overlay-head-actions">
@@ -301,7 +395,7 @@ export function OverlayApp() {
               title="点击查看热键"
             >
               <div className="overlay-mod-main">
-                <div className="overlay-mod-name">{mod.name}</div>
+                <ScrollTitle text={mod.name} className="overlay-mod-name" />
                 <div className="overlay-mod-sub">{mod.enabled ? '已启用' : '已禁用'}</div>
               </div>
               <button

@@ -216,10 +216,12 @@ export function LibraryView({
                     event.dataTransfer.setData('text/plain', character.folder)
                   }}
                   onDragOver={(event) => {
+                    if (!dragFolder) return
                     event.preventDefault()
                     event.dataTransfer.dropEffect = 'move'
                   }}
                   onDrop={(event) => {
+                    if (!dragFolder) return
                     event.preventDefault()
                     handleDrop(character.folder)
                   }}

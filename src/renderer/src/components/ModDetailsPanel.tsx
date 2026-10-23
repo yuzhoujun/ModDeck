@@ -1,6 +1,8 @@
+import { useState, type DragEvent } from 'react'
 import type { ModDetails } from '../../../shared/types'
 import { formatDate } from '../utils'
 import { Icon } from './Icon'
+import { ScrollTitle } from './ScrollTitle'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -9,6 +11,8 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
+const IMAGE_FILE_PATTERN = /\.(png|jpe?g|webp|gif|avif)$/i
+
 export function ModDetailsPanel({
   details,
   loading,
@@ -16,7 +20,8 @@ export function ModDetailsPanel({
   onClose,
   onToggle,
   onOpen,
-  onDelete
+  onDelete,
+  onSetPreview
 }: {
   details: ModDetails | null
   loading: boolean
@@ -25,7 +30,41 @@ export function ModDetailsPanel({
   onToggle: () => void
   onOpen: () => void
   onDelete: () => void
+  onSetPreview?: (sourcePath?: string) => Promise<void> | void
 }) {
+  const [previewDrag, setPreviewDrag] = useState(false)
+
+  function handlePreviewDragOver(event: DragEvent<HTMLDivElement>) {
+    if (!onSetPreview) return
+    if (!Array.from(event.dataTransfer.types).includes('Files')) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'copy'
+    if (!previewDrag) setPreviewDrag(true)
+  }
+
+  function handlePreviewDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.stopPropagation()
+    const related = event.relatedTarget as Node | null
+    if (related && event.currentTarget.contains(related)) return
+    setPreviewDrag(false)
+  }
+
+  function handlePreviewDrop(event: DragEvent<HTMLDivElement>) {
+    if (!onSetPreview) return
+    event.preventDefault()
+    event.stopPropagation()
+    setPreviewDrag(false)
+    const files = Array.from(event.dataTransfer.files)
+    const imgFile = files.find((f) => IMAGE_FILE_PATTERN.test(f.name))
+    const targetFile = imgFile ?? files[0]
+    if (!targetFile) return
+    const filePath = window.moddeck.getPathForFile(targetFile)
+    if (filePath) {
+      void onSetPreview(filePath)
+    }
+  }
+
   return (
     <aside className="detail-panel">
       <div className="detail-head">
@@ -46,16 +85,34 @@ export function ModDetailsPanel({
         </div>
       ) : details ? (
         <div className="detail-body">
-          <div className="detail-preview">
+          <div
+            className={`detail-preview${onSetPreview ? ' is-interactive' : ''}${previewDrag ? ' is-drag-over' : ''}`}
+            onClick={() => {
+              if (onSetPreview) void onSetPreview()
+            }}
+            onDragOver={handlePreviewDragOver}
+            onDragLeave={handlePreviewDragLeave}
+            onDrop={handlePreviewDrop}
+            title={onSetPreview ? '点击或拖入图片更换该 Mod 的预览图' : undefined}
+          >
             {details.previewUrl ? (
               <img src={details.previewUrl} alt="" />
             ) : (
-              <Icon name="image" size={28} />
+              <div className="detail-preview-empty">
+                <Icon name="image" size={28} />
+                <span>点击或拖入图片设置预览图</span>
+              </div>
             )}
+            {onSetPreview ? (
+              <div className="detail-preview-hint">
+                <Icon name="upload" size={15} />
+                <span>{previewDrag ? '松开保存为 Mod 预览图' : '点击或拖入图片更换预览图'}</span>
+              </div>
+            ) : null}
           </div>
 
           <div className="detail-title">
-            {details.name}
+            <ScrollTitle text={details.name} className="detail-title-text" />
             <span className={`chip ${details.enabled ? 'ok' : ''}`}>
               {details.enabled ? '已启用' : '已禁用'}
             </span>
