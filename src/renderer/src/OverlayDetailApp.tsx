@@ -74,9 +74,6 @@ export function OverlayDetailApp() {
           </div>
         ) : (
           <>
-            <p className="muted small">
-              点击热键会先隐藏面板，再把按键发送到当前游戏窗口。
-            </p>
             <div className="hotkey-grid">
               {details.hotkeys.map((hotkey, index) => (
                 <button

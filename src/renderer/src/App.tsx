@@ -555,6 +555,9 @@ export default function App() {
                 className={`game-nav-item${active ? ' active' : ''}`}
                 onClick={() => void switchGame(game.id)}
                 style={active ? { borderColor: `${game.accent}55` } : undefined}
+                role="radio"
+                aria-checked={active}
+                title={active ? '当前游戏' : `切换到 ${game.name}`}
               >
                 <span className="dot" style={{ background: game.accent }} />
                 <span className="grow">{game.shortName}</span>

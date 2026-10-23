@@ -1281,6 +1281,24 @@ code {
   color: var(--muted);
 }
 
+.overlay-game-select {
+  display: block;
+  max-width: 190px;
+  margin-top: 1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10.5px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.overlay-game-select option {
+  background: #111826;
+  color: var(--text);
+}
+
 .brand-mark.small {
   width: 26px;
   height: 26px;

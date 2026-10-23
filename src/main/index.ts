@@ -603,134 +603,156 @@ function hideOverlayDetail(): void {
   overlayDetailWindow?.hide()
 }
 
-type MouseButton = 'left' | 'right' | 'middle' | 'x1' | 'x2'
-type InputPlan = { sequence: string } | { mouse: MouseButton }
+type KeyPlan = { modifiers: number[]; keys: number[] }
 
-const MOUSE_KEYS: Record<string, MouseButton> = {
-  LBUTTON: 'left',
-  RBUTTON: 'right',
-  MBUTTON: 'middle',
-  XBUTTON1: 'x1',
-  XBUTTON2: 'x2'
+const MOUSE_KEYS = new Set([
+  'LBUTTON',
+  'RBUTTON',
+  'MBUTTON',
+  'XBUTTON1',
+  'XBUTTON2'
+])
+
+const VK_KEYS: Record<string, number> = {
+  BACK: 0x08,
+  BACKSPACE: 0x08,
+  TAB: 0x09,
+  RETURN: 0x0d,
+  ENTER: 0x0d,
+  SHIFT: 0x10,
+  CONTROL: 0x11,
+  MENU: 0x12,
+  ESCAPE: 0x1b,
+  ESC: 0x1b,
+  SPACE: 0x20,
+  PRIOR: 0x21,
+  PAGEUP: 0x21,
+  NEXT: 0x22,
+  PAGEDOWN: 0x22,
+  END: 0x23,
+  HOME: 0x24,
+  LEFT: 0x25,
+  UP: 0x26,
+  RIGHT: 0x27,
+  DOWN: 0x28,
+  INSERT: 0x2d,
+  DELETE: 0x2e,
+  DEL: 0x2e,
+  LWIN: 0x5b,
+  RWIN: 0x5c,
+  NUMPAD0: 0x60,
+  NUMPAD1: 0x61,
+  NUMPAD2: 0x62,
+  NUMPAD3: 0x63,
+  NUMPAD4: 0x64,
+  NUMPAD5: 0x65,
+  NUMPAD6: 0x66,
+  NUMPAD7: 0x67,
+  NUMPAD8: 0x68,
+  NUMPAD9: 0x69,
+  MULTIPLY: 0x6a,
+  ADD: 0x6b,
+  SUBTRACT: 0x6d,
+  DECIMAL: 0x6e,
+  DIVIDE: 0x6f,
+  LSHIFT: 0xa0,
+  RSHIFT: 0xa1,
+  LCONTROL: 0xa2,
+  RCONTROL: 0xa3,
+  LMENU: 0xa4,
+  RMENU: 0xa5,
+  OEM_1: 0xba,
+  OEM_PLUS: 0xbb,
+  OEM_COMMA: 0xbc,
+  OEM_MINUS: 0xbd,
+  OEM_PERIOD: 0xbe,
+  OEM_2: 0xbf,
+  OEM_3: 0xc0,
+  OEM_4: 0xdb,
+  OEM_5: 0xdc,
+  OEM_6: 0xdd,
+  OEM_7: 0xde
 }
 
-const PUNCTUATION_KEYS: Record<string, string> = {
-  '/': '/',
-  '.': '.',
-  ',': ',',
-  ';': ';',
-  '[': '{[}',
-  ']': '{]}',
-  '-': '-',
-  '=': '=',
-  '\\': '\\',
-  '`': '`'
+const PUNCTUATION_VK: Record<string, number> = {
+  '/': 0xbf,
+  '.': 0xbe,
+  ',': 0xbc,
+  ';': 0xba,
+  "'": 0xde,
+  '[': 0xdb,
+  ']': 0xdd,
+  '-': 0xbd,
+  '=': 0xbb,
+  '\\': 0xdc,
+  '`': 0xc0
 }
 
-const NAMED_KEYS: Record<string, string> = {
-  SPACE: '{SPACE}',
-  TAB: '{TAB}',
-  ENTER: '{ENTER}',
-  RETURN: '{ENTER}',
-  ESC: '{ESC}',
-  ESCAPE: '{ESC}',
-  BACKSPACE: '{BACKSPACE}',
-  BACK: '{BACKSPACE}',
-  DELETE: '{DELETE}',
-  DEL: '{DELETE}',
-  INSERT: '{INSERT}',
-  HOME: '{HOME}',
-  END: '{END}',
-  PAGEUP: '{PGUP}',
-  PRIOR: '{PGUP}',
-  PAGEDOWN: '{PGDN}',
-  NEXT: '{PGDN}',
-  UP: '{UP}',
-  DOWN: '{DOWN}',
-  LEFT: '{LEFT}',
-  RIGHT: '{RIGHT}',
-  NUMPAD0: '{NUMPAD0}',
-  NUMPAD1: '{NUMPAD1}',
-  NUMPAD2: '{NUMPAD2}',
-  NUMPAD3: '{NUMPAD3}',
-  NUMPAD4: '{NUMPAD4}',
-  NUMPAD5: '{NUMPAD5}',
-  NUMPAD6: '{NUMPAD6}',
-  NUMPAD7: '{NUMPAD7}',
-  NUMPAD8: '{NUMPAD8}',
-  NUMPAD9: '{NUMPAD9}',
-  ADD: '{ADD}',
-  SUBTRACT: '{SUBTRACT}',
-  MULTIPLY: '{MULTIPLY}',
-  DIVIDE: '{DIVIDE}',
-  DECIMAL: '{DECIMAL}'
+function vkForToken(token: string): number | null {
+  const raw = token.replace(/^VK_/i, '')
+  const key = raw.toUpperCase()
+  if (MOUSE_KEYS.has(key)) return null
+  if (/^[A-Z0-9]$/.test(key)) return key.charCodeAt(0)
+  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) {
+    return 0x6f + Number(key.slice(1))
+  }
+  if (PUNCTUATION_VK[raw]) return PUNCTUATION_VK[raw]
+  return VK_KEYS[key] ?? null
 }
 
-const OEM_KEYS: Record<string, string> = {
-  OEM_1: ';',
-  OEM_PLUS: '=',
-  OEM_COMMA: ',',
-  OEM_MINUS: '-',
-  OEM_PERIOD: '.',
-  OEM_2: '/',
-  OEM_3: '`',
-  OEM_4: '{[}',
-  OEM_5: '\\',
-  OEM_6: '{]}'
-}
-
-function toInputPlan(value: string): InputPlan | null {
+function toKeyPlan(value: string): KeyPlan | null {
   const tokens = String(value || '')
     .trim()
     .split(/\s+/)
     .filter(Boolean)
   if (tokens.length === 0) return null
 
-  let prefix = ''
-  let keyToken = ''
+  const modifiers = new Set<number>()
+  const keys: number[] = []
   for (const token of tokens) {
     const lower = token.toLowerCase()
     if (lower === 'ctrl' || lower === 'control') {
-      prefix += '^'
+      modifiers.add(0x11)
     } else if (lower === 'alt') {
-      prefix += '%'
+      modifiers.add(0x12)
     } else if (lower === 'shift') {
-      prefix += '+'
+      modifiers.add(0x10)
     } else if (lower === 'win') {
-      // SendKeys 没有 Win 前缀，交给 VK 发送器或拒绝。
-      return null
+      modifiers.add(0x5b)
     } else if (lower.startsWith('no_')) {
       continue
-    } else if (!keyToken) {
-      keyToken = token
     } else {
-      return null
+      const vk = vkForToken(token)
+      if (vk === null) return null
+      keys.push(vk)
     }
   }
-  if (!keyToken) return null
-
-  const rawKey = keyToken.replace(/^VK_/i, '')
-  const key = rawKey.toUpperCase()
-  if (MOUSE_KEYS[key]) return { mouse: MOUSE_KEYS[key] }
-  if (/^[A-Za-z0-9]$/.test(rawKey)) return { sequence: `${prefix}${rawKey}` }
-  if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) return { sequence: `${prefix}{${key}}` }
-  if (PUNCTUATION_KEYS[rawKey]) return { sequence: `${prefix}${PUNCTUATION_KEYS[rawKey]}` }
-  if (OEM_KEYS[key]) return { sequence: `${prefix}${OEM_KEYS[key]}` }
-  if (NAMED_KEYS[key]) return { sequence: `${prefix}${NAMED_KEYS[key]}` }
-  return null
+  if (keys.length === 0) return null
+  return { modifiers: [...modifiers], keys }
 }
 
-function mouseScript(mouse: MouseButton): string {
-  const flags = {
-    left: [0x0002, 0x0004, 0],
-    right: [0x0008, 0x0010, 0],
-    middle: [0x0020, 0x0040, 0],
-    x1: [0x0080, 0x0100, 1],
-    x2: [0x0080, 0x0100, 2]
-  }[mouse]
+function keyPlanScript(plan: KeyPlan): string {
   const csharp =
-    'using System; using System.Runtime.InteropServices; public static class ModDeckMouse { [DllImport("user32.dll")] public static extern void mouse_event(uint f,uint dx,uint dy,uint d,UIntPtr e); public static void Click(uint d,uint u,uint x){ mouse_event(d,0,0,x,UIntPtr.Zero); mouse_event(u,0,0,x,UIntPtr.Zero); } }'
-  return `Add-Type -TypeDefinition '${csharp}'; [ModDeckMouse]::Click(${flags[0]}, ${flags[1]}, ${flags[2]})`
+    'using System; using System.Runtime.InteropServices; public static class ModDeckKey { [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra); }'
+  const lines = [`Add-Type -TypeDefinition '${csharp}'`]
+  for (const vk of plan.modifiers) {
+    lines.push(`[ModDeckKey]::keybd_event(${vk},0,0,[UIntPtr]::Zero)`)
+    lines.push('Start-Sleep -Milliseconds 15')
+  }
+  for (const vk of plan.keys) {
+    lines.push(`[ModDeckKey]::keybd_event(${vk},0,0,[UIntPtr]::Zero)`)
+    lines.push('Start-Sleep -Milliseconds 15')
+  }
+  lines.push('Start-Sleep -Milliseconds 60')
+  for (const vk of [...plan.keys].reverse()) {
+    lines.push(`[ModDeckKey]::keybd_event(${vk},0,2,[UIntPtr]::Zero)`)
+    lines.push('Start-Sleep -Milliseconds 15')
+  }
+  for (const vk of [...plan.modifiers].reverse()) {
+    lines.push(`[ModDeckKey]::keybd_event(${vk},0,2,[UIntPtr]::Zero)`)
+    lines.push('Start-Sleep -Milliseconds 15')
+  }
+  return lines.join('; ')
 }
 
 function applyOverlayHotkey(value: string): { ok: boolean; error?: string } {
@@ -909,26 +931,6 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
 function sendKeysScript(sequence: string): string {
   const encoded = Buffer.from(sequence, 'utf8').toString('base64')
   return `Add-Type -AssemblyName System.Windows.Forms; $s=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')); [System.Windows.Forms.SendKeys]::SendWait($s)`
-}
-
-function focusGamePrefix(gamePath: string): string {
-  if (!gamePath) return ''
-  const encoded = Buffer.from(gamePath, 'utf8').toString('base64')
-  const csharp =
-    'using System; using System.Runtime.InteropServices; public static class ModDeckFocus { [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h); }'
-  return `Add-Type -TypeDefinition '${csharp}'; $gp=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}')); $proc=Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $gp } | Select-Object -First 1; if($proc -and $proc.MainWindowHandle -ne 0){ [ModDeckFocus]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null; Start-Sleep -Milliseconds 250 }`
-}
-
-function restoreOverlayWindows(showOverlay: boolean, showDetail: boolean): void {
-  if (showOverlay && overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.show()
-    overlayWindow.focus()
-    raiseOverlayWindow(overlayWindow)
-  }
-  if (showDetail && overlayDetailWindow && !overlayDetailWindow.isDestroyed()) {
-    overlayDetailWindow.showInactive()
-    raiseOverlayWindow(overlayDetailWindow)
-  }
 }
 
 function foregroundProcessPath(): Promise<string | null> {
@@ -1473,30 +1475,28 @@ function registerIpc(): void {
     if (!settings.ui.allowHotkeySend) {
       return { ok: false, error: '设置中已关闭“允许点击热键发送”' }
     }
-    const plan = toInputPlan(key)
-    if (!plan) return { ok: false, error: '暂不支持这个热键格式' }
-    const wasOverlayVisible = Boolean(overlayWindow?.isVisible())
-    const wasDetailVisible = Boolean(overlayDetailWindow?.isVisible())
-    // 先关侧栏再关主面板，避免关闭过程中焦点落回正在隐藏的窗口。
-    overlayDetailWindow?.hide()
-    overlayWindow?.hide()
-    await new Promise((resolve) => setTimeout(resolve, 220))
+    const plan = toKeyPlan(key)
+    if (!plan) {
+      return { ok: false, error: '暂不支持这个热键格式（目前只发送键盘热键）' }
+    }
     try {
-      const gamePath = settings.games[settings.activeGameId]?.gamePath || ''
-      const action = 'mouse' in plan ? mouseScript(plan.mouse) : sendKeysScript(plan.sequence)
-      const script = focusGamePrefix(gamePath) + action
+      // 和 QAQ 一样直接调用 keybd_event，不隐藏快捷菜单。
       const child = spawn(
         'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script],
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-WindowStyle',
+          'Hidden',
+          '-Command',
+          keyPlanScript(plan)
+        ],
         { detached: true, stdio: 'ignore', windowsHide: true }
       )
       child.on('error', (error) => logError('send-hotkey', error))
       child.unref()
-      // 发送后恢复面板，避免看起来像“快捷菜单崩掉”。
-      setTimeout(() => restoreOverlayWindows(wasOverlayVisible, wasDetailVisible), 1200)
       return { ok: true }
     } catch (error) {
-      restoreOverlayWindows(wasOverlayVisible, wasDetailVisible)
       return { ok: false, error: error instanceof Error ? error.message : String(error) }
     }
   })

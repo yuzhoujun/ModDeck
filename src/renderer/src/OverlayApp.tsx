@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type {
   Bootstrap,
   CharacterInfo,
+  GameId,
   GameSnapshot,
   ModInfo,
   RecentMod
@@ -169,6 +170,41 @@ export function OverlayApp() {
     })
   }
 
+  async function changeGame(gameId: GameId) {
+    if (!snapshot || gameId === snapshot.game.id) return
+    setLoading(true)
+    setError(null)
+    try {
+      const next = await window.moddeck.switchGame(gameId)
+      if (!next) {
+        setError('无法切换到这个游戏')
+        return
+      }
+      setSnapshot(next)
+      setBoot((current) =>
+        current
+          ? { ...current, settings: { ...current.settings, activeGameId: gameId } }
+          : current
+      )
+      setSelected('')
+      setMods([])
+      const candidates = next.characters.filter((character) => {
+        if (filter === 'withMods') return character.modCount > 0
+        if (filter === 'empty') return character.modCount === 0
+        return true
+      })
+      const first = candidates.find((character) => character.modCount > 0) ?? candidates[0]
+      if (first) {
+        setSelected(first.folder)
+        setMods(await window.moddeck.getMods(gameId, first.folder))
+      }
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function setPinnedState(value: boolean) {
     setPinned(value)
     await window.moddeck.setOverlayPinned(value)
@@ -186,7 +222,19 @@ export function OverlayApp() {
           <span className="brand-mark small">M</span>
           <div>
             <strong>ModDeck Quick</strong>
-            <span>{snapshot?.game.shortName ?? '未配置游戏'}</span>
+            <select
+              className="overlay-game-select"
+              value={snapshot?.game.id ?? ''}
+              onChange={(event) => void changeGame(event.target.value as GameId)}
+              title="切换当前游戏"
+            >
+              {!snapshot ? <option value="">未配置游戏</option> : null}
+              {boot?.games.map((game) => (
+                <option key={game.id} value={game.id}>
+                  {game.shortName} · {game.loader}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="overlay-head-actions">

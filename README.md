@@ -61,6 +61,7 @@ ModDeck 只管理 `Mods` 目录：扫描角色和 Mod、启停、导入、排序
 默认快捷键 `Alt+Shift+M`（可在设置中修改）。快捷窗口可以：
 
 - 切换角色、搜索 Mod、快速启停
+- 标题下方下拉切换当前游戏
 - 按“全部 / 有 Mod / 无 Mod”筛选角色
 - 置顶 / 取消置顶
 - 显示最近打开或切换过的 Mod
@@ -101,7 +102,7 @@ EFMI 自带的 `d3dx.ini` 默认包含 `include_recursive = Mods` 和
 `exclude_recursive = DISABLED*`，所以 `DISABLED_` 前缀是 EFMI / 3DMigoto 的加载规则，
 不依赖某个外部管理器。
 
-![设置与环境检查](docs/screenshot-settings.png)
+![设置](docs/screenshot-settings.png)
 
 ## 设置与本地数据
 
