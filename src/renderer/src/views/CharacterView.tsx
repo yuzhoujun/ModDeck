@@ -361,6 +361,7 @@ export function CharacterView({
 
         {selectedName ? (
           <ModDetailsPanel
+            gameId={game.id}
             details={details}
             loading={detailsLoading}
             error={detailsError}
@@ -381,6 +382,7 @@ export function CharacterView({
               setDetails(null)
             }}
             onSetPreview={(sourcePath) => void handleSetModPreview(sourcePath)}
+            onNotify={onNotify}
           />
         ) : null}
       </div>
