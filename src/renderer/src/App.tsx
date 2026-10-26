@@ -34,6 +34,7 @@ export default function App() {
   const [booting, setBooting] = useState(true)
   const [fatal, setFatal] = useState<string | null>(null)
   const [view, setView] = useState<View>('library')
+  const [settingsTab, setSettingsTab] = useState<'general' | 'games' | 'environment' | 'import' | 'about'>('general')
   const [selected, setSelected] = useState<CharacterInfo | null>(null)
   const [mods, setMods] = useState<ModInfo[]>([])
   const [modsLoading, setModsLoading] = useState(false)
@@ -695,7 +696,7 @@ export default function App() {
         <div className="sidebar-foot">
           <button
             className={`side-action${view === 'settings' ? ' active' : ''}`}
-            onClick={() => setView('settings')}
+            onClick={() => { setSettingsTab('general'); setView('settings'); }}
           >
             <Icon name="settings" size={17} />
             设置
@@ -745,7 +746,7 @@ export default function App() {
                 className="btn ghost small-btn"
                 onClick={() => {
                   setEnvWarning(null)
-                  setView('settings')
+                  setSettingsTab('environment'); setView('settings');
                 }}
               >
                 设置
@@ -771,6 +772,7 @@ export default function App() {
           <SettingsView
             games={boot.games}
             settings={boot.settings}
+            initialTab={settingsTab}
             onSave={saveSettings}
             onNotify={notify}
           />
@@ -819,7 +821,7 @@ export default function App() {
             onImport={() => void runImport('files')}
             onImportFolder={() => void runImport('folder')}
             onRefresh={() => void refreshSnapshot(snapshot.game.id)}
-            onOpenSettings={() => setView('settings')}
+            onOpenSettings={(targetTab) => { setSettingsTab(targetTab ?? 'games'); setView('settings'); }}
             onLaunchGame={() => void launchConfigured('game')}
             onLaunchLoader={() => void launchConfigured('loader')}
             onReorderCharacters={reorderCharacters}

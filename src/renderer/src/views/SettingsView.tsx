@@ -16,15 +16,17 @@ type SettingsTab = 'general' | 'games' | 'environment' | 'import' | 'about'
 export function SettingsView({
   games,
   settings,
+  initialTab = 'general',
   onSave,
   onNotify
 }: {
   games: GameDef[]
   settings: Settings
+  initialTab?: SettingsTab
   onSave: (patch: SettingsPatch) => Promise<void>
   onNotify: (text: string, kind?: 'ok' | 'err' | 'info') => void
 }) {
-  const [tab, setTab] = useState<SettingsTab>('general')
+  const [tab, setTab] = useState<SettingsTab>(initialTab)
   const [draft, setDraft] = useState<Settings>(settings)
   const [hotkeyDraft, setHotkeyDraft] = useState(settings.ui.overlayHotkey)
   const [saving, setSaving] = useState(false)
@@ -40,6 +42,10 @@ export function SettingsView({
     setDraft(settings)
     setHotkeyDraft(settings.ui.overlayHotkey)
   }, [settings])
+
+  useEffect(() => {
+    if (initialTab) setTab(initialTab)
+  }, [initialTab])
 
   useEffect(() => {
     window.moddeck
@@ -184,7 +190,7 @@ export function SettingsView({
     { id: 'games', label: '配置', icon: 'folder' },
     { id: 'environment', label: '环境', icon: 'box' },
     { id: 'import', label: '导入', icon: 'download' },
-    { id: 'about', label: '关于', icon: 'box' }
+    { id: 'about', label: '关于', icon: 'info' }
   ]
 
   return (
