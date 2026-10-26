@@ -266,3 +266,17 @@ export interface SimpleResult {
   error?: string
   path?: string
 }
+
+export interface ModVariantPreset {
+  id: string
+  name: string
+  modName: string
+  characterFolder: string
+  activeIniFiles: string[]
+  updatedAt: number
+}
+
+export interface SaveModPresetInput {
+  name: string
+  activeIniFiles?: string[]
+}

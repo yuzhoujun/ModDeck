@@ -48,6 +48,14 @@ const api: ModDeckApi = {
     ipcRenderer.invoke(IPC.saveCharacterCoverData, gameId, characterFolder, dataUrl),
   clearCharacterCover: (gameId, characterFolder) =>
     ipcRenderer.invoke(IPC.clearCharacterCover, gameId, characterFolder),
+  getModPresets: (gameId, characterFolder, modFolder) =>
+    ipcRenderer.invoke(IPC.getModPresets, gameId, characterFolder, modFolder),
+  saveModPreset: (gameId, characterFolder, modFolder, presetName) =>
+    ipcRenderer.invoke(IPC.saveModPreset, gameId, characterFolder, modFolder, presetName),
+  applyModPreset: (gameId, characterFolder, modFolder, presetId) =>
+    ipcRenderer.invoke(IPC.applyModPreset, gameId, characterFolder, modFolder, presetId),
+  deleteModPreset: (gameId, characterFolder, modFolder, presetId) =>
+    ipcRenderer.invoke(IPC.deleteModPreset, gameId, characterFolder, modFolder, presetId),
   getModDetails: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.getModDetails, gameId, characterFolder, modFolder),
   setModPreview: (gameId, characterFolder, modFolder, sourcePath) =>

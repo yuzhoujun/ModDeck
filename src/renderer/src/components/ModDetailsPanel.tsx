@@ -1,5 +1,5 @@
-import { useState, type DragEvent } from 'react'
-import type { ModDetails } from '../../../shared/types'
+import { useEffect, useState, type DragEvent } from 'react'
+import type { GameId, ModDetails, ModVariantPreset } from '../../../shared/types'
 import { formatDate } from '../utils'
 import { Icon } from './Icon'
 import { ScrollTitle } from './ScrollTitle'
@@ -14,6 +14,7 @@ function formatBytes(bytes: number): string {
 const IMAGE_FILE_PATTERN = /\.(png|jpe?g|webp|gif|avif)$/i
 
 export function ModDetailsPanel({
+  gameId,
   details,
   loading,
   error,
@@ -21,8 +22,10 @@ export function ModDetailsPanel({
   onToggle,
   onOpen,
   onDelete,
-  onSetPreview
+  onSetPreview,
+  onNotify
 }: {
+  gameId: GameId
   details: ModDetails | null
   loading: boolean
   error: string | null
@@ -31,8 +34,111 @@ export function ModDetailsPanel({
   onOpen: () => void
   onDelete: () => void
   onSetPreview?: (sourcePath?: string) => Promise<void> | void
+  onNotify?: (text: string, kind?: 'ok' | 'err' | 'info') => void
 }) {
   const [previewDrag, setPreviewDrag] = useState(false)
+  const [presets, setPresets] = useState<ModVariantPreset[]>([])
+  const [presetsLoading, setPresetsLoading] = useState(false)
+  const [newPresetName, setNewPresetName] = useState('')
+  const [showSavePreset, setShowSavePreset] = useState(false)
+
+  const modKey = details ? `${gameId}:${details.characterFolder}:${details.name}` : ''
+
+  useEffect(() => {
+    if (!details) {
+      setPresets([])
+      setShowSavePreset(false)
+      setNewPresetName('')
+      return
+    }
+    let active = true
+    setPresetsLoading(true)
+    window.moddeck
+      .getModPresets(gameId, details.characterFolder, details.folderName)
+      .then((res) => {
+        if (active) setPresets(res)
+      })
+      .catch(() => {
+        if (active) setPresets([])
+      })
+      .finally(() => {
+        if (active) setPresetsLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [gameId, details?.characterFolder, details?.folderName, details?.name])
+
+  async function handleSavePreset() {
+    if (!details) return
+    const name = newPresetName.trim()
+    if (!name) {
+      onNotify?.('请输入预设名称', 'err')
+      return
+    }
+    try {
+      const res = await window.moddeck.saveModPreset(
+        gameId,
+        details.characterFolder,
+        details.folderName,
+        name
+      )
+      if (res.ok) {
+        onNotify?.(`已保存预设「${name}」`, 'ok')
+        setNewPresetName('')
+        setShowSavePreset(false)
+        const updated = await window.moddeck.getModPresets(
+          gameId,
+          details.characterFolder,
+          details.folderName
+        )
+        setPresets(updated)
+      } else {
+        onNotify?.(res.error || '保存预设失败', 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
+  async function handleApplyPreset(preset: ModVariantPreset) {
+    if (!details) return
+    try {
+      const res = await window.moddeck.applyModPreset(
+        gameId,
+        details.characterFolder,
+        details.folderName,
+        preset.id
+      )
+      if (res.ok) {
+        onNotify?.(`已切换至预设「${preset.name}」`, 'ok')
+      } else {
+        onNotify?.(res.error || '切换预设失败', 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
+  async function handleDeletePreset(preset: ModVariantPreset) {
+    if (!details) return
+    try {
+      const res = await window.moddeck.deleteModPreset(
+        gameId,
+        details.characterFolder,
+        details.folderName,
+        preset.id
+      )
+      if (res.ok) {
+        onNotify?.(`已删除预设「${preset.name}」`, 'info')
+        setPresets((curr) => curr.filter((p) => p.id !== preset.id))
+      } else {
+        onNotify?.(res.error || '删除预设失败', 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
 
   function handlePreviewDragOver(event: DragEvent<HTMLDivElement>) {
     if (!onSetPreview) return
@@ -138,6 +244,67 @@ export function ModDetailsPanel({
               <span>INI</span>
               <strong>{details.iniFiles.length}</strong>
             </div>
+          </div>
+
+          {/* 2.2.1 Level 1: 单 Mod 专属预设与变体管理 */}
+          <div className="detail-section">
+            <div className="detail-section-head">
+              <span className="detail-section-title">Mod 预设 / 变体</span>
+              <button
+                className="btn ghost small-btn"
+                onClick={() => setShowSavePreset(!showSavePreset)}
+                title="将当前配置保存为该 Mod 的独立预设"
+              >
+                <Icon name="plus" size={13} />
+                {showSavePreset ? '取消' : '存为预设'}
+              </button>
+            </div>
+
+            {showSavePreset ? (
+              <div className="preset-save-box">
+                <input
+                  className="input preset-input"
+                  placeholder="输入预设名称（如：黑丝+眼镜）"
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleSavePreset()
+                  }}
+                  autoFocus
+                />
+                <button className="btn primary small-btn" onClick={() => void handleSavePreset()}>
+                  保存
+                </button>
+              </div>
+            ) : null}
+
+            {presetsLoading ? (
+              <div className="muted small">加载预设中…</div>
+            ) : presets.length === 0 ? (
+              <div className="muted small">暂无独立预设，点击右上角可将当前状态存为预设</div>
+            ) : (
+              <div className="detail-presets-list">
+                {presets.map((preset) => (
+                  <div key={preset.id} className="detail-preset-chip">
+                    <button
+                      className="preset-apply-btn"
+                      onClick={() => void handleApplyPreset(preset)}
+                      title={`应用预设「${preset.name}」并热重载`}
+                    >
+                      <span className="preset-dot" />
+                      <span className="preset-name">{preset.name}</span>
+                    </button>
+                    <button
+                      className="icon-btn danger preset-del-btn"
+                      onClick={() => void handleDeletePreset(preset)}
+                      title="删除该预设"
+                    >
+                      <Icon name="close" size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="detail-section">

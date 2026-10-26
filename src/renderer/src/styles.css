@@ -2003,3 +2003,87 @@ code {
     transform: translateX(var(--marquee-shift, -60px));
   }
 }
+
+/* ---------- 2.2.1 Level 1: Mod Variant Presets ---------- */
+
+.detail-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.preset-save-box {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.preset-input {
+  height: 28px;
+  font-size: 11.5px;
+  padding: 0 8px;
+  flex: 1;
+}
+
+.detail-presets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.detail-preset-chip {
+  display: flex;
+  align-items: center;
+  background: #0e131c;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.detail-preset-chip:hover {
+  border-color: #2f7d5f;
+}
+
+.preset-apply-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  font-size: 11.5px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.preset-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+}
+
+.preset-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preset-del-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  background: transparent;
+  opacity: 0.6;
+}
+
+.preset-del-btn:hover {
+  opacity: 1;
+  background: #251214;
+}

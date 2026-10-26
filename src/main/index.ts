@@ -52,6 +52,12 @@ import {
   setCharacterMeta
 } from './services/metadata'
 import {
+  applyModPreset,
+  deleteModPreset,
+  getModPresets,
+  saveModPreset
+} from './services/presets'
+import {
   buildSnapshot,
   getModDetails,
   invalidatePreviewCache,
@@ -1862,6 +1868,65 @@ function registerIpc(): void {
     broadcastStateChanged({ gameId, characterFolder })
     return snapshot
   })
+
+  register(
+    IPC.getModPresets,
+    async (gameId: GameId, characterFolder: string, modFolder: string) => {
+      requireGame(gameId)
+      if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return []
+      return getModPresets(baseDir(), gameId, characterFolder, modFolder)
+    }
+  )
+
+  register(
+    IPC.saveModPreset,
+    async (gameId: GameId, characterFolder: string, modFolder: string, presetName: string) => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return { ok: false, error: '目录参数不合法' }
+      const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
+      const baseName = modFolder.replace(/^DISABLED_/i, '')
+      let targetModDir = path.join(characterDir, modFolder)
+      if (!(await pathExists(targetModDir))) {
+        const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
+        targetModDir = path.join(characterDir, altFolder)
+      }
+      return saveModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, presetName)
+    }
+  )
+
+  register(
+    IPC.applyModPreset,
+    async (gameId: GameId, characterFolder: string, modFolder: string, presetId: string) => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return { ok: false, error: '目录参数不合法' }
+      const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
+      const baseName = modFolder.replace(/^DISABLED_/i, '')
+      let targetModDir = path.join(characterDir, modFolder)
+      if (!(await pathExists(targetModDir))) {
+        const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
+        targetModDir = path.join(characterDir, altFolder)
+      }
+      markInternalFsMutation()
+      const res = await applyModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, presetId)
+      if (res.ok) {
+        broadcastStateChanged({ gameId, characterFolder })
+        scheduleAutoReload()
+      }
+      return res
+    }
+  )
+
+  register(
+    IPC.deleteModPreset,
+    async (gameId: GameId, characterFolder: string, modFolder: string, presetId: string) => {
+      requireGame(gameId)
+      return deleteModPreset(baseDir(), gameId, characterFolder, modFolder, presetId)
+    }
+  )
 
   register(
     IPC.getModDetails,

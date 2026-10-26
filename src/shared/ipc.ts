@@ -1,5 +1,6 @@
 import type {
   AppInfo,
+  ModVariantPreset,
   Bootstrap,
   CharacterMeta,
   CreateCharacterInput,
@@ -52,6 +53,10 @@ export const IPC = {
   saveCharacterCoverData: 'character:save-cover-data',
   clearCharacterCover: 'character:clear-cover',
   getModDetails: 'mods:details',
+  getModPresets: 'presets:get-mod-presets',
+  saveModPreset: 'presets:save-mod-preset',
+  applyModPreset: 'presets:apply-mod-preset',
+  deleteModPreset: 'presets:delete-mod-preset',
   setModPreview: 'mods:set-preview',
   setModsEnabled: 'mods:set-enabled',
   reorderCharacters: 'character:reorder',
@@ -137,6 +142,29 @@ export interface ModDeckApi {
   showOverlayDetail(request: OverlayDetailRequest): Promise<ToggleResult>
   hideOverlayDetail(): Promise<void>
   sendModHotkey(key: string): Promise<ToggleResult>
+  getModPresets(
+    gameId: GameId,
+    characterFolder: string,
+    modFolder: string
+  ): Promise<ModVariantPreset[]>
+  saveModPreset(
+    gameId: GameId,
+    characterFolder: string,
+    modFolder: string,
+    presetName: string
+  ): Promise<ToggleResult>
+  applyModPreset(
+    gameId: GameId,
+    characterFolder: string,
+    modFolder: string,
+    presetId: string
+  ): Promise<ToggleResult>
+  deleteModPreset(
+    gameId: GameId,
+    characterFolder: string,
+    modFolder: string,
+    presetId: string
+  ): Promise<ToggleResult>
   getModDetails(
     gameId: GameId,
     characterFolder: string,
