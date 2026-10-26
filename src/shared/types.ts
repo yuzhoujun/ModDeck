@@ -280,3 +280,21 @@ export interface SaveModPresetInput {
   name: string
   activeIniFiles?: string[]
 }
+
+export interface CharacterModAssignment {
+  modName: string // 纯净名（不带 DISABLED_）
+  presetId?: string // 绑定的单 Mod 变体预设 id
+}
+
+export interface RosterPreset {
+  id: string
+  name: string
+  gameId: GameId
+  updatedAt: number
+  assignments: Record<string, CharacterModAssignment> // key: characterFolder
+}
+
+export interface SaveRosterPresetInput {
+  name: string
+  assignments: Record<string, CharacterModAssignment>
+}
