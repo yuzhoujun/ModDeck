@@ -39,7 +39,7 @@ export function LibraryView({
   onImport: () => void
   onImportFolder: () => void
   onRefresh: () => void
-  onOpenSettings: () => void
+  onOpenSettings: (tab?: 'general' | 'games' | 'environment' | 'import' | 'about') => void
   onLaunchGame: () => void
   onLaunchLoader: () => void
   onReorderCharacters: (folders: string[]) => void
@@ -138,7 +138,7 @@ export function LibraryView({
               : `选择 ${game.name} 的 Mods 文件夹后，ModDeck 会自动扫描角色和 Mod。`}
           </p>
           <div className="actions center">
-            <button className="btn primary" onClick={onOpenSettings}>
+            <button className="btn primary" onClick={() => onOpenSettings('games')}>
               <Icon name="folder" size={16} />
               打开设置
             </button>
@@ -178,7 +178,7 @@ export function LibraryView({
             <button
               className="path-chip"
               title={snapshot.settings.modsPath}
-              onClick={onOpenSettings}
+              onClick={() => onOpenSettings('games')}
             >
               <Icon name="folder" size={14} />
               {shortPath(snapshot.settings.modsPath)}
