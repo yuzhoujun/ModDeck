@@ -39,11 +39,50 @@ export async function getModPresets(
   baseDir: string,
   gameId: GameId,
   characterFolder: string,
-  modFolder: string
+  modFolder: string,
+  modPath?: string
 ): Promise<ModVariantPreset[]> {
   const store = await loadModPresetsStore(baseDir)
   const key = makeModKey(gameId, characterFolder, modFolder)
-  return store.presets[key] ?? []
+  const list = store.presets[key] ?? []
+  const cleanModName = modFolder.replace(/^DISABLED_/i, '')
+
+  // 保证存在默认（初始状态）预设。
+  // 若未初始化过默认预设且提供了有效 modPath，以首次见到的状态或所有基础 ini 全激活作为初始状态记录
+  let hasDefault = list.some((p) => p.id === '__default__')
+  if (!hasDefault) {
+    let defaultInis: string[] = []
+    if (modPath && (await pathExists(modPath))) {
+      const iniStatus = await inspectModIniFiles(modPath)
+      // 首次记录：以当前激活的 ini 为默认；如果当前全部禁用，则将所有 ini 作为默认
+      if (iniStatus.active.length > 0) {
+        defaultInis = iniStatus.active.map((rel) => {
+          const parts = rel.split(path.sep)
+          parts[parts.length - 1] = parts[parts.length - 1].replace(/^disabled_/i, '')
+          return parts.join('/')
+        })
+      } else {
+        defaultInis = iniStatus.disabled.map((rel) => {
+          const parts = rel.split(path.sep)
+          parts[parts.length - 1] = parts[parts.length - 1].replace(/^disabled_/i, '')
+          return parts.join('/')
+        })
+      }
+    }
+    const defaultPreset: ModVariantPreset = {
+      id: '__default__',
+      name: '默认 (初始)',
+      modName: cleanModName,
+      characterFolder,
+      activeIniFiles: defaultInis,
+      updatedAt: 0
+    }
+    list.unshift(defaultPreset)
+    store.presets[key] = list
+    await saveModPresetsStore(baseDir, store)
+  }
+
+  return list
 }
 
 /**
@@ -187,6 +226,9 @@ export async function deleteModPreset(
   modFolder: string,
   presetId: string
 ): Promise<ToggleResult> {
+  if (presetId === '__default__') {
+    return { ok: false, error: '默认初始预设不允许删除' }
+  }
   const store = await loadModPresetsStore(baseDir)
   const key = makeModKey(gameId, characterFolder, modFolder)
   const list = store.presets[key] ?? []

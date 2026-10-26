@@ -460,7 +460,11 @@ export async function getModDetails(
       } catch {
         // ignore
       }
-      if (entry.name.toLowerCase().endsWith('.ini')) iniFiles.push(nextRelative)
+      if (entry.name.toLowerCase().endsWith('.ini')) {
+        if (!/^disabled_/i.test(entry.name)) {
+          iniFiles.push(nextRelative)
+        }
+      }
     }
   }
   await walk(modPath, '')

@@ -2,6 +2,7 @@ import { useEffect, useState, type DragEvent } from 'react'
 import type { GameId, ModDetails, ModVariantPreset } from '../../../shared/types'
 import { formatDate } from '../utils'
 import { Icon } from './Icon'
+import { Modal } from './Modal'
 import { ScrollTitle } from './ScrollTitle'
 
 function formatBytes(bytes: number): string {
@@ -23,7 +24,8 @@ export function ModDetailsPanel({
   onOpen,
   onDelete,
   onSetPreview,
-  onNotify
+  onNotify,
+  onRefreshDetails
 }: {
   gameId: GameId
   details: ModDetails | null
@@ -35,6 +37,7 @@ export function ModDetailsPanel({
   onDelete: () => void
   onSetPreview?: (sourcePath?: string) => Promise<void> | void
   onNotify?: (text: string, kind?: 'ok' | 'err' | 'info') => void
+  onRefreshDetails?: () => void
 }) {
   const [previewDrag, setPreviewDrag] = useState(false)
   const [presets, setPresets] = useState<ModVariantPreset[]>([])
@@ -42,7 +45,33 @@ export function ModDetailsPanel({
   const [newPresetName, setNewPresetName] = useState('')
   const [showSavePreset, setShowSavePreset] = useState(false)
 
+  const [confirmPreset, setConfirmPreset] = useState<ModVariantPreset | null>(null)
+
   const modKey = details ? `${gameId}:${details.characterFolder}:${details.name}` : ''
+
+  // 判定当前 Mod 磁盘上处于激活状态的 ini
+  const currentActiveInis = (details?.iniFiles || []).map((f) =>
+    f.replace(/\\/g, '/').toLowerCase()
+  )
+
+  function isPresetActive(preset: ModVariantPreset): boolean {
+    const desired = new Set(preset.activeIniFiles.map((f) => f.replace(/\\/g, '/').toLowerCase()))
+    if (desired.size !== currentActiveInis.length) return false
+    for (const item of currentActiveInis) {
+      if (!desired.has(item)) return false
+    }
+    return true
+  }
+
+  // 检查当前变体是否已被更改且未保存
+  function hasUnsavedChanges(): boolean {
+    if (!details) return false
+    // 如果当前状态与列表中的任意一个预设（包括默认预设）完全吻合，则视为未更改
+    for (const preset of presets) {
+      if (isPresetActive(preset)) return false
+    }
+    return true
+  }
 
   useEffect(() => {
     if (!details) {
@@ -101,6 +130,15 @@ export function ModDetailsPanel({
     }
   }
 
+  function requestApplyPreset(preset: ModVariantPreset) {
+    if (isPresetActive(preset)) return
+    if (hasUnsavedChanges()) {
+      setConfirmPreset(preset)
+      return
+    }
+    void handleApplyPreset(preset)
+  }
+
   async function handleApplyPreset(preset: ModVariantPreset) {
     if (!details) return
     try {
@@ -112,6 +150,8 @@ export function ModDetailsPanel({
       )
       if (res.ok) {
         onNotify?.(`已切换至预设「${preset.name}」`, 'ok')
+        setConfirmPreset(null)
+        onRefreshDetails?.()
       } else {
         onNotify?.(res.error || '切换预设失败', 'err')
       }
@@ -284,25 +324,38 @@ export function ModDetailsPanel({
               <div className="muted small">暂无独立预设，点击右上角可将当前状态存为预设</div>
             ) : (
               <div className="detail-presets-list">
-                {presets.map((preset) => (
-                  <div key={preset.id} className="detail-preset-chip">
-                    <button
-                      className="preset-apply-btn"
-                      onClick={() => void handleApplyPreset(preset)}
-                      title={`应用预设「${preset.name}」并热重载`}
+                {presets.map((preset) => {
+                  const active = isPresetActive(preset)
+                  const isDefault = preset.id === '__default__'
+                  return (
+                    <div
+                      key={preset.id}
+                      className={`detail-preset-chip${active ? ' is-active' : ''}${isDefault ? ' is-default' : ''}`}
                     >
-                      <span className="preset-dot" />
-                      <span className="preset-name">{preset.name}</span>
-                    </button>
-                    <button
-                      className="icon-btn danger preset-del-btn"
-                      onClick={() => void handleDeletePreset(preset)}
-                      title="删除该预设"
-                    >
-                      <Icon name="close" size={12} />
-                    </button>
-                  </div>
-                ))}
+                      <button
+                        className="preset-apply-btn"
+                        onClick={() => requestApplyPreset(preset)}
+                        title={
+                          active
+                            ? `当前正处于「${preset.name}」`
+                            : `应用预设「${preset.name}」`
+                        }
+                      >
+                        <span className="preset-dot" />
+                        <span className="preset-name">{preset.name}</span>
+                      </button>
+                      {!isDefault ? (
+                        <button
+                          className="icon-btn danger preset-del-btn"
+                          onClick={() => void handleDeletePreset(preset)}
+                          title="删除该预设"
+                        >
+                          <Icon name="close" size={12} />
+                        </button>
+                      ) : null}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -354,6 +407,37 @@ export function ModDetailsPanel({
       ) : (
         <div className="detail-empty muted">选择一个 Mod 查看详情</div>
       )}
+
+      {confirmPreset ? (
+        <Modal
+          title="切换预设确认"
+          onClose={() => setConfirmPreset(null)}
+          width={400}
+          footer={
+            <>
+              <button className="btn ghost" onClick={() => setConfirmPreset(null)}>
+                取消
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => void handleApplyPreset(confirmPreset)}
+              >
+                确定覆盖并切换
+              </button>
+            </>
+          }
+        >
+          <div className="danger-confirm-dialog">
+            <p>
+              检测到当前变体状态已有<strong>未保存的改动</strong>。
+            </p>
+            <p className="muted small">
+              如果继续切换至「{confirmPreset.name}」，当前未存为预设的 ini
+              改动将被直接覆盖。是否确定继续？
+            </p>
+          </div>
+        </Modal>
+      ) : null}
     </aside>
   )
 }
