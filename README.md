@@ -12,9 +12,9 @@ ModDeck 只管理 `Mods` 目录：扫描角色和 Mod、启停、导入、排序
 
 ## 下载与运行
 
-**V2.1.0 正式版**：[下载 latest Release](https://github.com/yuzhoujun/ModDeck/releases/latest)
+**V2.2.0 正式版**：[下载 latest Release](https://github.com/yuzhoujun/ModDeck/releases/latest)
 
-1. 下载 `ModDeck-2.1.0-win-x64.zip`
+1. 下载 `ModDeck-2.2.0-win-x64.zip`
 2. 完整解压到任意目录（不要在压缩包里直接运行）
 3. 双击 `ModDeck.cmd`
 4. 打开“设置”，选择 EFMI 根目录或 `Mods` 目录
