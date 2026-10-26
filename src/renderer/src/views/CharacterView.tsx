@@ -381,6 +381,14 @@ export function CharacterView({
               setSelectedName(null)
               setDetails(null)
             }}
+            onRefreshDetails={() => {
+              if (selectedMod) {
+                void window.moddeck
+                  .getModDetails(game.id, character.folder, selectedMod.folderName)
+                  .then(setDetails)
+                  .catch(() => undefined)
+              }
+            }}
             onSetPreview={(sourcePath) => void handleSetModPreview(sourcePath)}
             onNotify={onNotify}
           />

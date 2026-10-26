@@ -1356,7 +1356,6 @@ async function reloadF10(): Promise<ToggleResult> {
 
 function scheduleAutoReload(): void {
   if (!settings.ui.autoReloadF10) return
-  if (!overlayWindow?.isVisible()) return
   if (autoReloadTimer) clearTimeout(autoReloadTimer)
   autoReloadTimer = setTimeout(() => {
     autoReloadTimer = null
@@ -1874,7 +1873,18 @@ function registerIpc(): void {
     async (gameId: GameId, characterFolder: string, modFolder: string) => {
       requireGame(gameId)
       if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return []
-      return getModPresets(baseDir(), gameId, characterFolder, modFolder)
+      let modPath: string | undefined
+      const gameSettings = settings.games[gameId]
+      if (gameSettings?.modsPath) {
+        const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
+        const baseName = modFolder.replace(/^DISABLED_/i, '')
+        let targetModDir = path.join(characterDir, modFolder)
+        if (!(await pathExists(targetModDir))) {
+          targetModDir = path.join(characterDir, `DISABLED_${baseName}`)
+        }
+        modPath = targetModDir
+      }
+      return getModPresets(baseDir(), gameId, characterFolder, modFolder, modPath)
     }
   )
 

@@ -8,6 +8,7 @@ import type {
   SettingsPatch
 } from '../../../shared/types'
 import { Icon } from '../components/Icon'
+import { Modal } from '../components/Modal'
 import type { IconName } from '../components/Icon'
 import { errorMessage } from '../utils'
 
@@ -37,6 +38,7 @@ export function SettingsView({
   const [envChecking, setEnvChecking] = useState(false)
   const [rosterStatus, setRosterStatus] = useState<RosterSyncStatus | null>(null)
   const [rosterSyncing, setRosterSyncing] = useState(false)
+  const [showF10WarningModal, setShowF10WarningModal] = useState(false)
 
   useEffect(() => {
     setDraft(settings)
@@ -273,17 +275,23 @@ export function SettingsView({
 
           <section className="section">
             <div className="section-head">
-              <h2>快捷窗口行为</h2>
-              <p className="muted">控制切换 Mod 后的刷新方式和最近使用记录。</p>
+              <h2>游戏刷新与快捷行为</h2>
+              <p className="muted">控制切换 Mod 或预设后的游戏重载（F10）与快捷使用记录。</p>
             </div>
             <label className="check-row">
               <input
                 type="checkbox"
                 checked={draft.ui.autoReloadF10}
-                onChange={(event) => updateUi({ autoReloadF10: event.target.checked })}
+                onChange={(event) => {
+                  if (event.target.checked) {
+                    setShowF10WarningModal(true)
+                  } else {
+                    updateUi({ autoReloadF10: false })
+                  }
+                }}
               />
               <span>
-                切换 Mod 后自动发送 F10（仅快捷窗口、800ms 防抖、前台是游戏时）
+                切换 Mod / 预设后自动发送 F10 热重载（800ms 防抖队列、前台为游戏时生效）
               </span>
             </label>
             <label className="field">
@@ -642,7 +650,7 @@ export function SettingsView({
         <section className="section first-section">
           <div className="section-head">
             <h2>关于</h2>
-            <p className="muted">ModDeck · MIT License · 完全离线</p>
+            <p className="muted">ModDeck · MIT License · 本地优先 (Local-First)</p>
           </div>
           {info ? (
             <div className="kv">
