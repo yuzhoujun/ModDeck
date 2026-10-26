@@ -1,19 +1,36 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import type { GameId, ModVariantPreset, ToggleResult } from '../../shared/types'
+import type {
+  GameId,
+  ModVariantPreset,
+  RosterPreset,
+  SaveRosterPresetInput,
+  ToggleResult
+} from '../../shared/types'
 import { ensureDir, pathExists, readJsonSafe, writeJsonAtomic } from '../core/fsx'
 import { isInside, isSafeSegment } from '../core/safe-path'
 
 const PRESETS_FILE = 'mod-presets.json'
+const ROSTER_PRESETS_FILE = 'roster-presets.json'
 
 interface ModPresetsStore {
   schemaVersion: 1
   presets: Record<string, ModVariantPreset[]> // key: `${gameId}:${characterFolder}:${modName}`
 }
 
+interface RosterPresetsStore {
+  schemaVersion: 1
+  presets: Record<string, RosterPreset[]> // key: gameId
+}
+
 async function getPresetsFilePath(baseDir: string): Promise<string> {
   await ensureDir(baseDir)
   return path.join(baseDir, PRESETS_FILE)
+}
+
+async function getRosterPresetsFilePath(baseDir: string): Promise<string> {
+  await ensureDir(baseDir)
+  return path.join(baseDir, ROSTER_PRESETS_FILE)
 }
 
 export async function loadModPresetsStore(baseDir: string): Promise<ModPresetsStore> {
@@ -27,6 +44,23 @@ export async function loadModPresetsStore(baseDir: string): Promise<ModPresetsSt
 
 export async function saveModPresetsStore(baseDir: string, store: ModPresetsStore): Promise<void> {
   const filePath = await getPresetsFilePath(baseDir)
+  await writeJsonAtomic(filePath, store)
+}
+
+export async function loadRosterPresetsStore(baseDir: string): Promise<RosterPresetsStore> {
+  const filePath = await getRosterPresetsFilePath(baseDir)
+  const data = await readJsonSafe<RosterPresetsStore | null>(filePath, null)
+  if (data && data.schemaVersion === 1 && typeof data.presets === 'object') {
+    return data
+  }
+  return { schemaVersion: 1, presets: {} }
+}
+
+export async function saveRosterPresetsStore(
+  baseDir: string,
+  store: RosterPresetsStore
+): Promise<void> {
+  const filePath = await getRosterPresetsFilePath(baseDir)
   await writeJsonAtomic(filePath, store)
 }
 
@@ -47,14 +81,11 @@ export async function getModPresets(
   const list = store.presets[key] ?? []
   const cleanModName = modFolder.replace(/^DISABLED_/i, '')
 
-  // 保证存在默认（初始状态）预设。
-  // 若未初始化过默认预设且提供了有效 modPath，以首次见到的状态或所有基础 ini 全激活作为初始状态记录
   let hasDefault = list.some((p) => p.id === '__default__')
   if (!hasDefault) {
     let defaultInis: string[] = []
     if (modPath && (await pathExists(modPath))) {
       const iniStatus = await inspectModIniFiles(modPath)
-      // 首次记录：以当前激活的 ini 为默认；如果当前全部禁用，则将所有 ini 作为默认
       if (iniStatus.active.length > 0) {
         defaultInis = iniStatus.active.map((rel) => {
           const parts = rel.split(path.sep)
@@ -85,9 +116,6 @@ export async function getModPresets(
   return list
 }
 
-/**
- * 递归收集 Mod 目录下的全部 ini 相对路径及其当前启用状态
- */
 async function inspectModIniFiles(modPath: string): Promise<{ active: string[]; disabled: string[] }> {
   const active: string[] = []
   const disabled: string[] = []
@@ -131,7 +159,6 @@ export async function saveModPreset(
   if (!(await pathExists(modPath))) return { ok: false, error: 'Mod 目录不存在' }
 
   const iniStatus = await inspectModIniFiles(modPath)
-  // 保存当前所有处于激活状态的 .ini 文件相对于 Mod 根目录的路径（规范为标准正名）
   const cleanActiveInis = iniStatus.active.map((rel) => {
     const parts = rel.split(path.sep)
     const fileName = parts[parts.length - 1].replace(/^disabled_/i, '')
@@ -183,7 +210,6 @@ export async function applyModPreset(
 
   const desiredActiveNorm = new Set(targetPreset.activeIniFiles.map((f) => f.replace(/\\/g, '/').toLowerCase()))
 
-  // 递归调整该 Mod 下的全部 .ini 文件：如果在 desiredActiveNorm 中，去掉 DISABLED_；否则加上 DISABLED_
   const walk = async (current: string, relative: string) => {
     const entries = await fs.readdir(current, { withFileTypes: true }).catch(() => [])
     for (const entry of entries) {
@@ -237,5 +263,124 @@ export async function deleteModPreset(
 
   store.presets[key] = filtered
   await saveModPresetsStore(baseDir, store)
+  return { ok: true }
+}
+
+// =========================================================================
+// 2.2.2 全局角色池预设（Roster Preset）服务
+// =========================================================================
+
+export async function getRosterPresets(baseDir: string, gameId: GameId): Promise<RosterPreset[]> {
+  const store = await loadRosterPresetsStore(baseDir)
+  return store.presets[gameId] ?? []
+}
+
+export async function saveRosterPreset(
+  baseDir: string,
+  gameId: GameId,
+  input: SaveRosterPresetInput
+): Promise<ToggleResult> {
+  const name = input.name.trim()
+  if (!name) return { ok: false, error: '方案名称不能为空' }
+
+  const store = await loadRosterPresetsStore(baseDir)
+  const list = store.presets[gameId] ?? []
+  const existingIdx = list.findIndex((p) => p.name.toLowerCase() === name.toLowerCase())
+
+  const newPreset: RosterPreset = {
+    id: existingIdx >= 0 ? list[existingIdx].id : `roster_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    name,
+    gameId,
+    updatedAt: Date.now(),
+    assignments: input.assignments
+  }
+
+  if (existingIdx >= 0) {
+    list[existingIdx] = newPreset
+  } else {
+    list.push(newPreset)
+  }
+
+  store.presets[gameId] = list
+  await saveRosterPresetsStore(baseDir, store)
+  return { ok: true }
+}
+
+export async function deleteRosterPreset(
+  baseDir: string,
+  gameId: GameId,
+  presetId: string
+): Promise<ToggleResult> {
+  const store = await loadRosterPresetsStore(baseDir)
+  const list = store.presets[gameId] ?? []
+  const filtered = list.filter((p) => p.id !== presetId)
+  if (filtered.length === list.length) return { ok: false, error: '未找到该方案' }
+
+  store.presets[gameId] = filtered
+  await saveRosterPresetsStore(baseDir, store)
+  return { ok: true }
+}
+
+/**
+ * 应用全局角色池预设：
+ * 遍历指定角色目录，将选中的 Mod 设为启用（去 DISABLED_），其余同角色下的 Mod 设为禁用（加 DISABLED_）；
+ * 若配置了单 Mod 内部预设 variantPresetId，同时就地切换该 Mod 内部的 .ini 文件。
+ */
+export async function applyRosterPreset(
+  baseDir: string,
+  gameId: GameId,
+  modsPath: string,
+  presetId: string,
+  resolveCharDir: (root: string, folder: string) => Promise<string>
+): Promise<ToggleResult> {
+  const store = await loadRosterPresetsStore(baseDir)
+  const list = store.presets[gameId] ?? []
+  const preset = list.find((p) => p.id === presetId)
+  if (!preset) return { ok: false, error: '未找到指定阵容方案' }
+
+  for (const [charFolder, assignment] of Object.entries(preset.assignments)) {
+    if (!isSafeSegment(charFolder)) continue
+    let charDir = ''
+    try {
+      charDir = await resolveCharDir(modsPath, charFolder)
+    } catch {
+      continue
+    }
+    if (!(await pathExists(charDir))) continue
+
+    const entries = await fs.readdir(charDir, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const currentDirName = entry.name
+      const cleanModName = currentDirName.replace(/^DISABLED_/i, '')
+      const shouldEnable = cleanModName.toLowerCase() === assignment.modName.toLowerCase()
+
+      const srcPath = path.join(charDir, currentDirName)
+      let activePath = srcPath
+
+      if (shouldEnable && /^DISABLED_/i.test(currentDirName)) {
+        const destPath = path.join(charDir, cleanModName)
+        await fs.rename(srcPath, destPath).catch(() => undefined)
+        activePath = destPath
+      } else if (!shouldEnable && !/^DISABLED_/i.test(currentDirName)) {
+        const destPath = path.join(charDir, `DISABLED_${cleanModName}`)
+        await fs.rename(srcPath, destPath).catch(() => undefined)
+        activePath = destPath
+      }
+
+      // 如果选中的 Mod 绑定了单 Mod 变体预设，同时应用变体
+      if (shouldEnable && assignment.presetId) {
+        await applyModPreset(
+          baseDir,
+          gameId,
+          charFolder,
+          cleanModName,
+          activePath,
+          assignment.presetId
+        ).catch(() => undefined)
+      }
+    }
+  }
+
   return { ok: true }
 }

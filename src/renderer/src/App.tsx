@@ -15,6 +15,7 @@ import { CreateCharacterModal } from './components/CreateCharacterModal'
 import { EditCharacterModal } from './components/EditCharacterModal'
 import { Icon } from './components/Icon'
 import { ImportPreviewModal } from './components/ImportPreviewModal'
+import { RosterPresetModal } from './components/RosterPresetModal'
 import { CharacterView } from './views/CharacterView'
 import { LibraryView } from './views/LibraryView'
 import { SettingsView } from './views/SettingsView'
@@ -44,6 +45,7 @@ export default function App() {
   const [modQuery, setModQuery] = useState('')
   const [editing, setEditing] = useState<CharacterInfo | null>(null)
   const [creating, setCreating] = useState(false)
+  const [showRosterPresets, setShowRosterPresets] = useState(false)
   const [envWarning, setEnvWarning] = useState<EnvironmentCheck | null>(null)
   const [parsedImport, setParsedImport] = useState<{
     result: ImportParseResult
@@ -826,10 +828,19 @@ export default function App() {
             onLaunchLoader={() => void launchConfigured('loader')}
             onReorderCharacters={reorderCharacters}
             onAdd={() => setCreating(true)}
+            onOpenRosterPresets={() => setShowRosterPresets(true)}
           />
         )}
       </main>
 
+      {showRosterPresets && snapshot ? (
+        <RosterPresetModal
+          game={snapshot.game}
+          snapshot={snapshot}
+          onClose={() => setShowRosterPresets(false)}
+          onNotify={notify}
+        />
+      ) : null}
       {editing ? (
         <EditCharacterModal
           character={editing}

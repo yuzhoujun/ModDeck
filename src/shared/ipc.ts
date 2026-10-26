@@ -1,6 +1,8 @@
 import type {
   AppInfo,
   ModVariantPreset,
+  RosterPreset,
+  SaveRosterPresetInput,
   Bootstrap,
   CharacterMeta,
   CreateCharacterInput,
@@ -57,6 +59,10 @@ export const IPC = {
   saveModPreset: 'presets:save-mod-preset',
   applyModPreset: 'presets:apply-mod-preset',
   deleteModPreset: 'presets:delete-mod-preset',
+  getRosterPresets: 'presets:get-roster-presets',
+  saveRosterPreset: 'presets:save-roster-preset',
+  applyRosterPreset: 'presets:apply-roster-preset',
+  deleteRosterPreset: 'presets:delete-roster-preset',
   setModPreview: 'mods:set-preview',
   setModsEnabled: 'mods:set-enabled',
   reorderCharacters: 'character:reorder',
@@ -142,6 +148,10 @@ export interface ModDeckApi {
   showOverlayDetail(request: OverlayDetailRequest): Promise<ToggleResult>
   hideOverlayDetail(): Promise<void>
   sendModHotkey(key: string): Promise<ToggleResult>
+  getRosterPresets(gameId: GameId): Promise<RosterPreset[]>
+  saveRosterPreset(gameId: GameId, input: SaveRosterPresetInput): Promise<ToggleResult>
+  applyRosterPreset(gameId: GameId, presetId: string): Promise<ToggleResult>
+  deleteRosterPreset(gameId: GameId, presetId: string): Promise<ToggleResult>
   getModPresets(
     gameId: GameId,
     characterFolder: string,

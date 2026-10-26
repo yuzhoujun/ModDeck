@@ -25,7 +25,8 @@ export function LibraryView({
   onLaunchGame,
   onLaunchLoader,
   onReorderCharacters,
-  onAdd
+  onAdd,
+  onOpenRosterPresets
 }: {
   game: GameDef
   snapshot: GameSnapshot
@@ -44,6 +45,7 @@ export function LibraryView({
   onLaunchLoader: () => void
   onReorderCharacters: (folders: string[]) => void
   onAdd: () => void
+  onOpenRosterPresets?: () => void
 }) {
   const [dragFolder, setDragFolder] = useState<string | null>(null)
 
@@ -110,6 +112,10 @@ export function LibraryView({
           <button className="btn ghost" onClick={onRefresh}>
             <Icon name="refresh" size={16} />
             刷新
+          </button>
+          <button className="btn ghost" onClick={onOpenRosterPresets} title="配置或切换全角色池方案">
+            <Icon name="box" size={16} />
+            预设方案
           </button>
           <button className="btn ghost" onClick={onAdd}>
             <Icon name="userPlus" size={16} />

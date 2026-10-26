@@ -56,6 +56,10 @@ const api: ModDeckApi = {
     ipcRenderer.invoke(IPC.applyModPreset, gameId, characterFolder, modFolder, presetId),
   deleteModPreset: (gameId, characterFolder, modFolder, presetId) =>
     ipcRenderer.invoke(IPC.deleteModPreset, gameId, characterFolder, modFolder, presetId),
+  getRosterPresets: (gameId) => ipcRenderer.invoke(IPC.getRosterPresets, gameId),
+  saveRosterPreset: (gameId, input) => ipcRenderer.invoke(IPC.saveRosterPreset, gameId, input),
+  applyRosterPreset: (gameId, presetId) => ipcRenderer.invoke(IPC.applyRosterPreset, gameId, presetId),
+  deleteRosterPreset: (gameId, presetId) => ipcRenderer.invoke(IPC.deleteRosterPreset, gameId, presetId),
   getModDetails: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.getModDetails, gameId, characterFolder, modFolder),
   setModPreview: (gameId, characterFolder, modFolder, sourcePath) =>

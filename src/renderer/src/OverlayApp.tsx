@@ -5,7 +5,8 @@ import type {
   GameId,
   GameSnapshot,
   ModInfo,
-  RecentMod
+  RecentMod,
+  RosterPreset
 } from '../../shared/types'
 import { Icon } from './components/Icon'
 import { ScrollTitle } from './components/ScrollTitle'
@@ -25,6 +26,42 @@ export function OverlayApp() {
   const [pinned, setPinned] = useState(true)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [rosterPresets, setRosterPresets] = useState<RosterPreset[]>([])
+  const [showPresetDrawer, setShowPresetDrawer] = useState(false)
+  const [activePresetId, setActivePresetId] = useState<string | null>(null)
+
+
+  useEffect(() => {
+    if (!snapshot) return
+    let active = true
+    window.moddeck
+      .getRosterPresets(snapshot.game.id)
+      .then((res) => {
+        if (active) setRosterPresets(res)
+      })
+      .catch(() => undefined)
+    async function applyPreset(preset: RosterPreset) {
+    if (!snapshot) return
+    try {
+      const res = await window.moddeck.applyRosterPreset(snapshot.game.id, preset.id)
+      if (res.ok) {
+        setActivePresetId(preset.id)
+        if (selected) {
+          const list = await window.moddeck.getMods(snapshot.game.id, selected)
+          setMods(list)
+        }
+      } else {
+        setError(res.error || '切换预设失败')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  return () => {
+      active = false
+    }
+  }, [snapshot?.game.id])
 
   useEffect(() => {
     let cancelled = false
@@ -113,6 +150,24 @@ export function OverlayApp() {
     return true
   })
   const current = characters.find((character) => character.folder === selected) ?? null
+  async function applyPreset(preset: RosterPreset) {
+    if (!snapshot) return
+    try {
+      const res = await window.moddeck.applyRosterPreset(snapshot.game.id, preset.id)
+      if (res.ok) {
+        setActivePresetId(preset.id)
+        if (selected) {
+          const list = await window.moddeck.getMods(snapshot.game.id, selected)
+          setMods(list)
+        }
+      } else {
+        setError(res.error || '切换预设失败')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
   const visibleMods = useMemo(() => {
     const value = query.trim().toLowerCase()
     if (!value) return mods
@@ -415,11 +470,52 @@ export function OverlayApp() {
         )}
       </div>
 
+      {showPresetDrawer ? (
+        <div className="overlay-preset-drawer">
+          <div className="overlay-preset-head">
+            <strong>选择角色池方案 (互斥单选)</strong>
+            <button className="icon-btn" onClick={() => setShowPresetDrawer(false)}>
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+          <div className="overlay-preset-list">
+            {rosterPresets.length === 0 ? (
+              <div className="muted small" style={{ padding: '8px 12px' }}>
+                暂无预设方案，请在管理器主界面新建。
+              </div>
+            ) : (
+              rosterPresets.map((p) => {
+                const isActive = activePresetId === p.id
+                return (
+                  <button
+                    key={p.id}
+                    className={`overlay-preset-item${isActive ? ' is-active' : ''}`}
+                    onClick={() => void applyPreset(p)}
+                  >
+                    <span className="preset-dot" />
+                    <span className="overlay-preset-name">{p.name}</span>
+                    <span className="muted small">
+                      {Object.keys(p.assignments).length} 角色
+                    </span>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+      ) : null}
       <footer className="overlay-foot">
         <span className="muted">
           快捷键 {boot?.settings.ui.overlayHotkey || '未设置'} · Esc 隐藏
         </span>
         <div className="overlay-foot-actions">
+          <button
+            className={`btn ghost small-btn${showPresetDrawer ? ' active' : ''}`}
+            onClick={() => setShowPresetDrawer(!showPresetDrawer)}
+            title="一键切换全角色池方案"
+          >
+            方案 ({rosterPresets.length})
+          </button>
           <button
             className="btn ghost small-btn"
             onClick={() => {
