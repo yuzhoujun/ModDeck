@@ -28,6 +28,7 @@ import type {
   ImportRequest,
   OverlayDetailRequest,
   Settings,
+  SaveRosterPresetInput,
   SettingsPatch,
   ToggleResult
 } from '../shared/types'
@@ -266,7 +267,9 @@ let overlayWindow: BrowserWindow | null = null
 let overlayDetailWindow: BrowserWindow | null = null
 let autoReloadTimer: NodeJS.Timeout | null = null
 let modsWatcher: fsSync.FSWatcher | null = null
+let d3dxWatcher: fsSync.FSWatcher | null = null
 let watchedModsPath = ''
+let watchedD3dxPath = ''
 let watchDebounceTimer: NodeJS.Timeout | null = null
 let suppressWatcherUntil = 0
 let tray: Tray | null = null
@@ -291,41 +294,92 @@ function refreshModsWatcher(): void {
   if (SMOKE_TEST || SCAN_REPORT) return
   const activeGameId = settings?.activeGameId
   const modsPath = activeGameId ? settings?.games?.[activeGameId]?.modsPath ?? '' : ''
-  if (modsPath === watchedModsPath && modsWatcher) return
 
-  if (modsWatcher) {
-    try {
-      modsWatcher.close()
-    } catch {
-      // ignore
-    }
-    modsWatcher = null
-  }
-  watchedModsPath = ''
-
-  if (!modsPath || !fsSync.existsSync(modsPath)) return
-  try {
-    modsWatcher = fsSync.watch(modsPath, { recursive: false }, () => {
-      if (Date.now() < suppressWatcherUntil) return
-      if (watchDebounceTimer) clearTimeout(watchDebounceTimer)
-      watchDebounceTimer = setTimeout(() => {
-        watchDebounceTimer = null
-        broadcastStateChanged({ gameId: settings?.activeGameId })
-      }, 280)
-    })
-    modsWatcher.on('error', () => {
+  // 1. 监听 Mods 目录变化
+  if (modsPath !== watchedModsPath || !modsWatcher) {
+    if (modsWatcher) {
       try {
-        modsWatcher?.close()
+        modsWatcher.close()
       } catch {
         // ignore
       }
       modsWatcher = null
-      watchedModsPath = ''
-    })
-    watchedModsPath = modsPath
-  } catch {
-    modsWatcher = null
+    }
     watchedModsPath = ''
+
+    if (modsPath && fsSync.existsSync(modsPath)) {
+      try {
+        modsWatcher = fsSync.watch(modsPath, { recursive: false }, () => {
+          if (Date.now() < suppressWatcherUntil) return
+          if (watchDebounceTimer) clearTimeout(watchDebounceTimer)
+          watchDebounceTimer = setTimeout(() => {
+            watchDebounceTimer = null
+            broadcastStateChanged({ gameId: settings?.activeGameId })
+          }, 280)
+        })
+        modsWatcher.on('error', () => {
+          try {
+            modsWatcher?.close()
+          } catch {
+            // ignore
+          }
+          modsWatcher = null
+          watchedModsPath = ''
+        })
+        watchedModsPath = modsPath
+      } catch {
+        modsWatcher = null
+        watchedModsPath = ''
+      }
+    }
+  }
+
+  // 2. 实时监听 d3dx_user.ini 变化（游戏内热键调完造型持久化时，快捷窗口与主界面秒级感知）
+  let targetD3dxPath = ''
+  if (modsPath) {
+    const parentDir = path.dirname(modsPath)
+    const p1 = path.join(parentDir, 'd3dx_user.ini')
+    const p2 = path.join(modsPath, 'd3dx_user.ini')
+    if (fsSync.existsSync(p1)) targetD3dxPath = p1
+    else if (fsSync.existsSync(p2)) targetD3dxPath = p2
+  }
+
+  if (targetD3dxPath !== watchedD3dxPath || !d3dxWatcher) {
+    if (d3dxWatcher) {
+      try {
+        d3dxWatcher.close()
+      } catch {
+        // ignore
+      }
+      d3dxWatcher = null
+    }
+    watchedD3dxPath = ''
+
+    if (targetD3dxPath && fsSync.existsSync(targetD3dxPath)) {
+      try {
+        d3dxWatcher = fsSync.watch(targetD3dxPath, () => {
+          if (Date.now() < suppressWatcherUntil) return
+          if (watchDebounceTimer) clearTimeout(watchDebounceTimer)
+          watchDebounceTimer = setTimeout(() => {
+            watchDebounceTimer = null
+            broadcastStateChanged({ gameId: settings?.activeGameId })
+          }, 280)
+        })
+        d3dxWatcher.on('error', () => {
+          try {
+            d3dxWatcher?.close()
+          } catch {
+            // ignore
+          }
+          d3dxWatcher = null
+          watchedD3dxPath = ''
+        })
+        watchedD3dxPath = targetD3dxPath
+      } catch {
+        d3dxWatcher = null
+        watchedD3dxPath = ''
+      }
+    }
   }
 }
 
@@ -1943,6 +1997,52 @@ function registerIpc(): void {
   )
 
   register(
+    IPC.getRosterPresets,
+    async (gameId: GameId) => {
+      requireGame(gameId)
+      return getRosterPresets(baseDir(), gameId)
+    }
+  )
+
+  register(
+    IPC.saveRosterPreset,
+    async (gameId: GameId, input: SaveRosterPresetInput) => {
+      requireGame(gameId)
+      return saveRosterPreset(baseDir(), gameId, input)
+    }
+  )
+
+  register(
+    IPC.applyRosterPreset,
+    async (gameId: GameId, presetId: string) => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      markInternalFsMutation()
+      const res = await applyRosterPreset(
+        baseDir(),
+        gameId,
+        gameSettings.modsPath,
+        presetId,
+        (root, folder) => resolveCharacterDir(root, folder)
+      )
+      if (res.ok) {
+        broadcastStateChanged({ gameId })
+        scheduleAutoReload()
+      }
+      return res
+    }
+  )
+
+  register(
+    IPC.deleteRosterPreset,
+    async (gameId: GameId, presetId: string) => {
+      requireGame(gameId)
+      return deleteRosterPreset(baseDir(), gameId, presetId)
+    }
+  )
+
+  register(
     IPC.getModDetails,
     async (gameId: GameId, characterFolder: string, modFolder: string) => {
       requireGame(gameId)
@@ -2573,6 +2673,14 @@ app.on('will-quit', () => {
       // ignore
     }
     modsWatcher = null
+  }
+  if (d3dxWatcher) {
+    try {
+      d3dxWatcher.close()
+    } catch {
+      // ignore
+    }
+    d3dxWatcher = null
   }
   tray?.destroy()
   tray = null

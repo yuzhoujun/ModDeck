@@ -12,8 +12,20 @@ import { isInside, isSafeSegment } from '../core/safe-path'
 
 const ROSTER_PRESETS_FILE = 'roster-presets.json'
 
-// 内存 LRU/Map 缓存：`${gameId}:${characterFolder}:${modName}` -> ModVariantPreset[]
-const presetsMemoryCache = new Map<string, ModVariantPreset[]>()
+/**
+ * 临时/UI/交互类瞬态变量过滤规则
+ * 这类变量在游戏中是频繁临时变动的（例如当前打开的菜单/页码/拖拽坐标/点击时间/鼠标悬停等），
+ * 不应参与外观预设的活性比对与切换覆盖。
+ */
+export const TRANSIENT_VAR_PATTERNS = [
+  /\\(?:ui_)?(?:menu|elem|drag|seen|info|page|sub|lang|ref_w|ref_h|off_x|off_y|slider|cursor|screen|click|hover|active_elem|buttons)\b/i,
+  /\\ssmtdrag_efmi_(?:frame|probe|poke|lmb|rmb|x|xb1|xb2|btn|press|hand|modifier|sim|release|draw|pass|bodypass|allowed|detect)\b/i,
+  /\\(?:show_time|inited|finished|begin_time|delta|ui4_finished|ww|wh|mod_in_use)\b/i
+]
+
+export function isTransientVariable(key: string): boolean {
+  return TRANSIENT_VAR_PATTERNS.some((rx) => rx.test(key))
+}
 
 /**
  * 获取某个 Mod 专属的预设分级文件路径：
@@ -68,11 +80,7 @@ export async function inspectModIniFiles(
 
 /**
  * 深入 Mod 目录下的所有 .ini 文件，解析出该 Mod 声明的所有带 persist 或 global 的变量定义与作者出厂默认值
- * 同时识别 namespace（如 namespace = endmin 或 namespace = gujun\test\gui），以此映射变量键
- */
-/**
- * 深入 Mod 目录下的所有 .ini 文件，解析出该 Mod 声明的所有带 persist 或 global 的变量定义与作者出厂默认值
- * key 统一存储为相对 ini 路径与变量名，如: "$\mod.ini\ssmtdrag_efmi_mode_a" 或带有 namespace 的 "$\ns\var"
+ * key 统一存储为相对 ini 路径与变量名，如: "$\\mod.ini\\ssmtdrag_efmi_mode_a" 或带有 namespace 的 "$\\ns\\var"
  */
 export async function inspectModDefaultVariables(
   modPath: string
@@ -108,10 +116,10 @@ export async function inspectModDefaultVariables(
 
           let key = ''
           if (ns) {
-            key = `\$\\${ns}\\${varName}`
+            key = `$\\${ns}\\${varName}`
           } else {
             const iniBase = path.basename(rel).replace(/^disabled_/i, '')
-            key = `\$\\${iniBase}\\${varName}`
+            key = `$\\${iniBase}\\${varName}`
           }
           defaultVars[key.toLowerCase()] = defaultVal
         }
@@ -156,7 +164,6 @@ export async function readActiveD3dxUserVariables(
     const result: Record<string, string> = {}
     const lines = raw.split(/\r?\n/)
     const cleanModName = modFolder ? modFolder.replace(/^disabled_/i, '').toLowerCase() : ''
-    const cleanChar = characterFolder ? characterFolder.toLowerCase() : ''
 
     const normalizedKnown = knownKeys ? knownKeys.map((k) => k.toLowerCase()) : null
 
@@ -171,9 +178,10 @@ export async function readActiveD3dxUserVariables(
       if (normalizedKnown && normalizedKnown.length > 0) {
         for (const targetKey of normalizedKnown) {
           // targetKey 形式为: $\ini\var 或 $\ns\var
+          // targetKey.substring(1) 为 \ini\var 或 \ns\var
           if (
             lowerFullKey === targetKey ||
-            lowerFullKey.endsWith(targetKey.substring(1)) // 比如 targetKey 是 $mod.inimode, 匹配以 mod.inimode 结尾的 fullKey
+            lowerFullKey.endsWith(targetKey.substring(1))
           ) {
             // 如果 fullKey 包含 \mods\，确保是属于当前 Mod 的
             if (cleanModName && lowerFullKey.includes('\\mods\\')) {
@@ -183,7 +191,6 @@ export async function readActiveD3dxUserVariables(
           }
         }
       } else {
-        // 无已知 key 时，若传入了 character/modFolder 则只收集属于该 Mod 的
         if (cleanModName && lowerFullKey.includes('\\mods\\') && lowerFullKey.includes(`\\${cleanModName}\\`)) {
           result[lowerFullKey] = val
         }
@@ -252,16 +259,17 @@ export async function applyVariablesToD3dxUserIni(
       updatedLines.push(rawLine)
     }
 
-    // 若 d3dx_user.ini 之前尚未记录该变量，则构建规范完整路径写入
+    // 若 d3dx_user.ini 之前尚未记录该变量，则构建规范完整路径追加
     for (const [targetKey, item] of varMap.entries()) {
       if (!handledKeys.has(targetKey)) {
         let fullWriteKey = item.originalKey
         if (!fullWriteKey.toLowerCase().includes('\\mods\\') && characterFolder && cleanModName) {
-          // 如果是 $\ini\var 形式，构造成 $\mods\characterFolder\cleanModName\ini\var
           if (targetKey.startsWith('$\\')) {
-            const relPart = item.originalKey.substring(2) // 剥除 $\
-            // 判断是否带有命名空间，如果只是一层 ini\var 则加前缀
-            fullWriteKey = `\$\\mods\\${characterFolder}\\${cleanModName}\\${relPart}`
+            const relPart = item.originalKey.substring(2)
+            // 带有命名空间（如 gujun\test\gui）则保持原样，不带命名空间才挂载到 \mods\...
+            if (!targetKey.substring(2).includes('\\')) {
+              fullWriteKey = `$\\mods\\${characterFolder}\\${cleanModName}\\${relPart}`
+            }
           }
         }
         updatedLines.push(`${fullWriteKey} = ${item.value}`)
@@ -276,7 +284,7 @@ export async function applyVariablesToD3dxUserIni(
 }
 
 /**
- * 比较预设与当前环境的激活状态
+ * 比较预设与当前环境的激活状态（自动忽略 transient 交互临时变量）
  */
 function evaluatePresetActive(
   preset: ModVariantPreset,
@@ -290,9 +298,11 @@ function evaluatePresetActive(
     if (!desiredInis.has(item)) return false
   }
 
-  // 2. 比对变量
+  // 2. 比对外观相关变量（过滤 transient 临时变量）
   if (preset.variables && Object.keys(preset.variables).length > 0) {
     for (const [k, v] of Object.entries(preset.variables)) {
+      if (isTransientVariable(k)) continue
+
       const lowerKey = k.toLowerCase()
       const effectiveVal = currentEffectiveVars[lowerKey]
       if (effectiveVal !== undefined) {
@@ -312,7 +322,7 @@ function evaluatePresetActive(
 }
 
 /**
- * 读取某个 Mod 的所有预设方案（优先读缓存，无缓存读分级 JSON，并动态计算 isActive）
+ * 读取某个 Mod 的所有预设方案（读取分级 JSON，并动态计算 isActive）
  */
 export async function getModPresets(
   baseDir: string,
@@ -544,7 +554,9 @@ async function getRosterPresetsFilePath(baseDir: string): Promise<string> {
   return path.join(baseDir, ROSTER_PRESETS_FILE)
 }
 
-export async function loadRosterPresetsStore(baseDir: string): Promise<{ schemaVersion: 1; presets: Record<string, RosterPreset[]> }> {
+export async function loadRosterPresetsStore(
+  baseDir: string
+): Promise<{ schemaVersion: 1; presets: Record<string, RosterPreset[]> }> {
   const filePath = await getRosterPresetsFilePath(baseDir)
   const data = await readJsonSafe<{ schemaVersion: 1; presets: Record<string, RosterPreset[]> } | null>(filePath, null)
   if (data && data.schemaVersion === 1 && typeof data.presets === 'object') {
@@ -622,7 +634,7 @@ export async function applyRosterPreset(
   const store = await loadRosterPresetsStore(baseDir)
   const list = store.presets[gameId] ?? []
   const preset = list.find((p) => p.id === presetId)
-  if (!preset) return { ok: false, error: '未找到指定阵容方案' }
+  if (!preset) return { ok: false, error: '未找到指定方案' }
 
   for (const [charFolder, assignment] of Object.entries(preset.assignments)) {
     if (!isSafeSegment(charFolder)) continue
@@ -654,7 +666,7 @@ export async function applyRosterPreset(
         activePath = destPath
       }
 
-      // 如果选中的 Mod 绑定了单 Mod 变体预设，同时应用变体
+      // 若选中的 Mod 绑定了单 Mod 变体预设，同时应用该变体
       if (shouldEnable && assignment.presetId) {
         await applyModPreset(
           baseDir,
