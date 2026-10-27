@@ -2371,3 +2371,81 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 2.2.2.2 预设详情卡片样式 */
+.preset-detail-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preset-detail-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-hover);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+}
+
+.preset-vars-table {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.preset-var-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 12px;
+}
+
+.preset-var-row:last-child {
+  border-bottom: 0;
+}
+
+.preset-var-row.head {
+  background: var(--bg-hover);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.var-col-key {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  max-width: 75%;
+}
+
+.var-col-key code {
+  color: #6ee7b7;
+  font-size: 12px;
+}
+
+.var-col-val {
+  display: flex;
+  align-items: center;
+}
+
+.preset-info-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 0;
+  background: transparent;
+  opacity: 0.5;
+}
+
+.preset-info-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}

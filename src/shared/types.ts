@@ -273,12 +273,14 @@ export interface ModVariantPreset {
   modName: string
   characterFolder: string
   activeIniFiles: string[]
+  variables?: Record<string, string> // 3DMigoto/XXMI 变量快照（如 "$\endmin\clothcolor": "1"）
   updatedAt: number
 }
 
 export interface SaveModPresetInput {
   name: string
   activeIniFiles?: string[]
+  variables?: Record<string, string>
 }
 
 export interface CharacterModAssignment {
