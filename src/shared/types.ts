@@ -274,6 +274,7 @@ export interface ModVariantPreset {
   characterFolder: string
   activeIniFiles: string[]
   variables?: Record<string, string> // 3DMigoto/XXMI 变量快照（如 "$\endmin\clothcolor": "1"）
+  isActive?: boolean
   updatedAt: number
 }
 

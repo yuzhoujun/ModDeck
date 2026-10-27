@@ -1985,11 +1985,8 @@ code {
 }
 
 /* 热键侧栏标题栏过长时自动平滑来回滚动；列表项与详情标题在悬停或选中时平滑滚动 */
-.overlay-title-marquee.is-overflow .scroll-title-inner,
-.scroll-title-wrap.is-overflow:hover .scroll-title-inner,
-.mod-row:hover .scroll-title-wrap.is-overflow .scroll-title-inner,
-.mod-row.is-selected .scroll-title-wrap.is-overflow .scroll-title-inner,
-.overlay-mod:hover .scroll-title-wrap.is-overflow .scroll-title-inner {
+.scroll-title-wrap.is-overflow .scroll-title-inner,
+.overlay-title-marquee.is-overflow .scroll-title-inner {
   animation: moddeck-marquee var(--marquee-duration, 6s) ease-in-out infinite alternate;
 }
 
@@ -2040,15 +2037,43 @@ code {
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   overflow: hidden;
-  transition: border-color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .detail-preset-chip:hover {
   border-color: #2f7d5f;
 }
 
+.detail-preset-chip.is-active {
+  border-color: #34d399;
+  background: #0f231a;
+}
+
+.detail-preset-chip .preset-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  transition: background-color 0.15s ease;
+}
+
+.detail-preset-chip.is-active .preset-dot,
+.overlay-preset-chip .preset-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  transition: background-color 0.15s ease;
+}
+
+.overlay-preset-chip.is-active .preset-dot {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.6);
+}
+
 .preset-apply-btn {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2061,12 +2086,7 @@ code {
   text-align: left;
 }
 
-.preset-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #34d399;
-}
+/* preset-dot styled with is-active */
 
 .preset-name {
   flex: 1;
@@ -2387,6 +2407,17 @@ code {
   background: var(--bg-hover);
   border: 1px solid var(--line-soft);
   border-radius: 8px;
+  gap: 12px;
+}
+
+.preset-detail-summary > div:first-child {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.preset-detail-summary > div:last-child {
+  flex-shrink: 0;
 }
 
 .preset-vars-table {

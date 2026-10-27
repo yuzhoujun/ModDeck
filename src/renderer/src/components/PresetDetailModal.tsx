@@ -1,3 +1,4 @@
+import { ScrollTitle } from './ScrollTitle'
 import type { ModVariantPreset } from '../../../shared/types'
 import { Modal } from './Modal'
 
@@ -27,7 +28,7 @@ export function PresetDetailModal({
         <div className="preset-detail-summary">
           <div>
             <span className="muted small">所属 Mod</span>
-            <strong>{preset.modName}</strong>
+            <div style={{ marginTop: 2, fontWeight: 600 }}><ScrollTitle text={preset.modName} /></div>
           </div>
           <div>
             <span className="muted small">预设类型</span>
