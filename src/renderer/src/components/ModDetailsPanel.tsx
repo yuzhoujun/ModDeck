@@ -78,6 +78,19 @@ export function ModDetailsPanel({
     return true
   }
 
+  const refreshPresets = async () => {
+    if (!details) return
+    try {
+      setPresetsLoading(true)
+      const res = await window.moddeck.getModPresets(gameId, details.characterFolder, details.folderName)
+      setPresets(res)
+    } catch {
+      setPresets([])
+    } finally {
+      setPresetsLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!details) {
       setPresets([])
@@ -85,21 +98,35 @@ export function ModDetailsPanel({
       setNewPresetName('')
       return
     }
-    let active = true
+    let cancelled = false
     setPresetsLoading(true)
     window.moddeck
       .getModPresets(gameId, details.characterFolder, details.folderName)
       .then((res) => {
-        if (active) setPresets(res)
+        if (!cancelled) setPresets(res)
       })
       .catch(() => {
-        if (active) setPresets([])
+        if (!cancelled) setPresets([])
       })
       .finally(() => {
-        if (active) setPresetsLoading(false)
+        if (!cancelled) setPresetsLoading(false)
       })
+
+    const unsubscribe = window.moddeck.onStateChanged((event) => {
+      if (cancelled) return
+      if (!event.gameId || event.gameId === gameId) {
+        window.moddeck
+          .getModPresets(gameId, details.characterFolder, details.folderName)
+          .then((res) => {
+            if (!cancelled) setPresets(res)
+          })
+          .catch(() => undefined)
+      }
+    })
+
     return () => {
-      active = false
+      cancelled = true
+      unsubscribe()
     }
   }, [gameId, details?.characterFolder, details?.folderName, details?.name])
 
@@ -157,6 +184,7 @@ export function ModDetailsPanel({
         onNotify?.(`已切换至预设「${preset.name}」`, 'ok')
         setConfirmPreset(null)
         onRefreshDetails?.()
+        void refreshPresets()
       } else {
         onNotify?.(res.error || '切换预设失败', 'err')
       }

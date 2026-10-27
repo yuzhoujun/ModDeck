@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { GameId, ModDetails, ModVariantPreset } from '../../shared/types'
 import { Icon } from './components/Icon'
+import { Modal } from './components/Modal'
 import { ScrollTitle } from './components/ScrollTitle'
 import { errorMessage } from './utils'
 
@@ -19,6 +20,7 @@ export function OverlayDetailApp() {
   const [showSaveBox, setShowSaveBox] = useState(false)
   const [newPresetName, setNewPresetName] = useState('')
   const [savingPreset, setSavingPreset] = useState(false)
+  const [confirmPreset, setConfirmPreset] = useState<ModVariantPreset | null>(null)
 
   const fetchPresets = async () => {
     if (!gameId || !characterFolder || !modFolder) return
@@ -90,6 +92,23 @@ export function OverlayDetailApp() {
     return true
   }
 
+  function hasUnsavedChanges(): boolean {
+    if (!details) return false
+    for (const preset of presets) {
+      if (isPresetActive(preset)) return false
+    }
+    return true
+  }
+
+  function requestApplyPreset(preset: ModVariantPreset) {
+    if (isPresetActive(preset)) return
+    if (hasUnsavedChanges()) {
+      setConfirmPreset(preset)
+      return
+    }
+    void handleApplyPreset(preset)
+  }
+
   // 应用预设
   async function handleApplyPreset(preset: ModVariantPreset) {
     if (!gameId || !characterFolder || !modFolder) return
@@ -102,6 +121,7 @@ export function OverlayDetailApp() {
       )
       if (res.ok) {
         setSent(`预设「${preset.name}」已应用`)
+        setConfirmPreset(null)
         void fetchDetails()
         void fetchPresets()
       } else {
@@ -221,7 +241,7 @@ export function OverlayDetailApp() {
                       <button
                         key={preset.id}
                         className={`overlay-preset-chip${active ? ' is-active' : ''}`}
-                        onClick={() => void handleApplyPreset(preset)}
+                        onClick={() => requestApplyPreset(preset)}
                         title={active ? '当前正处于此预设' : `点击应用「${preset.name}」并刷新`}
                       >
                         <span className="preset-dot" />
@@ -260,6 +280,36 @@ export function OverlayDetailApp() {
             </div>
 
             {sent ? <div className="hint" style={{ marginTop: '10px' }}>{sent}</div> : null}
+
+            {confirmPreset ? (
+              <Modal
+                title="切换预设确认"
+                onClose={() => setConfirmPreset(null)}
+                width={360}
+                footer={
+                  <>
+                    <button className="btn ghost small-btn" onClick={() => setConfirmPreset(null)}>
+                      取消
+                    </button>
+                    <button
+                      className="btn primary small-btn"
+                      onClick={() => void handleApplyPreset(confirmPreset)}
+                    >
+                      确认并切换
+                    </button>
+                  </>
+                }
+              >
+                <div className="danger-confirm-dialog" style={{ fontSize: '13px' }}>
+                  <p>
+                    检测到当前造型有<strong>未保存的实机改动</strong>。
+                  </p>
+                  <p className="muted small">
+                    切换到「{confirmPreset.name}」将覆盖未保存的配置，是否确认继续？
+                  </p>
+                </div>
+              </Modal>
+            ) : null}
           </>
         )}
       </div>
