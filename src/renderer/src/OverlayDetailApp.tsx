@@ -79,6 +79,9 @@ export function OverlayDetailApp() {
   )
 
   function isPresetActive(preset: ModVariantPreset): boolean {
+    if (typeof preset.isActive === 'boolean') {
+      return preset.isActive
+    }
     const desired = new Set(preset.activeIniFiles.map((f) => f.replace(/\\/g, '/').toLowerCase()))
     if (desired.size !== currentActiveInis.length) return false
     for (const item of currentActiveInis) {
@@ -222,7 +225,7 @@ export function OverlayDetailApp() {
                         title={active ? '当前正处于此预设' : `点击应用「${preset.name}」并刷新`}
                       >
                         <span className="preset-dot" />
-                        <span className="preset-chip-name">{preset.name}</span>
+                        <span className="preset-chip-name" style={{ minWidth: 0, flex: 1, overflow: "hidden" }}><ScrollTitle text={preset.name} /></span>
                       </button>
                     )
                   })

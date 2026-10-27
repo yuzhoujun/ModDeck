@@ -57,6 +57,9 @@ export function ModDetailsPanel({
   )
 
   function isPresetActive(preset: ModVariantPreset): boolean {
+    if (typeof preset.isActive === 'boolean') {
+      return preset.isActive
+    }
     const desired = new Set(preset.activeIniFiles.map((f) => f.replace(/\\/g, '/').toLowerCase()))
     if (desired.size !== currentActiveInis.length) return false
     for (const item of currentActiveInis) {
@@ -346,7 +349,7 @@ export function ModDetailsPanel({
                         }
                       >
                         <span className="preset-dot" />
-                        <span className="preset-name">{preset.name}</span>
+                        <span className="preset-name"><ScrollTitle text={preset.name} /></span>
                       </button>
                       <button
                         className="icon-btn preset-info-btn"
