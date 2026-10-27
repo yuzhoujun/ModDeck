@@ -1888,7 +1888,7 @@ function registerIpc(): void {
         }
         modPath = targetModDir
       }
-      return getModPresets(baseDir(), gameId, characterFolder, modFolder, modPath)
+      return getModPresets(baseDir(), gameId, characterFolder, modFolder, modPath, gameSettings?.modsPath)
     }
   )
 
@@ -1906,7 +1906,7 @@ function registerIpc(): void {
         const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
         targetModDir = path.join(characterDir, altFolder)
       }
-      return saveModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, presetName)
+      return saveModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, gameSettings.modsPath, presetName)
     }
   )
 
@@ -1925,7 +1925,7 @@ function registerIpc(): void {
         targetModDir = path.join(characterDir, altFolder)
       }
       markInternalFsMutation()
-      const res = await applyModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, presetId)
+      const res = await applyModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, gameSettings.modsPath, presetId)
       if (res.ok) {
         broadcastStateChanged({ gameId, characterFolder })
         scheduleAutoReload()

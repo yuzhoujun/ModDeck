@@ -3,6 +3,7 @@ import type { GameId, ModDetails, ModVariantPreset } from '../../../shared/types
 import { formatDate } from '../utils'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
+import { PresetDetailModal } from './PresetDetailModal'
 import { ScrollTitle } from './ScrollTitle'
 
 function formatBytes(bytes: number): string {
@@ -46,6 +47,7 @@ export function ModDetailsPanel({
   const [showSavePreset, setShowSavePreset] = useState(false)
 
   const [confirmPreset, setConfirmPreset] = useState<ModVariantPreset | null>(null)
+  const [inspectingPreset, setInspectingPreset] = useState<ModVariantPreset | null>(null)
 
   const modKey = details ? `${gameId}:${details.characterFolder}:${details.name}` : ''
 
@@ -331,18 +333,30 @@ export function ModDetailsPanel({
                     <div
                       key={preset.id}
                       className={`detail-preset-chip${active ? ' is-active' : ''}${isDefault ? ' is-default' : ''}`}
+                      onDoubleClick={() => setInspectingPreset(preset)}
+                      title="双击查看预设参数详情"
                     >
                       <button
                         className="preset-apply-btn"
                         onClick={() => requestApplyPreset(preset)}
                         title={
                           active
-                            ? `当前正处于「${preset.name}」`
-                            : `应用预设「${preset.name}」`
+                            ? `当前正处于「${preset.name}」（双击查看详情）`
+                            : `点击应用「${preset.name}」（双击查看详情）`
                         }
                       >
                         <span className="preset-dot" />
                         <span className="preset-name">{preset.name}</span>
+                      </button>
+                      <button
+                        className="icon-btn preset-info-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setInspectingPreset(preset)
+                        }}
+                        title="查看预设详情"
+                      >
+                        <Icon name="info" size={12} />
                       </button>
                       {!isDefault ? (
                         <button
@@ -408,6 +422,12 @@ export function ModDetailsPanel({
         <div className="detail-empty muted">选择一个 Mod 查看详情</div>
       )}
 
+      {inspectingPreset ? (
+        <PresetDetailModal
+          preset={inspectingPreset}
+          onClose={() => setInspectingPreset(null)}
+        />
+      ) : null}
       {confirmPreset ? (
         <Modal
           title="切换预设确认"
