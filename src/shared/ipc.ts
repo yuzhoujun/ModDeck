@@ -81,6 +81,7 @@ export const IPC = {
   checkEnvironment: 'env:check',
   openEnvironmentFolder: 'env:open-folder',
   reloadF10: 'env:reload-f10',
+  configureFastReload: 'env:configure-fast-reload',
   rosterStatus: 'roster:status',
   rosterSync: 'roster:sync',
   stateChanged: 'app:state-changed'
@@ -202,6 +203,7 @@ export interface ModDeckApi {
   checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]>
   openEnvironmentFolder(gameId: GameId): Promise<ToggleResult>
   reloadF10(): Promise<ToggleResult>
+  configureFastReload(gameId: GameId, enable: boolean): Promise<ToggleResult>
   getRosterStatus(): Promise<RosterSyncStatus>
   syncRemoteRoster(customUrl?: string): Promise<RosterSyncResult>
   onStateChanged(listener: (event: StateChangedEvent) => void): () => void

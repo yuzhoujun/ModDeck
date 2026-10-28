@@ -84,6 +84,7 @@ const api: ModDeckApi = {
   checkEnvironment: (gameId) => ipcRenderer.invoke(IPC.checkEnvironment, gameId),
   openEnvironmentFolder: (gameId) => ipcRenderer.invoke(IPC.openEnvironmentFolder, gameId),
   reloadF10: () => ipcRenderer.invoke(IPC.reloadF10),
+  configureFastReload: (gameId, enable) => ipcRenderer.invoke(IPC.configureFastReload, gameId, enable),
   getRosterStatus: () => ipcRenderer.invoke(IPC.rosterStatus),
   syncRemoteRoster: (customUrl) => ipcRenderer.invoke(IPC.rosterSync, customUrl),
   onStateChanged: (listener) => {

@@ -118,8 +118,11 @@ export async function inspectModDefaultVariables(
           if (ns) {
             key = `$\\${ns}\\${varName}`
           } else {
-            const iniBase = path.basename(rel).replace(/^disabled_/i, '')
-            key = `$\\${iniBase}\\${varName}`
+            const cleanRel = rel
+              .split(path.sep)
+              .map((p) => p.replace(/^disabled_/i, ''))
+              .join('\\')
+            key = `$\\${cleanRel}\\${varName}`
           }
           defaultVars[key.toLowerCase()] = defaultVal
         }
@@ -177,13 +180,16 @@ export async function readActiveD3dxUserVariables(
 
       if (normalizedKnown && normalizedKnown.length > 0) {
         for (const targetKey of normalizedKnown) {
-          // targetKey 形式为: $\ini\var 或 $\ns\var
-          // targetKey.substring(1) 为 \ini\var 或 \ns\var
+          const targetSuffix = targetKey.substring(1)
+          const varNameOnly = targetKey.substring(targetKey.lastIndexOf('\\'))
           if (
             lowerFullKey === targetKey ||
-            lowerFullKey.endsWith(targetKey.substring(1))
+            lowerFullKey.endsWith(targetSuffix) ||
+            (cleanModName &&
+              lowerFullKey.includes('\\mods\\') &&
+              lowerFullKey.includes(`\\${cleanModName}\\`) &&
+              lowerFullKey.endsWith(varNameOnly))
           ) {
-            // 如果 fullKey 包含 \mods\，确保是属于当前 Mod 的
             if (cleanModName && lowerFullKey.includes('\\mods\\')) {
               if (!lowerFullKey.includes(`\\${cleanModName}\\`)) continue
             }
@@ -236,10 +242,15 @@ export async function applyVariablesToD3dxUserIni(
 
         let matchedTargetKey: string | null = null
         for (const [targetKey] of varMap.entries()) {
-          // targetKey: $\ini\var 或 $\ns\var
+          const targetSuffix = targetKey.substring(1)
+          const varNameOnly = targetKey.substring(targetKey.lastIndexOf('\\'))
           if (
             lowerLineKey === targetKey ||
-            lowerLineKey.endsWith(targetKey.substring(1))
+            lowerLineKey.endsWith(targetSuffix) ||
+            (cleanModName &&
+              lowerLineKey.includes('\\mods\\') &&
+              lowerLineKey.includes(`\\${cleanModName.toLowerCase()}\\`) &&
+              lowerLineKey.endsWith(varNameOnly))
           ) {
             if (cleanModName && lowerLineKey.includes('\\mods\\')) {
               if (!lowerLineKey.includes(`\\${cleanModName.toLowerCase()}\\`)) continue
@@ -266,9 +277,10 @@ export async function applyVariablesToD3dxUserIni(
         if (!fullWriteKey.toLowerCase().includes('\\mods\\') && characterFolder && cleanModName) {
           if (targetKey.startsWith('$\\')) {
             const relPart = item.originalKey.substring(2)
-            // 带有命名空间（如 gujun\test\gui）则保持原样，不带命名空间才挂载到 \mods\...
-            if (!targetKey.substring(2).includes('\\')) {
+            if (relPart.toLowerCase().includes('.ini\\')) {
               fullWriteKey = `$\\mods\\${characterFolder}\\${cleanModName}\\${relPart}`
+            } else {
+              fullWriteKey = `$\\${relPart}`
             }
           }
         }

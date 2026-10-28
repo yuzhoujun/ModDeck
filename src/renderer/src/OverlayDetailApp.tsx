@@ -235,7 +235,17 @@ export function OverlayDetailApp() {
                 ) : presets.length === 0 ? (
                   <span className="muted small">暂无预设</span>
                 ) : (
-                  presets.map((preset) => {
+                  <>
+                    {hasUnsavedChanges() ? (
+                      <div
+                        className="overlay-preset-chip is-dirty"
+                        title="当前实机参数处于未保存的自定义状态，点击上方『存为预设』可保存"
+                      >
+                        <span className="preset-dot is-dirty" />
+                        <span className="preset-chip-name">未保存实机改动</span>
+                      </div>
+                    ) : null}
+                    {presets.map((preset) => {
                     const active = isPresetActive(preset)
                     return (
                       <button
@@ -248,7 +258,8 @@ export function OverlayDetailApp() {
                         <span className="preset-chip-name" style={{ minWidth: 0, flex: 1, overflow: "hidden" }}><ScrollTitle text={preset.name} /></span>
                       </button>
                     )
-                  })
+                  })}
+                  </>
                 )}
               </div>
             </div>
@@ -285,7 +296,7 @@ export function OverlayDetailApp() {
               <Modal
                 title="切换预设确认"
                 onClose={() => setConfirmPreset(null)}
-                width={360}
+                width={290}
                 footer={
                   <>
                     <button className="btn ghost small-btn" onClick={() => setConfirmPreset(null)}>

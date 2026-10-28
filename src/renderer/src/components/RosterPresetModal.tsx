@@ -8,6 +8,7 @@ import type {
 } from '../../../shared/types'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
+import { ScrollTitle } from './ScrollTitle'
 
 export function RosterPresetModal({
   game,
@@ -214,7 +215,7 @@ export function RosterPresetModal({
                       title={`一键应用「${p.name}」并刷新`}
                     >
                       <span className="preset-dot" />
-                      <span>{p.name}</span>
+                      <span style={{ minWidth: 0, overflow: 'hidden' }}><ScrollTitle text={p.name} /></span>
                       <span className="muted small">
                         ({Object.keys(p.assignments).length} 人)
                       </span>
@@ -292,7 +293,7 @@ export function RosterPresetModal({
                               }))
                             }}
                           />
-                          <span className="roster-mod-name-label">{mod.name}</span>
+                          <span className="roster-mod-name-label" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}><ScrollTitle text={mod.name} /></span>
                         </label>
                       )
                     })}

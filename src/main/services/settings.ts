@@ -72,7 +72,8 @@ function normalizeGameSettings(raw: Partial<GameSettings> | undefined): GameSett
     modsPath: normalizeModsPath(asString(raw?.modsPath)),
     gamePath: asString(raw?.gamePath),
     loaderPath: asString(raw?.loaderPath),
-    launchArgs: asString(raw?.launchArgs)
+    launchArgs: asString(raw?.launchArgs),
+    fastConfigReloadEnabled: raw?.fastConfigReloadEnabled === true
   }
 }
 
