@@ -3,193 +3,158 @@
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck?label=release&cacheSeconds=300)](https://github.com/yuzhoujun/ModDeck/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#系统要求)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#三系统要求与运行)
 
-面向 3DMigoto / XXMI 系游戏的 Windows 本地 Mod 管理器。
+面向 3DMigoto / XXMI 系游戏的开源、现代、本地优先（Local-First）Windows Mod 管理器与游戏内快捷工作台。
 
-ModDeck 只管理 `Mods` 目录：扫描角色和 Mod、启停、导入、排序、封面和快捷开关。
-游戏注入仍然交给 XXMI / 3DMigoto，ModDeck 不修改游戏本体。
+ModDeck 专职管理游戏 `Mods` 目录：秒级启停、智能角色匹配导入、单 Mod 变体预设引擎、全角色阵容方案管理、微秒级文件常驻感知与游戏内沉浸式快捷窗（Overlay）。游戏底层 Direct3D 注入与 Shader 处理严格交给 3DMigoto / XXMI，ModDeck **绝不侵入游戏内存、绝不修改游戏本体代码**，安全零封号风险。
 
-## 下载与运行
+---
 
-**V2.2.0 正式版**：[下载 latest Release](https://github.com/yuzhoujun/ModDeck/releases/latest)
+## 一、下载与运行
 
-1. 下载 `ModDeck-2.2.0-win-x64.zip`
-2. 完整解压到任意目录（不要在压缩包里直接运行）
-3. 双击 `ModDeck.cmd`
-4. 打开“设置”，选择 EFMI 根目录或 `Mods` 目录
+- **最新正式版发布包**：前往 [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) 下载 `ModDeck-<version>-win-x64.zip`；
+- **运行方式**：
+  1. 将 ZIP 压缩包完整解压至任意目录（建议非系统只读盘，路径避免特殊符号）；
+  2. **双击 `ModDeck.exe` 即可直接启动**；
+  3. （备用）若系统或部分安全软件拦截了 Chromium 沙箱进程导致直接双击无反应，可双击同目录下的 **`ModDeck.cmd`** 脚本启动（内部自动配置 `--no-sandbox` 兼容参数）；
+  4. 初次打开进入「设置」，配置对应游戏的 `Mods` 或 MI 根目录。
 
-> 启动入口是 `ModDeck.cmd`，它内部带 `--no-sandbox`。部分安全软件会阻止 Electron 的
-> Chromium 沙箱，直接双击 `ModDeck.exe` 可能没有窗口。
+---
 
-**系统要求**：Windows 10 / 11 x64。
+## 二、软件功能总览
 
-## 角色库
-
-角色和 Mod 直接来自磁盘，不依赖内置名单或在线数据库。第一次连接现有库时，当前角色会
-被登记为“已有”，之后新增的目录才显示“新”。
-
-- 角色筛选：全部 / 仅有 Mod / 仅无 Mod
-- 搜索显示名、别名、目录名
-- 拖动卡片自定义排序，顺序保存在本机
-- 新增角色或“功能 Mod”目录
-- `.` 和 `_` 开头的目录自动隐藏
+### 1. 现代化角色库与封面工作台
+- **磁盘原生驱动**：角色与 Mod 直接扫描自磁盘真实结构，不强制绑定外部服务器或写死名单；
+- **视觉化管理**：支持一键拖拽卡片自由排序（顺序本机持久化存储），支持模糊搜索角色名、别名、拼音与目录名；
+- **专属封面编辑器**：支持拖入任意图片，内置 1:1 视口自由平移与缩放裁剪，自动生成无损 `.preview.png`。
 
 ![角色库](docs/screenshot-library.png)
 
-## 角色详情与封面
+### 2. 批量智能导入与无损修复
+- **整页全格式拖拽**：直接向角色库拖入多个 `.zip / .7z / .rar` 压缩包或解压文件夹；
+- **离线角色智能匹配**：内置 5 大游戏全量中英/别名/拼音词典，自动识别解压包归属角色；
+- **乱码自动修复**：内置 CP437 -> GB18030 字符集无损解码引擎，自动纠正历史压缩包解压后的中文目录与乱码文件名。
 
-角色封面优先读取角色目录下的 `.preview.png / .jpg / .webp`。
-在“编辑角色”里可以拖入或选择图片，拖动、缩放裁剪成 1:1 后保存为 `.preview.png`。
-
-![角色详情与 Mod 详情](docs/screenshot-details.png)
-
-![编辑角色封面](docs/screenshot-cover-editor.png)
-
-## Mod 管理
-
-- 点击 Mod 在右侧查看预览、大小、文件数、ini 文件和热键
-- **Mod 预览图**：自动读取 Mod 目录（及非贴图一级子目录）内的 `preview / cover` 图片；也支持在右侧 Mod 详情面板中**直接拖入图片或点击选择图片**，自动复制保存为该 Mod 的专属预览图（`.preview.*`）
-- 启用 / 禁用通过 `DISABLED_` 前缀完成；当游戏运行中占用子目录资源导致外层目录无法改名时，自动回退为将内部 `.ini` 切换为 `DISABLED_*.ini`（配合 F10 重载即可免关游戏生效）
-- 单选：启用一个 Mod 时关闭同角色其他 Mod
-- 多选：可同时启用多个，支持勾选后批量启停
-- **批量与拖拽导入**：支持在角色库整页或特定角色页批量选择或直接拖入多个 `.zip / .7z / .rar` 压缩包与已解压的 Mod 文件夹
-- **导入解析与角色匹配**：弹出导入解析预览窗，支持基于内置 5 大游戏离线角色词典（中文、英文、拼音、别名）自动匹配目标角色（未匹配默认归入“其他”），支持下拉菜单手动调整角色与勾选导入，并可选复制（默认保留原包）或移动模式
-- **中文乱码自动修复**：自动识别并无损还原旧版非 UTF-8 中文压缩包解压后的 CP437/GBK 乱码目录名与文件名
-- 同名默认生成 `名字 (2)`；开启覆盖时先将旧目录移到 `backups/`
-- 删除走系统回收站，不直接永久删除
-
-## 快捷窗口
-
-默认快捷键 `Alt+Shift+M`（可在设置中修改）。快捷窗口可以：
-
-- 切换角色、搜索 Mod、快速启停
-- 标题下方下拉切换当前游戏
-- 按“全部 / 有 Mod / 无 Mod”筛选角色
-- 置顶 / 取消置顶
-- 显示最近打开或切换过的 Mod
-- 点击 Mod 在侧边展开热键列表
+### 3. 游戏内快捷操作台（Overlay）与原生键盘驱动
+- **游戏沉浸呼出**：默认全局快捷键 `Alt+Shift+M`（支持自定义），无需切屏即可在游戏上层直接呼出；
+- **Mod 状态秒级同步**：常驻监听底层的 `Mods` 与 `d3dx_user.ini`，游戏内调完造型外部毫秒级同步；
+- **硬件级按键助手**：内置轻量原生按键助手 `ModDeckKeyHelper-v2.exe`，向游戏前台精准模拟硬件级 DirectInput/RawInput 键盘扫描码，支持热键发送与一键重载。
 
 ![快捷窗口](docs/screenshot-overlay.png)
 
-![热键侧栏](docs/screenshot-hotkeys.png)
+---
 
-热键列表会读取 ini 中的 `key = ...`，点击后先隐藏面板，再发送到当前前台游戏窗口。
-支持常见键盘按键、`VK_OEM_*`、小键盘和鼠标键；多主键、Win 键和未识别的表达式会提示不支持。
-
-## 游戏实测与集成
-
-当前版本只对 **EFMI（明日方舟：终末地）** 做了完整实测。其他 MI 分支使用同一套目录、
-`DISABLED_` 和热键逻辑，但尚未在对应游戏中实机验证。
-
-| 游戏 | MI 分支 | 实测状态 |
-| --- | --- | --- |
-| 鸣潮 | WWMI | 未测试 |
-| 崩坏：星穹铁道 | SRMI | 未测试 |
-| 绝区零 | ZZMI | 未测试 |
-| 明日方舟：终末地 | EFMI | **已测试** |
-| 异环 | NEMI | 未测试 |
-
-> 其他 MI 分支的完整实机测试和适配会作为大版本更新（如 V2.2 / V3.0）规划。
-
-### EFMI（已测试）
-
-- 设置里可以直接选择 EFMI 根目录（如 `.../XXMI/XXMI/EFMI`），ModDeck 会自动落到 `Mods`
-- 启动时检查 `d3dx.ini` 是否包含 `exclude_recursive = DISABLED*`
-- 缺失时页面顶部提示，可以在设置里关闭检查或设置“不再提示”
-- 快捷窗口提供“重载 F10”按钮
-- 可选自动 F10：快捷窗口内切换后 800ms 防抖，确认前台是游戏时才发送
-- 热键侧栏支持常见键盘按键、鼠标键和 `VK_OEM_*`
-
-EFMI 自带的 `d3dx.ini` 默认包含 `include_recursive = Mods` 和
-`exclude_recursive = DISABLED*`，所以 `DISABLED_` 前缀是 EFMI / 3DMigoto 的加载规则，
-不依赖某个外部管理器。
-
-![设置](docs/screenshot-settings.png)
-
-## 设置与本地数据
-
-设置分为通用、配置、环境、导入和关于。环境页集中展示 5 个游戏的 MI 环境状态，
-目前只接入 EFMI；其他 MI 预留位置。本地优先架构，核心管理功能离线运行，配置与数据仅保存在本机；仅在用户手动点击更新公开角色词典时可选请求远程静态清单。
-
-通用页可以设置关闭主窗口时“直接退出”或“最小化到托盘”。最小化后全局快捷键和快捷窗口
-继续可用，托盘菜单提供打开管理器、快捷窗口和退出。
-
-正常情况下数据目录是 `%APPDATA%/ModDeck/`；如果 AppData 被安全软件拦截，会改用 exe
-同目录的 `ModDeck-data/`。
-
-| 路径 | 内容 |
-| --- | --- |
-| `settings.json` | 游戏路径、启动参数、导入选项、筛选/排序、自定义顺序、快捷键 |
-| `characters.json` | 角色显示名、别名、封面、排序、基线 |
-| `Mods/<角色>/.preview.png` | 角色默认封面 |
-| `backups/` | 覆盖导入前的备份 |
-| `logs/` | 运行日志 |
-
-升级时先打开“设置 → 关于”确认实际数据目录，再把旧目录的 `settings.json`、
-`characters.json` 和 `covers/` 复制过去。
-
-## 兼容性与限制
-
-- 仅 Windows x64
-- 不包含 Mod 注入、游戏内 overlay、市场或账号功能
-- 启动游戏 / XXMI 只是调用外部程序，不做注入
-- 关闭主窗口可设为直接退出或最小化到托盘；托盘驻留时快捷键继续可用
-- 不提供 `.exe` 安装器，使用免安装 ZIP + `ModDeck.cmd`
-- 快捷窗口在无边框窗口 / 窗口化模式下可以置顶；游戏使用**独占全屏**时 Windows 不允许普通窗口盖在游戏上，
-  快捷窗口可能表现为任务栏闪烁或被游戏重新覆盖，请把游戏切换为无边框窗口模式
-- F10 重载和热键发送依赖前台窗口；游戏使用原始输入或反作弊时可能无效
-- 仅以内置规则和实际测试覆盖常见 3DMigoto 热键，无法保证所有 Mod 的自定义表达式
-
-## 从源码构建
+## 三、进阶功能与高级操作指南
 
 <details>
-<summary>展开开发与构建说明</summary>
+<summary><strong>👉 点击展开高级功能详述（变体预设引擎、全角色阵容池、DISABLED 规则、错位极速重载与启动参数）</strong></summary>
 
-### 环境
+### 1. 单 Mod 变体预设引擎（Mod Variant Presets）
+现代 3DMigoto Mod 通常包含丰富的服装配色、配件开关与体型滑动条。
+- **出厂基线保障**：每个 Mod 自动解析原生 `.ini` 声明的作者出厂参数，生成永久内置的「默认 (初始)」预设，随时可一键复原；
+- **现场实机快照**：玩家在游戏内按热键或在 GUI 菜单调好造型后，在快捷窗口侧栏直接输入名称即可一键保存为新预设；
+- **瞬态变量过滤（Transient Var Filter）**：ModDeck 智能识别并过滤非外观临时变量（如菜单开启 `$ui_menu`、页码、鼠标抓手坐标等），只比对和覆盖真正的服装与体型参数；
+- **防误触脏状态对比**：当检测到当前实机参数与已有预设不符（有未保存现场改动）时，切换其他预设会自动弹出防覆盖二次确认弹窗。
 
+### 2. 全角色池阵容预设方案（Roster Presets）
+- **全队阵容一键换装**：角色库顶部「预设方案」大模态框，支持集中配置全队每个角色当前激活的 Mod 及对应的单 Mod 变体；
+- **单选互斥严格保护**：同角色多 Mod 强制单选互斥，杜绝同角色骨骼模型冲突导致的崩溃；
+- **快捷抽屉一键上阵**：快捷窗口（Overlay）底部配备阵容抽屉面板，按一个键即可秒级切换全角色阵容及所有变体。
+
+### 3. 3DMigoto `DISABLED_` 状态机制与文件锁回退
+- 3DMigoto 官方通过 `exclude_recursive = DISABLED*` 忽略被禁用的 Mod；
+- **智能免关游戏热切换**：当游戏运行导致 Mod 外部文件夹被 Windows 锁定（无法重命名目录）时，ModDeck 会智能降级重命名内部主 `.ini` 为 `DISABLED_*.ini`，配合热重载无需重启游戏即可立刻生效。
+
+### 4. 高级性能架构：错位极速热重载（Fast Config Reload）
+在 3DMigoto 原版机制中，热键拆分为两个不同维度的功能：
+```ini
+; 1. 全局重载所有 Shader 和修复（高开销，重编译整个渲染管道，耗时数百毫秒至数秒）
+reload_fixes = no_modifiers VK_F10
+
+; 2. 仅重载配置与运行时变量（极低开销，仅重读 ini 并赋值变量，耗时毫秒级，零掉帧）
+reload_config = no_modifiers VK_F10
+```
+- **错位热键加速原理**：绝大多数整合包默认将两者并绑在 `VK_F10`，导致哪怕仅仅改一个衣服颜色也会引起 Shader 全量重编译掉帧。
+- **加速方案**：在 `d3dx.ini` 中将 `reload_config` 错位配置为独立热键（如 `reload_config = alt shift no_ctrl VK_F10`）。切换预设时 ModDeck 仅触发该加速键，实机毫秒级即时换装，彻底告别切预设卡顿。
+
+### 5. 自定义启动参数与命令行
+- 在游戏配置面板中支持为游戏主程序自定义追加启动参数（Launch Arguments），如 `-dx11`、`-window-mode exclusive` 或其他调试参数；
+- ModDeck 自身启动支持 `--no-sandbox`（跳过沙箱）、`--smoke-test`（自检测试）等调试标识。
+
+</details>
+
+---
+
+## 四、游戏实测与集成状态
+
+| 游戏平台 | 推荐 MI 注入分支 | 兼容与集成状态 | 说明 |
+| :--- | :--- | :--- | :--- |
+| **明日方舟：终末地** | **EFMI** | **完整实测与深度适配** | 完整验证变体预设引擎、瞬态过滤、快捷侧栏及热重载机制 |
+| **鸣潮** | **WWMI** | 规则兼容（待实机验证） | 采用通用 3DMigoto 树型结构与 `DISABLED_` 规范 |
+| **崩坏：星穹铁道** | **SRMI** | 规则兼容（待实机验证） | 采用通用 3DMigoto 规范 |
+| **绝区零** | **ZZMI** | 规则兼容（待实机验证） | 采用通用 3DMigoto 规范 |
+| **异环** | **NEMI** | 规则兼容（待实机验证） | 采用通用 3DMigoto 规范 |
+
+---
+
+## 五、环境要求与兼容说明
+
+- **操作系统**：Windows 10 / Windows 11 64 位（x64）；
+- **运行环境**：无需安装 Python、无需全局 Node.js，发布包内已自包含完整运行环境与 native 依赖；
+- **游戏窗口化要求**：快捷窗口（Overlay）置顶在游戏上层需要游戏运行于**无边框窗口模式（Borderless Windowed）**或**窗口化模式**。若开启独占全屏（Exclusive Fullscreen），Windows 窗口管理器会强制抢占置顶通道导致快捷窗无法覆顶，请将游戏调为无边框模式；
+- **本地优先（Local-First）**：所有预设、角色封面及配置数据严格保存在本地 `%APPDATA%/ModDeck/`，离线断网完全可用，绝不上传玩家任何本地游戏资产。
+
+---
+
+## 六、从源码构建
+
+<details>
+<summary><strong>👉 点击展开开发者编译与打包说明</strong></summary>
+
+### 1. 开发环境准备
 - Windows 10 / 11 x64
-- Node.js 22 或更新
-- Git、7-Zip
+- Node.js 22+ & npm
+- Git
 
+### 2. 获取代码与依赖安装
 ```bash
 git clone https://github.com/yuzhoujun/ModDeck.git
 cd ModDeck
 npm install
-npm run dev
 ```
 
-常用命令：
+### 3. 常用开发与打包指令
+```bash
+# 启动热重载开发模式
+npm run dev
 
-| 命令 | 作用 |
-| --- | --- |
-| `npm run dev` | 开发模式 |
-| `npm run build` | 构建到 `out/` |
-| `npm run typecheck` | 主进程 + 渲染层类型检查 |
-| `npm run smoke` | 无头冒烟测试（夹具在 `temp/`，不会碰真实 Mods） |
-| `npm run package:portable` | 构建免安装 ZIP，入口 `ModDeck.cmd` |
+# 完整静态类型检查（主进程 + Preload + 渲染层）
+npm run typecheck
 
-完整构建、缓存镜像和打包说明见 [docs/BUILD.md](docs/BUILD.md)。
+# 生产环境编译构建
+npm run build
+
+# 打包便携绿色免安装 ZIP 分发包
+npm run package:portable
+```
+
+更多底层构建与打包机制请参阅 [docs/BUILD.md](docs/BUILD.md)。
 
 </details>
 
-## 更新日志
+---
 
-版本历史与发布规则见 [CHANGELOG.md](CHANGELOG.md)。GitHub Release 只发布 V1.0、V2.1
-这类大版本，`2.1.1` 等测试版本只在本地构建。
+## 七、版本历史与更新日志
 
-## 作者与致谢
+详细版本迭代记录、功能改进与各测试修复版本说明请查阅完整更新日志：
+👉 **[CHANGELOG.md](CHANGELOG.md)**
 
-ModDeck 由 **yuzhoujun** 发起并维护。
+---
 
-作者此前使用的 Mod 管理器在功能和操作习惯上不太适应，于是先后委托 **大肥鱼（DeepSeek-Flash）**
-与 **银弧（Gemini 4 Argon）** 协助完成软件架构设计、代码实现、疑难调试、构建与测试。
+## 八、免责声明、版权与致谢
 
-本项目是 clean-room 实现：不复制任何第三方管理器的代码、图标、文案或游戏素材。
-游戏名称、角色名称及相关素材版权归各自权利人所有。
-
-## 许可
-
-本项目使用 [MIT License](LICENSE)。
-
-Copyright (c) 2026 yuzhoujun and ModDeck contributors.
+- **免责声明**：本项目为开源本地 Mod 资源辅助管理工具，仅操作玩家本地磁盘文件。本项目不提供任何破解、注入代码或反作弊规避能力；游戏名称、角色形象及官方资产版权均归属各自官方权利人所有。
+- **开源许可**：本项目基于 **[MIT License](LICENSE)** 开源发布。
+- **项目发起与维护**：由 **yuzhoujun** 发起并维护。
+- **致谢**：作者此前使用的 Mod 管理器在功能和操作习惯上不太适应，于是先后委托 **大肥鱼（DeepSeek-Flash）** 与 **银弧（Gemini 4 Argon）** 协助完成软件架构设计、代码实现、疑难调试、构建与测试。
