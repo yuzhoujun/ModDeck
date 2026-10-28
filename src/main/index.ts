@@ -60,7 +60,12 @@ import {
   getModPresets,
   getRosterPresets,
   saveModPreset,
-  saveRosterPreset
+  saveRosterPreset,
+  applyVariablesToD3dxUserIni,
+  clearOptimisticPresets,
+  clearPresetBridgeIni,
+  findD3dxUserIniPath,
+  getPendingPresetSyncEntries
 } from './services/presets'
 import {
   buildSnapshot,
@@ -266,6 +271,7 @@ let mainWindow: BrowserWindow | null = null
 let overlayWindow: BrowserWindow | null = null
 let overlayDetailWindow: BrowserWindow | null = null
 let autoReloadTimer: NodeJS.Timeout | null = null
+let postReloadBridgeTimer: NodeJS.Timeout | null = null
 let modsWatcher: fsSync.FSWatcher | null = null
 let d3dxWatcher: fsSync.FSWatcher | null = null
 let watchedModsPath = ''
@@ -965,7 +971,36 @@ function gameProcessNamesForActiveGame(): string[] {
   return [...names]
 }
 
-const KEY_HELPER_CS_SOURCE = `using System;
+async function isGameRunning(): Promise<boolean> {
+  const targets = new Set(gameProcessNamesForActiveGame().map((n) => `${n.toLowerCase()}.exe`))
+  return new Promise<boolean>((resolve) => {
+    execFile(
+      'tasklist.exe',
+      ['/NH', '/FO', 'CSV'],
+      { windowsHide: true, timeout: 2500 },
+      (error, stdout) => {
+        if (error || !stdout) {
+          resolve(false)
+          return
+        }
+        for (const rawLine of stdout.split(/\r?\n/)) {
+          const m = rawLine.match(/^"([^"]+)"/)
+          if (m && targets.has(m[1].toLowerCase())) {
+            resolve(true)
+            return
+          }
+        }
+        resolve(false)
+      }
+    )
+  })
+}
+
+function oldUnused(): string[] { return []; /*
+  return [...names]
+}
+
+*/ } const KEY_HELPER_CS_SOURCE = `using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -1373,33 +1408,29 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
     }
 
     try {
-      const text = await fs.readFile(d3dxPath, 'utf8')
+      let text = await fs.readFile(d3dxPath, 'utf8')
       let ok = false
-      let reloadConfigKey: string | undefined
-      let reloadFixesKey: string | undefined
+      let needRestoreReloadConfig = false
 
-      for (const rawLine of text.split(/\r?\n/)) {
+      const rawLines = text.split(/\r?\n/)
+      const updatedLines = rawLines.map((rawLine) => {
         const line = rawLine.split(';')[0].trim()
         const match = line.match(/^exclude_recursive\s*=\s*(.+)$/i)
         if (match && match[1].split(/\s+/).some((item) => /^DISABLED\*?$/i.test(item))) {
           ok = true
         }
         const rcMatch = line.match(/^reload_config\s*=\s*(.+)$/i)
-        if (rcMatch) {
-          reloadConfigKey = rcMatch[1].trim()
+        if (rcMatch && /alt\s+shift\s+no_ctrl\s+vk_f10/i.test(rcMatch[1])) {
+          needRestoreReloadConfig = true
+          return 'reload_config = no_modifiers VK_F10'
         }
-        const rfMatch = line.match(/^reload_fixes\s*=\s*(.+)$/i)
-        if (rfMatch) {
-          reloadFixesKey = rfMatch[1].trim()
-        }
-      }
+        return rawLine
+      })
 
-      const normStr = (s?: string) => (s || '').toLowerCase().replace(/\s+/g, ' ')
-      const isFastReloadConfigured = Boolean(
-        reloadConfigKey &&
-          reloadFixesKey &&
-          normStr(reloadConfigKey) !== normStr(reloadFixesKey)
-      )
+      // 自动修复之前 2.2.3 测试版曾写入的错位 reload_config，恢复标准 F10 一键重载
+      if (needRestoreReloadConfig) {
+        await fs.writeFile(d3dxPath, updatedLines.join('\r\n'), 'utf8').catch(() => undefined)
+      }
 
       result.push({
         gameId: target,
@@ -1407,10 +1438,7 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
         root,
         d3dxPath,
         status: ok ? 'ok' : 'missing-line',
-        detail: ok ? undefined : 'd3dx.ini 缺少 exclude_recursive = DISABLED*',
-        reloadConfigKey,
-        reloadFixesKey,
-        isFastReloadConfigured
+        detail: ok ? undefined : 'd3dx.ini 缺少 exclude_recursive = DISABLED*'
       })
     } catch (error) {
       result.push({
@@ -1426,107 +1454,54 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
   return result
 }
 
+function schedulePostReloadPresetSync(gameId?: GameId): void {
+  if (postReloadBridgeTimer) clearTimeout(postReloadBridgeTimer)
+  postReloadBridgeTimer = setTimeout(async () => {
+    postReloadBridgeTimer = null
+    try {
+      const pending = getPendingPresetSyncEntries()
+      const touchedModsPaths = new Set<string>()
+      markInternalFsMutation()
+      for (const entry of pending) {
+        touchedModsPaths.add(entry.modsPath)
+        await applyVariablesToD3dxUserIni(
+          entry.modsPath,
+          entry.variables,
+          entry.characterFolder,
+          entry.cleanModName
+        )
+      }
+      const activeModsPath = settings?.games?.[gameId ?? settings.activeGameId]?.modsPath
+      if (activeModsPath) touchedModsPaths.add(activeModsPath)
+      for (const mp of touchedModsPaths) {
+        await clearPresetBridgeIni(mp)
+      }
+      clearOptimisticPresets(gameId)
+      broadcastStateChanged({ gameId: gameId ?? settings.activeGameId })
+    } catch (error) {
+      logError('post-reload-preset-sync', error)
+    }
+  }, 6200)
+}
+
 async function reloadF10(): Promise<ToggleResult> {
-  const plan = toKeyPlan('F10')
-  if (!plan) return { ok: false, error: '按键生成失败' }
-  return executeKeyPlan(plan)
-}
-
-async function reloadConfigOnly(gameId?: GameId): Promise<ToggleResult> {
-  const targetId = gameId ?? settings.activeGameId
-  let hotkey = 'alt shift no_ctrl VK_F10'
-  try {
-    const envList = await checkEnvironment(targetId)
-    const env = envList.find((e) => e.gameId === targetId)
-    if (env?.reloadConfigKey) {
-      hotkey = env.reloadConfigKey
-    }
-  } catch {
-    // fallback
-  }
+  const hotkey = (settings?.ui?.reloadHotkey || 'F10').trim() || 'F10'
   const plan = toKeyPlan(hotkey)
-  if (!plan) return { ok: false, error: '按键解析失败' }
-  return executeKeyPlan(plan)
+  if (!plan) return { ok: false, error: '按键生成失败' }
+  const res = await executeKeyPlan(plan)
+  if (res.ok && getPendingPresetSyncEntries().length > 0) {
+    schedulePostReloadPresetSync(settings.activeGameId)
+  }
+  return res
 }
 
-async function configureFastReload(gameId: GameId, enable: boolean): Promise<ToggleResult> {
-  requireGame(gameId)
-  const envList = await checkEnvironment(gameId)
-  const env = envList.find((e) => e.gameId === gameId)
-  if (!env || !env.d3dxPath) return { ok: false, error: '未找到 d3dx.ini 路径' }
-
-  try {
-    const raw = await fs.readFile(env.d3dxPath, 'utf8')
-    const lines = raw.split(/\r?\n/)
-    const desiredConfigKey = enable ? 'alt shift no_ctrl VK_F10' : 'no_modifiers VK_F10'
-    let replaced = false
-    const updatedLines = lines.map((line: string) => {
-      const trimmed = line.trim()
-      if (/^reload_config\s*=/i.test(trimmed)) {
-        replaced = true
-        return `reload_config = ${desiredConfigKey}`
-      }
-      return line
-    })
-
-    if (!replaced) {
-      let insertIdx = -1
-      for (let i = 0; i < updatedLines.length; i++) {
-        if (/^reload_fixes\s*=/i.test(updatedLines[i].trim())) {
-          insertIdx = i + 1
-          break
-        }
-      }
-      if (insertIdx >= 0) {
-        updatedLines.splice(insertIdx, 0, `reload_config = ${desiredConfigKey}`)
-      } else {
-        updatedLines.push(`reload_config = ${desiredConfigKey}`)
-      }
-    }
-
-    await fs.writeFile(env.d3dxPath, updatedLines.join('\r\n'), 'utf8')
-
-    if (!settings.games[gameId]) {
-      settings.games[gameId] = { modsPath: '' }
-    }
-    settings.games[gameId].fastConfigReloadEnabled = enable
-    await saveSettings(baseDir(), settings)
-    broadcastStateChanged({ gameId })
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
-}
-
-function scheduleAutoReload(mode: 'fixes' | 'config' = 'fixes', gameId?: GameId): void {
-  const targetId = gameId ?? settings.activeGameId
-  const gameSettings = settings.games[targetId]
-
-  if (mode === 'config') {
-    if (gameSettings?.fastConfigReloadEnabled) {
-      if (autoReloadTimer) clearTimeout(autoReloadTimer)
-      autoReloadTimer = setTimeout(() => {
-        autoReloadTimer = null
-        void reloadConfigOnly(targetId).catch((error) => logError('auto-reload-config', error))
-      }, 150)
-      return
-    }
-    if (settings.ui.autoReloadF10) {
-      if (autoReloadTimer) clearTimeout(autoReloadTimer)
-      autoReloadTimer = setTimeout(() => {
-        autoReloadTimer = null
-        void reloadF10().catch((error) => logError('auto-reload', error))
-      }, 800)
-    }
-    return
-  }
-
+function scheduleAutoReload(gameId?: GameId): void {
   if (!settings.ui.autoReloadF10) return
   if (autoReloadTimer) clearTimeout(autoReloadTimer)
   autoReloadTimer = setTimeout(() => {
     autoReloadTimer = null
     void reloadF10().catch((error) => logError('auto-reload', error))
-  }, 800)
+  }, 600)
 }
 
 async function toggleChildIniFiles(modPath: string, enable: boolean): Promise<number> {
@@ -2068,7 +2043,54 @@ function registerIpc(): void {
         const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
         targetModDir = path.join(characterDir, altFolder)
       }
-      return saveModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, gameSettings.modsPath, presetName)
+
+      // 保存预设前先确保桥接文件处于静默态，避免旧桥接干扰
+      if (postReloadBridgeTimer) {
+        clearTimeout(postReloadBridgeTimer)
+        postReloadBridgeTimer = null
+      }
+      clearOptimisticPresets(gameId)
+      await clearPresetBridgeIni(gameSettings.modsPath)
+
+      // 若游戏正在运行且允许热键发送，先触发一次 F10 让 3DMigoto 将当前内存变量实时刷入 d3dx_user.ini（<200ms 完成落盘）
+      if (settings.ui.allowHotkeySend && (await isGameRunning())) {
+        const userIni = await findD3dxUserIniPath(gameSettings.modsPath)
+        let prevMtime = 0
+        if (userIni) {
+          try {
+            prevMtime = fsSync.statSync(userIni).mtimeMs
+          } catch {
+            prevMtime = 0
+          }
+        }
+        const hotkey = (settings.ui.reloadHotkey || 'F10').trim() || 'F10'
+        const plan = toKeyPlan(hotkey)
+        if (plan) {
+          markInternalFsMutation()
+          await executeKeyPlan(plan)
+          if (userIni) {
+            const deadline = Date.now() + 1500
+            while (Date.now() < deadline) {
+              await new Promise((r) => setTimeout(r, 80))
+              try {
+                const curMtime = fsSync.statSync(userIni).mtimeMs
+                if (curMtime > prevMtime) {
+                  await new Promise((r) => setTimeout(r, 120))
+                  break
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        }
+      }
+
+      const res = await saveModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, gameSettings.modsPath, presetName)
+      if (res.ok) {
+        broadcastStateChanged({ gameId, characterFolder })
+      }
+      return res
     }
   )
 
@@ -2090,7 +2112,8 @@ function registerIpc(): void {
       const res = await applyModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, gameSettings.modsPath, presetId)
       if (res.ok) {
         broadcastStateChanged({ gameId, characterFolder })
-        scheduleAutoReload('config', gameId)
+        scheduleAutoReload(gameId)
+        schedulePostReloadPresetSync(gameId)
       }
       return res
     }
@@ -2136,7 +2159,8 @@ function registerIpc(): void {
       )
       if (res.ok) {
         broadcastStateChanged({ gameId })
-        scheduleAutoReload()
+        scheduleAutoReload(gameId)
+        schedulePostReloadPresetSync(gameId)
       }
       return res
     }
@@ -2354,7 +2378,23 @@ function registerIpc(): void {
   })
 
   register(IPC.reloadF10, async () => reloadF10())
-  register(IPC.configureFastReload, async (gameId: GameId, enable: boolean) => configureFastReload(gameId, enable))
+  register(IPC.setReloadHotkey, async (hotkey: string) => {
+    const value = String(hotkey || '').trim() || 'F10'
+    if (
+      settings.ui.overlayHotkey &&
+      value.toLowerCase() === settings.ui.overlayHotkey.trim().toLowerCase()
+    ) {
+      return { ok: false, error: '重载快捷键不能与呼出快捷窗口热键相同' }
+    }
+    const plan = toKeyPlan(value)
+    if (!plan) {
+      return { ok: false, error: '不支持该按键格式，请使用标准键盘按键（如 F10）' }
+    }
+    settings = mergeSettings(settings, { ui: { reloadHotkey: value } })
+    await saveSettings(baseDir(), settings)
+    broadcastStateChanged({ gameId: settings.activeGameId })
+    return { ok: true, hotkey: value }
+  })
 
   register(IPC.overlayHide, async () => {
     overlayWindow?.hide()

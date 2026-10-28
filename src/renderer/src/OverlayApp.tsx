@@ -524,9 +524,9 @@ export function OverlayApp() {
                 if (!result.ok) setError(result.error || '重载失败')
               })()
             }}
-            title="发送 F10 重载 EFMI 配置"
+            title={`发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 重载 EFMI 配置`}
           >
-            重载 F10
+            重载 {boot?.settings.ui.reloadHotkey || 'F10'}
           </button>
           <button
             className="btn ghost small-btn"

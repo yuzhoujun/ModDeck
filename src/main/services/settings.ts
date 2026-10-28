@@ -26,6 +26,7 @@ export function defaultSettings(): Settings {
       showHidden: false,
       characterFilter: 'all',
       overlayHotkey: 'Alt+Shift+M',
+      reloadHotkey: 'F10',
       overlayPinned: true,
       modSelectMode: 'multi',
       allowHotkeySend: true,
@@ -72,8 +73,8 @@ function normalizeGameSettings(raw: Partial<GameSettings> | undefined): GameSett
     modsPath: normalizeModsPath(asString(raw?.modsPath)),
     gamePath: asString(raw?.gamePath),
     loaderPath: asString(raw?.loaderPath),
-    launchArgs: asString(raw?.launchArgs),
-    fastConfigReloadEnabled: raw?.fastConfigReloadEnabled === true
+    launchArgs: asString(raw?.launchArgs)
+
   }
 }
 
@@ -149,6 +150,10 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
         typeof source.ui?.overlayHotkey === 'string'
           ? source.ui.overlayHotkey.trim()
           : 'Alt+Shift+M',
+      reloadHotkey:
+        typeof source.ui?.reloadHotkey === 'string' && source.ui.reloadHotkey.trim()
+          ? source.ui.reloadHotkey.trim()
+          : 'F10',
       overlayPinned: source.ui?.overlayPinned !== false,
       modSelectMode: source.ui?.modSelectMode === 'single' ? 'single' : 'multi',
       allowHotkeySend: source.ui?.allowHotkeySend !== false,

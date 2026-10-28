@@ -21,7 +21,7 @@ export interface GameSettings {
   gamePath?: string
   loaderPath?: string
   launchArgs?: string
-  fastConfigReloadEnabled?: boolean
+
 }
 
 export interface UiSettings {
@@ -31,6 +31,7 @@ export interface UiSettings {
   showHidden: boolean
   characterFilter: 'all' | 'withMods' | 'empty'
   overlayHotkey: string
+  reloadHotkey: string
   overlayPinned: boolean
   modSelectMode: 'single' | 'multi'
   allowHotkeySend: boolean
@@ -58,9 +59,9 @@ export interface EnvironmentCheck {
   d3dxPath: string
   status: EnvironmentStatus
   detail?: string
-  reloadConfigKey?: string
-  reloadFixesKey?: string
-  isFastReloadConfigured?: boolean
+
+
+
 }
 
 export interface ImportSettings {
