@@ -370,11 +370,12 @@ export function ModDetailsPanel({
                 ) : null}
                 {presets.map((preset) => {
                   const active = isPresetActive(preset)
+                  const pending = preset.isPending === true
                   const isDefault = preset.id === '__default__'
                   return (
                     <div
                       key={preset.id}
-                      className={`detail-preset-chip${active ? ' is-active' : ''}${isDefault ? ' is-default' : ''}`}
+                      className={`detail-preset-chip${pending ? ' is-pending' : active ? ' is-active' : ''}${isDefault ? ' is-default' : ''}`}
                       onDoubleClick={() => setInspectingPreset(preset)}
                       title="双击查看预设参数详情"
                     >
@@ -382,9 +383,11 @@ export function ModDetailsPanel({
                         className="preset-apply-btn"
                         onClick={() => requestApplyPreset(preset)}
                         title={
-                          active
-                            ? `当前正处于「${preset.name}」（双击查看详情）`
-                            : `点击应用「${preset.name}」（双击查看详情）`
+                          pending
+                            ? `「${preset.name}」已排队待生效，按 F10 立即刷新实机画面`
+                            : active
+                              ? `当前正处于「${preset.name}」（双击查看详情）`
+                              : `点击应用「${preset.name}」（双击查看详情）`
                         }
                       >
                         <span className="preset-dot" />

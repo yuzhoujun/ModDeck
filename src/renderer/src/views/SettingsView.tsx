@@ -40,6 +40,7 @@ export function SettingsView({
   const [rosterStatus, setRosterStatus] = useState<RosterSyncStatus | null>(null)
   const [rosterSyncing, setRosterSyncing] = useState(false)
   const [showF10WarningModal, setShowF10WarningModal] = useState(false)
+  const [showDisablePresetReloadModal, setShowDisablePresetReloadModal] = useState<"modPreset" | "rosterPreset" | null>(null)
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -376,22 +377,58 @@ export function SettingsView({
               {reloadHotkeyMessage ? <div className="hint">{reloadHotkeyMessage}</div> : null}
             </div>
 
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={draft.ui.autoReloadF10}
-                onChange={(event) => {
-                  if (event.target.checked) {
-                    setShowF10WarningModal(true)
-                  } else {
-                    updateUi({ autoReloadF10: false })
-                  }
-                }}
-              />
-              <span>
-                切换 Mod / 预设后自动发送 {draft.ui.reloadHotkey || 'F10'} 热重载（600ms 防抖队列、前台为游戏时生效）
-              </span>
-            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '6px 0 12px 0' }}>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={draft.ui.autoReloadModToggle === true}
+                  onChange={(event) => {
+                    if (event.target.checked) {
+                      setShowF10WarningModal(true)
+                    } else {
+                      updateUi({ autoReloadModToggle: false, autoReloadF10: false })
+                    }
+                  }}
+                />
+                <span>
+                  切换普通 Mod 启停后自动重载（默认关闭，避免理库连续操作导致游戏重复卡顿）
+                </span>
+              </label>
+
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={draft.ui.autoReloadModPreset !== false}
+                  onChange={(event) => {
+                    if (!event.target.checked) {
+                      setShowDisablePresetReloadModal('modPreset')
+                    } else {
+                      updateUi({ autoReloadModPreset: true })
+                    }
+                  }}
+                />
+                <span>
+                  切换单 Mod 变体预设后自动重载（<strong>推荐常开</strong>，点击预设即刻换装生效）
+                </span>
+              </label>
+
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={draft.ui.autoReloadRosterPreset !== false}
+                  onChange={(event) => {
+                    if (!event.target.checked) {
+                      setShowDisablePresetReloadModal('rosterPreset')
+                    } else {
+                      updateUi({ autoReloadRosterPreset: true })
+                    }
+                  }}
+                />
+                <span>
+                  切换全角色池方案后自动重载（<strong>推荐常开</strong>，一键全队阵容换装即时生效）
+                </span>
+              </label>
+            </div>
             <label className="field">
               <span>最近使用 Mod 数量：{draft.ui.recentModCount}</span>
               <input
@@ -779,7 +816,7 @@ export function SettingsView({
                 className="btn primary"
                 onClick={() => {
                   setShowF10WarningModal(false)
-                  updateUi({ autoReloadF10: true })
+                  updateUi({ autoReloadModToggle: true, autoReloadF10: true })
                 }}
               >
                 确认开启
@@ -794,6 +831,43 @@ export function SettingsView({
             </p>
             <p className="muted small">
               注意：当 Mods 目录下启用的 Mod 较多时，3DMigoto 执行每次重载大约会有数秒钟的画面停顿，属于加载器正常现象。
+            </p>
+          </div>
+        </Modal>
+      ) : null}
+      {showDisablePresetReloadModal ? (
+        <Modal
+          title="关闭预设自动重载确认"
+          onClose={() => setShowDisablePresetReloadModal(null)}
+          width={440}
+          footer={
+            <>
+              <button className="btn ghost" onClick={() => setShowDisablePresetReloadModal(null)}>
+                取消
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  const target = showDisablePresetReloadModal
+                  setShowDisablePresetReloadModal(null)
+                  if (target === 'modPreset') {
+                    updateUi({ autoReloadModPreset: false })
+                  } else if (target === 'rosterPreset') {
+                    updateUi({ autoReloadRosterPreset: false })
+                  }
+                }}
+              >
+                确认关闭
+              </button>
+            </>
+          }
+        >
+          <div className="danger-confirm-dialog">
+            <p>
+              关闭后，在主界面或快捷窗口切换预设将<strong>不再自动驱动游戏换装</strong>。
+            </p>
+            <p className="muted small">
+              新预设将暂存为“待生效”状态（显示为蓝色脉冲光标），您可以在离线状态下挑选多个角色的不同预设，最后<strong>手动按下 {draft.ui.reloadHotkey || 'F10'}</strong>（或点击快捷窗口底部的“立即生效”按钮）一次性全部换装。
             </p>
           </div>
         </Modal>

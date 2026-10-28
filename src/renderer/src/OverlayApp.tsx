@@ -29,6 +29,7 @@ export function OverlayApp() {
   const [rosterPresets, setRosterPresets] = useState<RosterPreset[]>([])
   const [showPresetDrawer, setShowPresetDrawer] = useState(false)
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
+  const [pendingCount, setPendingCount] = useState(0)
 
 
   useEffect(() => {
@@ -40,23 +41,7 @@ export function OverlayApp() {
         if (active) setRosterPresets(res)
       })
       .catch(() => undefined)
-    async function applyPreset(preset: RosterPreset) {
-    if (!snapshot) return
-    try {
-      const res = await window.moddeck.applyRosterPreset(snapshot.game.id, preset.id)
-      if (res.ok) {
-        setActivePresetId(preset.id)
-        if (selected) {
-          const list = await window.moddeck.getMods(snapshot.game.id, selected)
-          setMods(list)
-        }
-      } else {
-        setError(res.error || '切换预设失败')
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    }
-  }
+
 
   return () => {
       active = false
@@ -156,6 +141,9 @@ export function OverlayApp() {
       const res = await window.moddeck.applyRosterPreset(snapshot.game.id, preset.id)
       if (res.ok) {
         setActivePresetId(preset.id)
+        if (boot?.settings.ui.autoReloadRosterPreset === false) {
+          setPendingCount((c) => Math.max(1, c + 1))
+        }
         if (selected) {
           const list = await window.moddeck.getMods(snapshot.game.id, selected)
           setMods(list)
@@ -517,16 +505,17 @@ export function OverlayApp() {
             方案 ({rosterPresets.length})
           </button>
           <button
-            className="btn ghost small-btn"
+            className={`btn ghost small-btn${pendingCount > 0 ? ' btn-pending-pulse' : ''}`}
             onClick={() => {
               void (async () => {
                 const result = await window.moddeck.reloadF10()
                 if (!result.ok) setError(result.error || '重载失败')
+                else setPendingCount(0)
               })()
             }}
-            title={`发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 重载 EFMI 配置`}
+            title={pendingCount > 0 ? `有 ${pendingCount} 个预设待生效，点击发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 立即刷新实机画面` : `发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 重载 EFMI 配置`}
           >
-            重载 {boot?.settings.ui.reloadHotkey || 'F10'}
+            {pendingCount > 0 ? `● 立即生效 (${pendingCount})` : `重载 ${boot?.settings.ui.reloadHotkey || 'F10'}`}
           </button>
           <button
             className="btn ghost small-btn"

@@ -33,6 +33,9 @@ export function defaultSettings(): Settings {
       envCheckEnabled: true,
       envCheckNeverPrompt: false,
       autoReloadF10: false,
+      autoReloadModToggle: false,
+      autoReloadModPreset: true,
+      autoReloadRosterPreset: true,
       recentModCount: 8,
       closeBehavior: 'quit'
     },
@@ -160,6 +163,9 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
       envCheckEnabled: source.ui?.envCheckEnabled !== false,
       envCheckNeverPrompt: source.ui?.envCheckNeverPrompt === true,
       autoReloadF10: source.ui?.autoReloadF10 === true,
+      autoReloadModToggle: source.ui?.autoReloadModToggle === true,
+      autoReloadModPreset: source.ui?.autoReloadModPreset !== false,
+      autoReloadRosterPreset: source.ui?.autoReloadRosterPreset !== false,
       recentModCount,
       closeBehavior: source.ui?.closeBehavior === 'minimize' ? 'minimize' : 'quit'
     },
