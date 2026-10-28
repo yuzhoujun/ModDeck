@@ -62,10 +62,12 @@ import {
   saveModPreset,
   saveRosterPreset,
   applyVariablesToD3dxUserIni,
-  clearOptimisticPresets,
+  clearPendingPresetQueue,
   clearPresetBridgeIni,
   findD3dxUserIniPath,
-  getPendingPresetSyncEntries
+  getPendingPresetCount,
+  getPendingQueueEntries,
+  syncBridgeFileFromQueue
 } from './services/presets'
 import {
   buildSnapshot,
@@ -1459,7 +1461,7 @@ function schedulePostReloadPresetSync(gameId?: GameId): void {
   postReloadBridgeTimer = setTimeout(async () => {
     postReloadBridgeTimer = null
     try {
-      const pending = getPendingPresetSyncEntries()
+      const pending = getPendingQueueEntries(gameId)
       const touchedModsPaths = new Set<string>()
       markInternalFsMutation()
       for (const entry of pending) {
@@ -1476,7 +1478,7 @@ function schedulePostReloadPresetSync(gameId?: GameId): void {
       for (const mp of touchedModsPaths) {
         await clearPresetBridgeIni(mp)
       }
-      clearOptimisticPresets(gameId)
+      clearPendingPresetQueue(gameId)
       broadcastStateChanged({ gameId: gameId ?? settings.activeGameId })
     } catch (error) {
       logError('post-reload-preset-sync', error)
@@ -1489,14 +1491,31 @@ async function reloadF10(): Promise<ToggleResult> {
   const plan = toKeyPlan(hotkey)
   if (!plan) return { ok: false, error: '按键生成失败' }
   const res = await executeKeyPlan(plan)
-  if (res.ok && getPendingPresetSyncEntries().length > 0) {
-    schedulePostReloadPresetSync(settings.activeGameId)
+  if (res.ok) {
+    // 无论是手动在快捷窗口/设置中点击发送，还是自动发送，只要队列中有待生效预设，均启动同步与清理
+    if (getPendingPresetCount(settings.activeGameId) > 0) {
+      schedulePostReloadPresetSync(settings.activeGameId)
+    }
   }
   return res
 }
 
-function scheduleAutoReload(gameId?: GameId): void {
-  if (!settings.ui.autoReloadF10) return
+function scheduleAutoReload(
+  type: 'mod-toggle' | 'mod-preset' | 'roster-preset' = 'mod-toggle',
+  gameId?: GameId
+): void {
+  const ui = settings.ui
+  let shouldReload = false
+  if (type === 'mod-toggle') {
+    shouldReload = ui.autoReloadModToggle === true || ui.autoReloadF10 === true
+  } else if (type === 'mod-preset') {
+    shouldReload = ui.autoReloadModPreset !== false
+  } else if (type === 'roster-preset') {
+    shouldReload = ui.autoReloadRosterPreset !== false
+  }
+
+  if (!shouldReload) return
+
   if (autoReloadTimer) clearTimeout(autoReloadTimer)
   autoReloadTimer = setTimeout(() => {
     autoReloadTimer = null
@@ -1701,7 +1720,7 @@ function registerIpc(): void {
           logError('recent', error)
         )
         broadcastStateChanged({ gameId, characterFolder })
-        scheduleAutoReload()
+        scheduleAutoReload('mod-toggle', gameId)
       }
       return result
     }
@@ -1727,7 +1746,7 @@ function registerIpc(): void {
         }
       }
       broadcastStateChanged({ gameId, characterFolder })
-      scheduleAutoReload()
+      scheduleAutoReload('mod-toggle', gameId)
       return { ok: true }
     }
   )
@@ -2049,7 +2068,7 @@ function registerIpc(): void {
         clearTimeout(postReloadBridgeTimer)
         postReloadBridgeTimer = null
       }
-      clearOptimisticPresets(gameId)
+      clearPendingPresetQueue(gameId)
       await clearPresetBridgeIni(gameSettings.modsPath)
 
       // 若游戏正在运行且允许热键发送，先触发一次 F10 让 3DMigoto 将当前内存变量实时刷入 d3dx_user.ini（<200ms 完成落盘）
@@ -2112,8 +2131,11 @@ function registerIpc(): void {
       const res = await applyModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, gameSettings.modsPath, presetId)
       if (res.ok) {
         broadcastStateChanged({ gameId, characterFolder })
-        scheduleAutoReload(gameId)
-        schedulePostReloadPresetSync(gameId)
+        const autoReload = settings.ui.autoReloadModPreset !== false
+        if (autoReload) {
+          scheduleAutoReload('mod-preset', gameId)
+          schedulePostReloadPresetSync(gameId)
+        }
       }
       return res
     }
@@ -2159,8 +2181,11 @@ function registerIpc(): void {
       )
       if (res.ok) {
         broadcastStateChanged({ gameId })
-        scheduleAutoReload(gameId)
-        schedulePostReloadPresetSync(gameId)
+        const autoReload = settings.ui.autoReloadRosterPreset !== false
+        if (autoReload) {
+          scheduleAutoReload('roster-preset', gameId)
+          schedulePostReloadPresetSync(gameId)
+        }
       }
       return res
     }

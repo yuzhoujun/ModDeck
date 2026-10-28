@@ -247,12 +247,13 @@ export function OverlayDetailApp() {
                     ) : null}
                     {presets.map((preset) => {
                     const active = isPresetActive(preset)
+                    const pending = preset.isPending === true
                     return (
                       <button
                         key={preset.id}
-                        className={`overlay-preset-chip${active ? ' is-active' : ''}`}
+                        className={`overlay-preset-chip${pending ? ' is-pending' : active ? ' is-active' : ''}`}
                         onClick={() => requestApplyPreset(preset)}
-                        title={active ? '当前正处于此预设' : `点击应用「${preset.name}」并刷新`}
+                        title={pending ? `「${preset.name}」待刷新生效，按 F10 即可换装` : active ? '当前正处于此预设' : `点击应用「${preset.name}」并刷新`}
                       >
                         <span className="preset-dot" />
                         <span className="preset-chip-name" style={{ minWidth: 0, flex: 1, overflow: "hidden" }}><ScrollTitle text={preset.name} /></span>

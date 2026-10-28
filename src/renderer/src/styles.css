@@ -2522,3 +2522,52 @@ code {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 4px;
 }
+
+
+/* ---------- 2.2.4.1 Pending Preset State & Glow ---------- */
+.detail-preset-chip.is-pending,
+.overlay-preset-chip.is-pending,
+.overlay-preset-item.is-pending {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.detail-preset-chip.is-pending .preset-dot,
+.overlay-preset-chip.is-pending .preset-dot,
+.overlay-preset-item.is-pending .preset-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+  animation: pending-dot-pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes pending-dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 1);
+  }
+}
+
+.overlay-foot-actions .btn-pending-pulse {
+  background: #059669 !important;
+  color: #fff !important;
+  border-color: #34d399 !important;
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+  animation: btn-f10-pulse 2s infinite ease-in-out;
+  font-weight: 500;
+}
+
+@keyframes btn-f10-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(52, 211, 153, 0.85);
+    transform: scale(1.03);
+  }
+}

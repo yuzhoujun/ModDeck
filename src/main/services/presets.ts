@@ -32,49 +32,81 @@ export function isTransientVariable(key: string): boolean {
 }
 
 /**
- * 乐观激活状态缓存：
- * 在游戏运行时点击预设（T=0）到 F10 重载完毕并回写 d3dx_user.ini（T=6.2s）期间，
- * 3DMigoto 在 T=0.1s 会先把旧内存 flush 到 d3dx_user.ini。
- * 通过乐观缓存，UI 在此窗口期内始终稳定显示刚点击的目标预设为绿灯激活态。
+ * 待生效预设条目（Pending Preset Queue Entry）：
+ * 用于集中管理所有角色和 Mod 的待刷新预设。
+ * 当用户关闭自动重载时，支持连续选择多个角色的不同预设，或同一 Mod 切换多次。
+ * 队列中永远以 (gameId, characterFolder, modFolder) 为唯一键，自动保留最终意图。
  */
-interface OptimisticPresetEntry {
+export interface PendingPresetEntry {
+  gameId: GameId
   presetId: string
   characterFolder: string
   cleanModName: string
   modsPath: string
   variables: Record<string, string>
-  expiresAt: number
+  updatedAt: number
 }
 
-const optimisticPresets = new Map<string, OptimisticPresetEntry>()
+// 内存中的待生效聚合队列：Key 为 `${gameId}:${characterFolder.toLowerCase()}:${cleanModName.toLowerCase()}`
+const pendingPresetQueue = new Map<string, PendingPresetEntry>()
 
-function makeOptimisticKey(gameId: GameId, characterFolder: string, modFolder: string): string {
+function makeQueueKey(gameId: GameId, characterFolder: string, modFolder: string): string {
   const cleanMod = modFolder.replace(/^DISABLED_/i, '').toLowerCase()
   return `${gameId}:${characterFolder.toLowerCase()}:${cleanMod}`
 }
 
-export function clearOptimisticPresets(gameId?: GameId): void {
+/**
+ * 获取当前游戏待生效（等待手动 F10）的预设数量
+ */
+export function getPendingPresetCount(gameId?: GameId): number {
+  if (!gameId) return pendingPresetQueue.size
+  let count = 0
+  const prefix = `${gameId}:`
+  for (const key of pendingPresetQueue.keys()) {
+    if (key.startsWith(prefix)) count++
+  }
+  return count
+}
+
+/**
+ * 获取当前队列中某游戏的所有待生效条目
+ */
+export function getPendingQueueEntries(gameId?: GameId): PendingPresetEntry[] {
+  if (!gameId) return [...pendingPresetQueue.values()]
+  const list: PendingPresetEntry[] = []
+  const prefix = `${gameId}:`
+  for (const [key, val] of pendingPresetQueue.entries()) {
+    if (key.startsWith(prefix)) list.push(val)
+  }
+  return list
+}
+
+/**
+ * 清空待生效队列
+ */
+export function clearPendingPresetQueue(gameId?: GameId): void {
   if (!gameId) {
-    optimisticPresets.clear()
+    pendingPresetQueue.clear()
     return
   }
   const prefix = `${gameId}:`
-  for (const key of optimisticPresets.keys()) {
-    if (key.startsWith(prefix)) optimisticPresets.delete(key)
+  for (const key of pendingPresetQueue.keys()) {
+    if (key.startsWith(prefix)) pendingPresetQueue.delete(key)
   }
 }
 
-export function getPendingPresetSyncEntries(): OptimisticPresetEntry[] {
-  const now = Date.now()
-  const list: OptimisticPresetEntry[] = []
-  for (const [key, entry] of optimisticPresets.entries()) {
-    if (entry.expiresAt < now) {
-      optimisticPresets.delete(key)
-    } else {
-      list.push(entry)
-    }
-  }
-  return list
+/**
+ * 检查某个 Mod 的某个预设是否处于待生效（Pending）状态
+ */
+export function isPresetPending(
+  gameId: GameId,
+  characterFolder: string,
+  modFolder: string,
+  presetId: string
+): boolean {
+  const key = makeQueueKey(gameId, characterFolder, modFolder)
+  const entry = pendingPresetQueue.get(key)
+  return Boolean(entry && entry.presetId === presetId)
 }
 
 /**
@@ -250,7 +282,7 @@ export async function readActiveD3dxUserVariables(
           }
         }
       } else {
-        if (cleanModName && lowerFullKey.includes('\\mods\\') && lowerFullKey.includes(`\\${cleanModName}\\`)) {
+        if (cleanModName && lowerFullKey.includes('\\mods\\')) {
           result[lowerFullKey] = val
         }
       }
@@ -361,9 +393,8 @@ export async function applyVariablesToD3dxUserIni(
 
 /**
  * 写入 [Present] 一次性帧桥接脚本 (Mods\_ModDeck_Preset_Bridge\bridge.ini)
- * 解决 3DMigoto 在游戏内按 F10 时先将旧内存覆写回 d3dx_user.ini 导致外部修改失效的问题。
- * 在重载后的第 1 帧通过 [Present] 一次性注入目标预设变量，随后立即自锁 ($md_preset_applied = 1)，
- * 绝不干扰玩家后续在游戏内的热键或 GUI 交互。
+ * 支持将待生效队列中全部角色的最新变量批量合成写入这一个集中式桥接文件。
+ * 在重载后的第 1 帧通过 [Present] 一次性注入所有角色的目标预设变量，随后立即自锁 ($md_preset_applied = 1)。
  */
 export async function writePresetBridgeIni(
   modsPath: string,
@@ -378,6 +409,11 @@ export async function writePresetBridgeIni(
     const bridgeDir = path.join(modsPath, BRIDGE_FOLDER_NAME)
     await ensureDir(bridgeDir)
     const bridgeFile = path.join(bridgeDir, BRIDGE_FILE_NAME)
+
+    if (!entries || entries.length === 0) {
+      await clearPresetBridgeIni(modsPath)
+      return true
+    }
 
     // 先收集 d3dx_user.ini 中已有的真实键路径映射，确保桥接脚本的变量路径与 3DMigoto 内存完全一致
     const userIni = await findD3dxUserIniPath(modsPath)
@@ -403,6 +439,8 @@ export async function writePresetBridgeIni(
     for (const entry of entries) {
       const cleanModName = entry.modFolder.replace(/^DISABLED_/i, '')
       const cleanModLower = cleanModName.toLowerCase()
+
+      assignmentLines.push(`  ; Character: ${entry.characterFolder} | Mod: ${cleanModName}`)
 
       for (const [rawKey, rawVal] of Object.entries(entry.variables)) {
         if (isTransientVariable(rawKey)) continue
@@ -448,7 +486,7 @@ export async function writePresetBridgeIni(
     }
 
     const content = [
-      '; Auto-generated by ModDeck Preset Engine (One-Shot Frame Bridge)',
+      '; Auto-generated by ModDeck Preset Engine (Multi-Character Batch Bridge)',
       '[Constants]',
       'global $md_preset_applied = 0',
       '',
@@ -465,6 +503,25 @@ export async function writePresetBridgeIni(
   } catch {
     return false
   }
+}
+
+/**
+ * 根据当前的待生效队列，重新全量合成写入 bridge.ini
+ */
+export async function syncBridgeFileFromQueue(modsPath: string, gameId: GameId): Promise<void> {
+  const entries = getPendingQueueEntries(gameId)
+  if (entries.length === 0) {
+    await clearPresetBridgeIni(modsPath)
+    return
+  }
+  await writePresetBridgeIni(
+    modsPath,
+    entries.map((e) => ({
+      variables: e.variables,
+      characterFolder: e.characterFolder,
+      modFolder: e.cleanModName
+    }))
+  )
 }
 
 /**
@@ -521,7 +578,7 @@ function evaluatePresetActive(
 }
 
 /**
- * 读取某个 Mod 的所有预设方案（读取分级 JSON，并动态计算 isActive）
+ * 读取某个 Mod 的所有预设方案（读取分级 JSON，并动态计算 isActive 和 isPending）
  */
 export async function getModPresets(
   baseDir: string,
@@ -564,18 +621,9 @@ export async function getModPresets(
     currentEffectiveVars[k] = v
   }
 
-  // 若在乐观窗口期内（刚点击切换预设、等待 3DMigoto F10 重载落盘），使用乐观快照覆盖
-  const optKey = makeOptimisticKey(gameId, characterFolder, modFolder)
-  const optEntry = optimisticPresets.get(optKey)
-  if (optEntry) {
-    if (optEntry.expiresAt > Date.now()) {
-      for (const [k, v] of Object.entries(optEntry.variables)) {
-        currentEffectiveVars[k.toLowerCase()] = v
-      }
-    } else {
-      optimisticPresets.delete(optKey)
-    }
-  }
+  // 检查队列中是否有该 Mod 的待生效记录
+  const queueKey = makeQueueKey(gameId, characterFolder, modFolder)
+  const pendingEntry = pendingPresetQueue.get(queueKey)
 
   // 确保存在「默认 (初始)」出厂预设，并始终同步最新解析出的 persist 默认变量
   let defaultPreset = list.find((p) => p.id === '__default__')
@@ -616,9 +664,10 @@ export async function getModPresets(
     await writeJsonAtomic(filePath, list)
   }
 
-  // 计算每一个预设的 isActive 状态
+  // 计算每一个预设的 isActive 与 isPending 状态
   for (const p of list) {
     p.isActive = evaluatePresetActive(p, currentActiveInis, currentEffectiveVars)
+    p.isPending = Boolean(pendingEntry && pendingEntry.presetId === p.id)
   }
 
   return list
@@ -642,8 +691,8 @@ export async function saveModPreset(
 
   const cleanModName = modFolder.replace(/^DISABLED_/i, '')
 
-  // 清除该 Mod 的乐观缓存，确保读取真实落盘的 d3dx_user.ini
-  optimisticPresets.delete(makeOptimisticKey(gameId, characterFolder, modFolder))
+  // 移除该 Mod 的待生效队列，确保保存的是真实落盘数据
+  pendingPresetQueue.delete(makeQueueKey(gameId, characterFolder, modFolder))
 
   // 1. 获取当前 ini 启停状态
   const iniStatus = await inspectModIniFiles(modPath)
@@ -694,6 +743,7 @@ export async function saveModPreset(
 
 /**
  * 应用该 Mod 的某个指定预设
+ * @param autoReloadEnabled 是否配置了“切换预设后自动重载”
  */
 export async function applyModPreset(
   baseDir: string,
@@ -753,28 +803,24 @@ export async function applyModPreset(
   const mergedVars: Record<string, string> = { ...defaultVars, ...(targetPreset.variables ?? {}) }
 
   if (Object.keys(mergedVars).length > 0) {
-    // 写入 d3dx_user.ini（冷态/离线直接持久化）
+    // 写入 d3dx_user.ini（离线/冷态直接持久化）
     await applyVariablesToD3dxUserIni(modsPath, mergedVars, characterFolder, modFolder)
 
-    // 记录乐观激活缓存（持续 10 秒，覆盖 3DMigoto ~5s 重载耗时）
-    optimisticPresets.set(makeOptimisticKey(gameId, characterFolder, modFolder), {
+    // 加入/覆盖到待生效聚合队列（支持同一 Mod 多次切换，永远只保留最新形态）
+    const qKey = makeQueueKey(gameId, characterFolder, modFolder)
+    pendingPresetQueue.set(qKey, {
+      gameId,
       presetId,
       characterFolder,
       cleanModName,
       modsPath,
       variables: mergedVars,
-      expiresAt: Date.now() + 10_000
+      updatedAt: Date.now()
     })
 
-    // 写入 [Present] 一次性帧桥接脚本（热态第 1 次 F10 立即生效）
+    // 全量合成写入全局 bridge.ini
     if (!skipBridge) {
-      await writePresetBridgeIni(modsPath, [
-        {
-          variables: mergedVars,
-          characterFolder,
-          modFolder: cleanModName
-        }
-      ])
+      await syncBridgeFileFromQueue(modsPath, gameId)
     }
   }
 
@@ -894,12 +940,6 @@ export async function applyRosterPreset(
   const preset = list.find((p) => p.id === presetId)
   if (!preset) return { ok: false, error: '未找到指定方案' }
 
-  const bridgeBatch: Array<{
-    variables: Record<string, string>
-    characterFolder: string
-    modFolder: string
-  }> = []
-
   for (const [charFolder, assignment] of Object.entries(preset.assignments)) {
     if (!isSafeSegment(charFolder)) continue
     let charDir = ''
@@ -930,7 +970,7 @@ export async function applyRosterPreset(
         activePath = destPath
       }
 
-      // 若选中的 Mod 绑定了单 Mod 变体预设，同时应用该变体（跳过单独写 bridge，最后批量合成写入）
+      // 若选中的 Mod 绑定了单 Mod 变体预设，同时加入聚合队列（跳过单独写 bridge，最后批量合成写入）
       if (shouldEnable && assignment.presetId) {
         await applyModPreset(
           baseDir,
@@ -942,22 +982,12 @@ export async function applyRosterPreset(
           assignment.presetId,
           true
         ).catch(() => undefined)
-
-        const optEntry = optimisticPresets.get(makeOptimisticKey(gameId, charFolder, cleanModName))
-        if (optEntry) {
-          bridgeBatch.push({
-            variables: optEntry.variables,
-            characterFolder: charFolder,
-            modFolder: cleanModName
-          })
-        }
       }
     }
   }
 
-  if (bridgeBatch.length > 0) {
-    await writePresetBridgeIni(modsPath, bridgeBatch)
-  }
+  // 全量合成写入全局 bridge.ini
+  await syncBridgeFileFromQueue(modsPath, gameId)
 
   return { ok: true }
 }
