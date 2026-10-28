@@ -455,6 +455,17 @@ export function SettingsView({
                       }
                     />
                   </label>
+
+                  <label className="checkbox" style={{ marginTop: '4px' }}>
+                    <input
+                      type="checkbox"
+                      checked={value?.fastConfigReloadEnabled === true}
+                      onChange={(event) =>
+                        updateGame(game.id, { fastConfigReloadEnabled: event.target.checked })
+                      }
+                    />
+                    <span>开启预设切换错位极速重载 (仅重载配置参数，无感生效零掉帧)</span>
+                  </label>
                 </div>
               )
             })}
@@ -532,6 +543,48 @@ export function SettingsView({
                           <Icon name="folder" size={14} />
                           打开 EFMI 目录
                         </button>
+                      </div>
+
+                      <div className="fast-reload-card">
+                        <div className="fast-reload-head">
+                          <strong>3DMigoto 重载模式诊断</strong>
+                          <span className={`chip${env?.isFastReloadConfigured ? ' ok' : ' warn'}`}
+                          >
+                            {env?.isFastReloadConfigured ? '⚡ 极速分离模式 (零掉帧)' : '⚠️ 标准合并模式'}
+                          </span>
+                        </div>
+                        <div className="fast-reload-keys">
+                          <div>
+                            <span className="muted small">着色器修复重载: </span>
+                            <code>{env?.reloadFixesKey || 'VK_F10'}</code>
+                          </div>
+                          <div>
+                            <span className="muted small">ini配置重载: </span>
+                            <code>{env?.reloadConfigKey || 'VK_F10'}</code>
+                          </div>
+                        </div>
+                        <p className="muted small" style={{ margin: '4px 0 8px 0' }}>
+                          {env?.isFastReloadConfigured
+                            ? '已将 reload_config 错位绑定为独立热键 (Alt+Shift+F10)。切换变体预设仅重载参数，无需重载着色器。'
+                            : '当前 reload_config 与 reload_fixes 相同，变体预设重载时会伴随全量着色器刷新。建议一键开启错位加速。'}
+                        </p>
+                        <div className="row">
+                          <button
+                            className={`btn ${env?.isFastReloadConfigured ? 'ghost' : 'primary'} small-btn`}
+                            onClick={async () => {
+                              const enable = !env?.isFastReloadConfigured
+                              const res = await window.moddeck.configureFastReload(game.id, enable)
+                              if (res.ok) {
+                                onNotify?.(enable ? '已配置错位极速重载 (Alt+Shift+F10)' : '已恢复标准合并重载模式', 'ok')
+                                void refreshEnvironment()
+                              } else {
+                                onNotify?.(res.error || '配置失败', 'err')
+                              }
+                            }}
+                          >
+                            {env?.isFastReloadConfigured ? '还原为默认合并模式' : '一键配置错位极速重载 (Alt+Shift+F10)'}
+                          </button>
+                        </div>
                       </div>
                     </>
                   ) : (

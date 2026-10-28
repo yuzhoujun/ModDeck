@@ -357,6 +357,17 @@ export function ModDetailsPanel({
               <div className="muted small">暂无独立预设，点击右上角可将当前状态存为预设</div>
             ) : (
               <div className="detail-presets-list">
+                {hasUnsavedChanges() ? (
+                  <div
+                    className="detail-preset-chip is-dirty"
+                    title="检测到实机参数已发生自定义修改，未匹配任何已保存预设。点击右上角『存为预设』可将其持久化保存。"
+                  >
+                    <div className="preset-apply-btn" style={{ cursor: 'default' }}>
+                      <span className="preset-dot is-dirty" />
+                      <span className="preset-name">当前实机状态 (未保存改动)</span>
+                    </div>
+                  </div>
+                ) : null}
                 {presets.map((preset) => {
                   const active = isPresetActive(preset)
                   const isDefault = preset.id === '__default__'
