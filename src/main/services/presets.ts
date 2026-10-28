@@ -8,23 +8,73 @@ import type {
   ToggleResult
 } from '../../shared/types'
 import { ensureDir, pathExists, readJsonSafe, writeJsonAtomic } from '../core/fsx'
-import { isInside, isSafeSegment } from '../core/safe-path'
+import { isSafeSegment } from '../core/safe-path'
 
 const ROSTER_PRESETS_FILE = 'roster-presets.json'
+const BRIDGE_FOLDER_NAME = '_ModDeck_Preset_Bridge'
+const BRIDGE_FILE_NAME = 'bridge.ini'
 
 /**
- * 临时/UI/交互类瞬态变量过滤规则
- * 这类变量在游戏中是频繁临时变动的（例如当前打开的菜单/页码/拖拽坐标/点击时间/鼠标悬停等），
+ * 临时/UI/交互/帧动画类瞬态变量过滤规则
+ * 这类变量在游戏中是频繁临时变动或由帧动画重算的（例如打开的菜单/页码/拖拽坐标/动画振荡器/形态键），
  * 不应参与外观预设的活性比对与切换覆盖。
  */
 export const TRANSIENT_VAR_PATTERNS = [
-  /\\(?:ui_)?(?:menu|elem|drag|seen|info|page|sub|lang|ref_w|ref_h|off_x|off_y|slider|cursor|screen|click|hover|active_elem|buttons)\b/i,
-  /\\ssmtdrag_efmi_(?:frame|probe|poke|lmb|rmb|x|xb1|xb2|btn|press|hand|modifier|sim|release|draw|pass|bodypass|allowed|detect)\b/i,
+  /(?:\\|_)(?:menu|elem|drag|seen|info|page|sub|lang|ref_w|ref_h|off_x|off_y|offset_x|offset_y|offset_x_px|offset_y_px|slider|cursor|screen|click|hover|active_elem|buttons)(?:_|\b)/i,
+  /\\ssmtdrag_efmi_/i,
+  /\\tg_gui_anim_/i,
+  /\\(?:tg_)?shapekey_\d+\b/i,
   /\\(?:show_time|inited|finished|begin_time|delta|ui4_finished|ww|wh|mod_in_use)\b/i
 ]
 
 export function isTransientVariable(key: string): boolean {
   return TRANSIENT_VAR_PATTERNS.some((rx) => rx.test(key))
+}
+
+/**
+ * 乐观激活状态缓存：
+ * 在游戏运行时点击预设（T=0）到 F10 重载完毕并回写 d3dx_user.ini（T=6.2s）期间，
+ * 3DMigoto 在 T=0.1s 会先把旧内存 flush 到 d3dx_user.ini。
+ * 通过乐观缓存，UI 在此窗口期内始终稳定显示刚点击的目标预设为绿灯激活态。
+ */
+interface OptimisticPresetEntry {
+  presetId: string
+  characterFolder: string
+  cleanModName: string
+  modsPath: string
+  variables: Record<string, string>
+  expiresAt: number
+}
+
+const optimisticPresets = new Map<string, OptimisticPresetEntry>()
+
+function makeOptimisticKey(gameId: GameId, characterFolder: string, modFolder: string): string {
+  const cleanMod = modFolder.replace(/^DISABLED_/i, '').toLowerCase()
+  return `${gameId}:${characterFolder.toLowerCase()}:${cleanMod}`
+}
+
+export function clearOptimisticPresets(gameId?: GameId): void {
+  if (!gameId) {
+    optimisticPresets.clear()
+    return
+  }
+  const prefix = `${gameId}:`
+  for (const key of optimisticPresets.keys()) {
+    if (key.startsWith(prefix)) optimisticPresets.delete(key)
+  }
+}
+
+export function getPendingPresetSyncEntries(): OptimisticPresetEntry[] {
+  const now = Date.now()
+  const list: OptimisticPresetEntry[] = []
+  for (const [key, entry] of optimisticPresets.entries()) {
+    if (entry.expiresAt < now) {
+      optimisticPresets.delete(key)
+    } else {
+      list.push(entry)
+    }
+  }
+  return list
 }
 
 /**
@@ -79,7 +129,8 @@ export async function inspectModIniFiles(
 }
 
 /**
- * 深入 Mod 目录下的所有 .ini 文件，解析出该 Mod 声明的所有带 persist 或 global 的变量定义与作者出厂默认值
+ * 深入 Mod 目录下的所有 .ini 文件，仅解析声明了 persist 的持久化变量定义与作者出厂默认值
+ * （排除无 persist 的内部骨骼/动画计算寄存器）
  * key 统一存储为相对 ini 路径与变量名，如: "$\\mod.ini\\ssmtdrag_efmi_mode_a" 或带有 namespace 的 "$\\ns\\var"
  */
 export async function inspectModDefaultVariables(
@@ -105,8 +156,10 @@ export async function inspectModDefaultVariables(
           continue
         }
 
-        // 匹配 global persist $var = value 或 global $var = value
-        const varMatch = line.match(/^global\s+(?:persist\s+)?\$([a-zA-Z0-9_]+)\s*=\s*([^;]+)/i)
+        // 仅匹配带 persist 关键字的持久化变量（global persist $var = value / persist global $var = value / persist $var = value）
+        const varMatch = line.match(
+          /^(?:global\s+persist|persist\s+global|persist)\s+\$([a-zA-Z0-9_]+)\s*=\s*([^;]+)/i
+        )
         if (varMatch) {
           const varName = varMatch[1].trim()
           let defaultVal = varMatch[2].trim()
@@ -138,7 +191,7 @@ export async function inspectModDefaultVariables(
 /**
  * 寻找游戏目录下的 d3dx_user.ini
  */
-async function findD3dxUserIniPath(modsPath: string): Promise<string | null> {
+export async function findD3dxUserIniPath(modsPath: string): Promise<string | null> {
   const parent = path.dirname(modsPath)
   const candidate1 = path.join(parent, 'd3dx_user.ini')
   if (await pathExists(candidate1)) return candidate1
@@ -156,7 +209,7 @@ async function findD3dxUserIniPath(modsPath: string): Promise<string | null> {
 export async function readActiveD3dxUserVariables(
   modsPath: string,
   knownKeys?: string[],
-  characterFolder?: string,
+  _characterFolder?: string,
   modFolder?: string
 ): Promise<Record<string, string>> {
   const userIni = await findD3dxUserIniPath(modsPath)
@@ -209,6 +262,26 @@ export async function readActiveD3dxUserVariables(
 }
 
 /**
+ * 构建 3DMigoto 规范变量全路径名（用于写入 d3dx_user.ini 或 bridge.ini）
+ */
+function buildFull3DMigotoVarKey(
+  rawKey: string,
+  characterFolder?: string,
+  cleanModName?: string
+): string {
+  const lower = rawKey.toLowerCase()
+  if (lower.includes('\\mods\\')) return rawKey
+  if (rawKey.startsWith('$\\') && characterFolder && cleanModName) {
+    const relPart = rawKey.substring(2)
+    if (relPart.toLowerCase().includes('.ini\\')) {
+      return `$\\mods\\${characterFolder}\\${cleanModName}\\${relPart}`
+    }
+    return `$\\${relPart}`
+  }
+  return rawKey
+}
+
+/**
  * 将指定预设的变量值安全写回 d3dx_user.ini
  */
 export async function applyVariablesToD3dxUserIni(
@@ -227,6 +300,7 @@ export async function applyVariablesToD3dxUserIni(
 
     const varMap = new Map<string, { originalKey: string; value: string }>()
     for (const [k, v] of Object.entries(variables)) {
+      if (isTransientVariable(k)) continue
       varMap.set(k.toLowerCase(), { originalKey: k, value: v })
     }
 
@@ -273,17 +347,7 @@ export async function applyVariablesToD3dxUserIni(
     // 若 d3dx_user.ini 之前尚未记录该变量，则构建规范完整路径追加
     for (const [targetKey, item] of varMap.entries()) {
       if (!handledKeys.has(targetKey)) {
-        let fullWriteKey = item.originalKey
-        if (!fullWriteKey.toLowerCase().includes('\\mods\\') && characterFolder && cleanModName) {
-          if (targetKey.startsWith('$\\')) {
-            const relPart = item.originalKey.substring(2)
-            if (relPart.toLowerCase().includes('.ini\\')) {
-              fullWriteKey = `$\\mods\\${characterFolder}\\${cleanModName}\\${relPart}`
-            } else {
-              fullWriteKey = `$\\${relPart}`
-            }
-          }
-        }
+        const fullWriteKey = buildFull3DMigotoVarKey(item.originalKey, characterFolder, cleanModName)
         updatedLines.push(`${fullWriteKey} = ${item.value}`)
       }
     }
@@ -292,6 +356,129 @@ export async function applyVariablesToD3dxUserIni(
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * 写入 [Present] 一次性帧桥接脚本 (Mods\_ModDeck_Preset_Bridge\bridge.ini)
+ * 解决 3DMigoto 在游戏内按 F10 时先将旧内存覆写回 d3dx_user.ini 导致外部修改失效的问题。
+ * 在重载后的第 1 帧通过 [Present] 一次性注入目标预设变量，随后立即自锁 ($md_preset_applied = 1)，
+ * 绝不干扰玩家后续在游戏内的热键或 GUI 交互。
+ */
+export async function writePresetBridgeIni(
+  modsPath: string,
+  entries: Array<{
+    variables: Record<string, string>
+    characterFolder: string
+    modFolder: string
+  }>
+): Promise<boolean> {
+  if (!modsPath) return false
+  try {
+    const bridgeDir = path.join(modsPath, BRIDGE_FOLDER_NAME)
+    await ensureDir(bridgeDir)
+    const bridgeFile = path.join(bridgeDir, BRIDGE_FILE_NAME)
+
+    // 先收集 d3dx_user.ini 中已有的真实键路径映射，确保桥接脚本的变量路径与 3DMigoto 内存完全一致
+    const userIni = await findD3dxUserIniPath(modsPath)
+    const existingKeyLines: Array<{ rawKey: string; lowerKey: string }> = []
+    if (userIni) {
+      try {
+        const raw = await fs.readFile(userIni, 'utf8')
+        for (const rawLine of raw.split(/\r?\n/)) {
+          const line = rawLine.trim()
+          if (line.startsWith('$\\') && line.includes('=')) {
+            const k = line.substring(0, line.indexOf('=')).trim()
+            existingKeyLines.push({ rawKey: k, lowerKey: k.toLowerCase() })
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    const assignmentLines: string[] = []
+    const assignedCanonical = new Set<string>()
+
+    for (const entry of entries) {
+      const cleanModName = entry.modFolder.replace(/^DISABLED_/i, '')
+      const cleanModLower = cleanModName.toLowerCase()
+
+      for (const [rawKey, rawVal] of Object.entries(entry.variables)) {
+        if (isTransientVariable(rawKey)) continue
+        const trimmedVal = String(rawVal ?? '').trim()
+        if (!/^[-+]?\d+(?:\.\d+)?$/.test(trimmedVal)) continue
+
+        const targetKey = rawKey.toLowerCase()
+        const targetSuffix = targetKey.substring(1)
+        const varNameOnly = targetKey.substring(targetKey.lastIndexOf('\\'))
+
+        let resolvedKey = ''
+        for (const item of existingKeyLines) {
+          if (
+            item.lowerKey === targetKey ||
+            item.lowerKey.endsWith(targetSuffix) ||
+            (cleanModLower &&
+              item.lowerKey.includes('\\mods\\') &&
+              item.lowerKey.includes(`\\${cleanModLower}\\`) &&
+              item.lowerKey.endsWith(varNameOnly))
+          ) {
+            if (cleanModLower && item.lowerKey.includes('\\mods\\')) {
+              if (!item.lowerKey.includes(`\\${cleanModLower}\\`)) continue
+            }
+            resolvedKey = item.rawKey
+            break
+          }
+        }
+
+        if (!resolvedKey) {
+          resolvedKey = buildFull3DMigotoVarKey(rawKey, entry.characterFolder, cleanModName)
+        }
+
+        const lowerResolved = resolvedKey.toLowerCase()
+        if (assignedCanonical.has(lowerResolved)) continue
+        assignedCanonical.add(lowerResolved)
+        assignmentLines.push(`  ${resolvedKey} = ${trimmedVal}`)
+      }
+    }
+
+    if (assignmentLines.length === 0) {
+      await clearPresetBridgeIni(modsPath)
+      return true
+    }
+
+    const content = [
+      '; Auto-generated by ModDeck Preset Engine (One-Shot Frame Bridge)',
+      '[Constants]',
+      'global $md_preset_applied = 0',
+      '',
+      '[Present]',
+      'if $md_preset_applied == 0',
+      ...assignmentLines,
+      '  $md_preset_applied = 1',
+      'endif',
+      ''
+    ].join('\r\n')
+
+    await fs.writeFile(bridgeFile, content, 'utf8')
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 清空桥接脚本，使其处于静默空闲状态
+ */
+export async function clearPresetBridgeIni(modsPath: string): Promise<void> {
+  if (!modsPath) return
+  try {
+    const bridgeFile = path.join(modsPath, BRIDGE_FOLDER_NAME, BRIDGE_FILE_NAME)
+    if (await pathExists(bridgeFile)) {
+      await fs.writeFile(bridgeFile, '; ModDeck Preset Bridge Idle\r\n', 'utf8')
+    }
+  } catch {
+    // ignore
   }
 }
 
@@ -377,8 +564,22 @@ export async function getModPresets(
     currentEffectiveVars[k] = v
   }
 
-  // 确保存在「默认 (初始)」出厂预设
+  // 若在乐观窗口期内（刚点击切换预设、等待 3DMigoto F10 重载落盘），使用乐观快照覆盖
+  const optKey = makeOptimisticKey(gameId, characterFolder, modFolder)
+  const optEntry = optimisticPresets.get(optKey)
+  if (optEntry) {
+    if (optEntry.expiresAt > Date.now()) {
+      for (const [k, v] of Object.entries(optEntry.variables)) {
+        currentEffectiveVars[k.toLowerCase()] = v
+      }
+    } else {
+      optimisticPresets.delete(optKey)
+    }
+  }
+
+  // 确保存在「默认 (初始)」出厂预设，并始终同步最新解析出的 persist 默认变量
   let defaultPreset = list.find((p) => p.id === '__default__')
+  let listModified = false
   if (!defaultPreset) {
     let defaultInis: string[] = []
     if (modPath && (await pathExists(modPath))) {
@@ -401,6 +602,17 @@ export async function getModPresets(
       updatedAt: 0
     }
     list.unshift(defaultPreset)
+    listModified = true
+  } else if (Object.keys(defaultVars).length > 0) {
+    const prevKeys = Object.keys(defaultPreset.variables ?? {})
+    const nextKeys = Object.keys(defaultVars)
+    if (prevKeys.length !== nextKeys.length) {
+      defaultPreset.variables = defaultVars
+      listModified = true
+    }
+  }
+
+  if (listModified) {
     await writeJsonAtomic(filePath, list)
   }
 
@@ -430,6 +642,9 @@ export async function saveModPreset(
 
   const cleanModName = modFolder.replace(/^DISABLED_/i, '')
 
+  // 清除该 Mod 的乐观缓存，确保读取真实落盘的 d3dx_user.ini
+  optimisticPresets.delete(makeOptimisticKey(gameId, characterFolder, modFolder))
+
   // 1. 获取当前 ini 启停状态
   const iniStatus = await inspectModIniFiles(modPath)
   const cleanActiveInis = iniStatus.active.map((rel) => {
@@ -439,15 +654,18 @@ export async function saveModPreset(
     return parts.join('/')
   })
 
-  // 2. 识别出该 Mod 关联的已知变量键列表，并从 d3dx_user.ini 中提取当前实机运行值
+  // 2. 识别出该 Mod 关联的已知 persist 变量键列表，并从 d3dx_user.ini 中提取当前实机运行值
   const defaultVars = await inspectModDefaultVariables(modPath)
   const knownKeys = Object.keys(defaultVars)
   const activeVars = await readActiveD3dxUserVariables(modsPath, knownKeys, characterFolder, modFolder)
 
-  // 合并：如果 d3dx_user.ini 里有变动取运行时值，若无则取作者默认出厂值
-  const currentSnapshotVars: Record<string, string> = { ...defaultVars }
+  // 合并：如果 d3dx_user.ini 里有变动取运行时值，若无则取作者默认出厂值（同时剔除瞬态变量）
+  const currentSnapshotVars: Record<string, string> = {}
+  for (const [k, v] of Object.entries(defaultVars)) {
+    if (!isTransientVariable(k)) currentSnapshotVars[k] = v
+  }
   for (const [k, v] of Object.entries(activeVars)) {
-    currentSnapshotVars[k] = v
+    if (!isTransientVariable(k)) currentSnapshotVars[k] = v
   }
 
   const filePath = await getModPresetFilePath(baseDir, gameId, characterFolder, modFolder)
@@ -484,7 +702,8 @@ export async function applyModPreset(
   modFolder: string,
   modPath: string,
   modsPath: string,
-  presetId: string
+  presetId: string,
+  skipBridge = false
 ): Promise<ToggleResult> {
   const filePath = await getModPresetFilePath(baseDir, gameId, characterFolder, modFolder)
   const list = (await readJsonSafe<ModVariantPreset[] | null>(filePath, null)) ?? []
@@ -492,6 +711,8 @@ export async function applyModPreset(
   if (!targetPreset) return { ok: false, error: '未找到指定预设' }
 
   if (!(await pathExists(modPath))) return { ok: false, error: 'Mod 目录不存在' }
+
+  const cleanModName = modFolder.replace(/^DISABLED_/i, '')
 
   // 1. 如果有 ini 文件级的互斥启用/禁用，重命名文件
   const desiredActiveNorm = new Set(targetPreset.activeIniFiles.map((f) => f.replace(/\\/g, '/').toLowerCase()))
@@ -527,9 +748,34 @@ export async function applyModPreset(
   }
   await walk(modPath, '')
 
-  // 2. 将预设保存的 variables 写回 d3dx_user.ini
-  if (targetPreset.variables && Object.keys(targetPreset.variables).length > 0) {
-    await applyVariablesToD3dxUserIni(modsPath, targetPreset.variables, characterFolder, modFolder)
+  // 2. 合并该 Mod 的默认 persist 变量与预设变量（确保切回默认或旧预设时所有 persist 变量完整覆盖）
+  const defaultVars = await inspectModDefaultVariables(modPath)
+  const mergedVars: Record<string, string> = { ...defaultVars, ...(targetPreset.variables ?? {}) }
+
+  if (Object.keys(mergedVars).length > 0) {
+    // 写入 d3dx_user.ini（冷态/离线直接持久化）
+    await applyVariablesToD3dxUserIni(modsPath, mergedVars, characterFolder, modFolder)
+
+    // 记录乐观激活缓存（持续 10 秒，覆盖 3DMigoto ~5s 重载耗时）
+    optimisticPresets.set(makeOptimisticKey(gameId, characterFolder, modFolder), {
+      presetId,
+      characterFolder,
+      cleanModName,
+      modsPath,
+      variables: mergedVars,
+      expiresAt: Date.now() + 10_000
+    })
+
+    // 写入 [Present] 一次性帧桥接脚本（热态第 1 次 F10 立即生效）
+    if (!skipBridge) {
+      await writePresetBridgeIni(modsPath, [
+        {
+          variables: mergedVars,
+          characterFolder,
+          modFolder: cleanModName
+        }
+      ])
+    }
   }
 
   return { ok: true }
@@ -648,6 +894,12 @@ export async function applyRosterPreset(
   const preset = list.find((p) => p.id === presetId)
   if (!preset) return { ok: false, error: '未找到指定方案' }
 
+  const bridgeBatch: Array<{
+    variables: Record<string, string>
+    characterFolder: string
+    modFolder: string
+  }> = []
+
   for (const [charFolder, assignment] of Object.entries(preset.assignments)) {
     if (!isSafeSegment(charFolder)) continue
     let charDir = ''
@@ -678,7 +930,7 @@ export async function applyRosterPreset(
         activePath = destPath
       }
 
-      // 若选中的 Mod 绑定了单 Mod 变体预设，同时应用该变体
+      // 若选中的 Mod 绑定了单 Mod 变体预设，同时应用该变体（跳过单独写 bridge，最后批量合成写入）
       if (shouldEnable && assignment.presetId) {
         await applyModPreset(
           baseDir,
@@ -687,10 +939,24 @@ export async function applyRosterPreset(
           cleanModName,
           activePath,
           modsPath,
-          assignment.presetId
+          assignment.presetId,
+          true
         ).catch(() => undefined)
+
+        const optEntry = optimisticPresets.get(makeOptimisticKey(gameId, charFolder, cleanModName))
+        if (optEntry) {
+          bridgeBatch.push({
+            variables: optEntry.variables,
+            characterFolder: charFolder,
+            modFolder: cleanModName
+          })
+        }
       }
     }
+  }
+
+  if (bridgeBatch.length > 0) {
+    await writePresetBridgeIni(modsPath, bridgeBatch)
   }
 
   return { ok: true }

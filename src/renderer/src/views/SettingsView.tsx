@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type {
   AppInfo,
   EnvironmentCheck,
@@ -30,9 +30,10 @@ export function SettingsView({
   const [tab, setTab] = useState<SettingsTab>(initialTab)
   const [draft, setDraft] = useState<Settings>(settings)
   const [hotkeyDraft, setHotkeyDraft] = useState(settings.ui.overlayHotkey)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  const [reloadHotkeyDraft, setReloadHotkeyDraft] = useState(settings.ui.reloadHotkey || 'F10')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [hotkeyMessage, setHotkeyMessage] = useState<string | null>(null)
+  const [reloadHotkeyMessage, setReloadHotkeyMessage] = useState<string | null>(null)
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [envResults, setEnvResults] = useState<EnvironmentCheck[]>([])
   const [envChecking, setEnvChecking] = useState(false)
@@ -40,9 +41,13 @@ export function SettingsView({
   const [rosterSyncing, setRosterSyncing] = useState(false)
   const [showF10WarningModal, setShowF10WarningModal] = useState(false)
 
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const savedBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     setDraft(settings)
     setHotkeyDraft(settings.ui.overlayHotkey)
+    setReloadHotkeyDraft(settings.ui.reloadHotkey || 'F10')
   }, [settings])
 
   useEffect(() => {
@@ -58,7 +63,41 @@ export function SettingsView({
       .getRosterStatus()
       .then(setRosterStatus)
       .catch(() => undefined)
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+      if (savedBadgeTimerRef.current) clearTimeout(savedBadgeTimerRef.current)
+    }
   }, [])
+
+  async function persistPatch(patch: SettingsPatch, debounced = false) {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
+
+    const execute = async () => {
+      setSaveStatus('saving')
+      try {
+        await onSave(patch)
+        setSaveStatus('saved')
+        if (savedBadgeTimerRef.current) clearTimeout(savedBadgeTimerRef.current)
+        savedBadgeTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2400)
+      } catch (error) {
+        setSaveStatus('idle')
+        onNotify(errorMessage(error), 'err')
+      }
+    }
+
+    if (debounced) {
+      setSaveStatus('saving')
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null
+        void execute()
+      }, 400)
+    } else {
+      await execute()
+    }
+  }
 
   async function handleSyncRoster() {
     setRosterSyncing(true)
@@ -92,8 +131,14 @@ export function SettingsView({
     if (settings.ui.envCheckEnabled) void refreshEnvironment()
   }, [settings.ui.envCheckEnabled])
 
-  function updateUi(patch: Partial<Settings['ui']>) {
+  function updateUi(patch: Partial<Settings['ui']>, debounced = false) {
     setDraft((current) => ({ ...current, ui: { ...current.ui, ...patch } }))
+    void persistPatch({ ui: patch }, debounced)
+  }
+
+  function updateImport(patch: Partial<Settings['import']>, debounced = false) {
+    setDraft((current) => ({ ...current, import: { ...current.import, ...patch } }))
+    void persistPatch({ import: patch }, debounced)
   }
 
   function shortPath(value: string): string {
@@ -109,14 +154,22 @@ export function SettingsView({
     return '尚未检测'
   }
 
-  function updateGame(gameId: string, patch: Partial<Settings['games'][string]>) {
-    setDraft((current) => ({
-      ...current,
-      games: {
-        ...current.games,
-        [gameId]: { ...current.games[gameId], ...patch }
+  function updateGame(
+    gameId: string,
+    patch: Partial<Settings['games'][string]>,
+    debounced = false
+  ) {
+    setDraft((current) => {
+      const nextGame = { ...current.games[gameId], ...patch }
+      void persistPatch({ games: { [gameId]: nextGame } }, debounced)
+      return {
+        ...current,
+        games: {
+          ...current.games,
+          [gameId]: nextGame
+        }
       }
-    }))
+    })
   }
 
   async function pickInto(
@@ -125,38 +178,13 @@ export function SettingsView({
     picker: () => Promise<string | null>
   ) {
     const picked = await picker()
-    if (picked) updateGame(gameId, { [field]: picked })
+    if (picked) updateGame(gameId, { [field]: picked }, false)
   }
 
-  async function save() {
-    setSaving(true)
-    setMessage(null)
-    try {
-      await onSave({
-        games: draft.games,
-        import: draft.import,
-        ui: {
-          allowHotkeySend: draft.ui.allowHotkeySend,
-          envCheckEnabled: draft.ui.envCheckEnabled,
-          envCheckNeverPrompt: draft.ui.envCheckNeverPrompt,
-          autoReloadF10: draft.ui.autoReloadF10,
-          recentModCount: draft.ui.recentModCount,
-          closeBehavior: draft.ui.closeBehavior
-        }
-      })
-      setMessage('已保存')
-      onNotify('设置已保存')
-    } catch (error) {
-      onNotify(errorMessage(error), 'err')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  function captureHotkey(event: KeyboardEvent<HTMLInputElement>) {
+  function formatCapturedKey(event: KeyboardEvent<HTMLInputElement>): string | null {
     event.preventDefault()
-    if (event.key === 'Escape') return
-    if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) return
+    if (event.key === 'Escape') return null
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(event.key)) return null
 
     const parts: string[] = []
     if (event.ctrlKey) parts.push('Control')
@@ -168,7 +196,14 @@ export function SettingsView({
     if (key === ' ') key = 'Space'
     else if (key.length === 1) key = key.toUpperCase()
     parts.push(key)
-    setHotkeyDraft(parts.join('+'))
+    return parts.join('+')
+  }
+
+  function captureHotkey(event: KeyboardEvent<HTMLInputElement>) {
+    const combo = formatCapturedKey(event)
+    if (!combo) return
+    setHotkeyDraft(combo)
+    void applyHotkey(combo)
   }
 
   async function applyHotkey(value: string) {
@@ -179,11 +214,39 @@ export function SettingsView({
         setHotkeyMessage(result.error || '快捷键保存失败')
         return
       }
-      await onSave({ ui: { overlayHotkey: result.hotkey ?? value } })
-      setHotkeyMessage(value ? `已保存：${value}` : '已禁用快捷窗口快捷键')
-      onNotify(value ? `快捷键已设为 ${value}` : '已禁用快捷键')
+      const nextVal = result.hotkey ?? value
+      setHotkeyDraft(nextVal)
+      await persistPatch({ ui: { overlayHotkey: nextVal } }, false)
+      setHotkeyMessage(nextVal ? `已自动保存：${nextVal}` : '已禁用快捷窗口快捷键')
     } catch (error) {
       setHotkeyMessage(errorMessage(error))
+    }
+  }
+
+  function captureReloadHotkey(event: KeyboardEvent<HTMLInputElement>) {
+    const combo = formatCapturedKey(event)
+    if (!combo) return
+    setReloadHotkeyDraft(combo)
+    void applyReloadHotkey(combo)
+  }
+
+  async function applyReloadHotkey(value: string) {
+    setReloadHotkeyMessage(null)
+    try {
+      const result = await window.moddeck.setReloadHotkey(value)
+      if (!result.ok) {
+        setReloadHotkeyMessage(result.error || '重载快捷键保存失败')
+        return
+      }
+      const nextVal = result.hotkey ?? (value || 'F10')
+      setReloadHotkeyDraft(nextVal)
+      setDraft((current) => ({ ...current, ui: { ...current.ui, reloadHotkey: nextVal } }))
+      setReloadHotkeyMessage(`已自动保存：${nextVal}`)
+      setSaveStatus('saved')
+      if (savedBadgeTimerRef.current) clearTimeout(savedBadgeTimerRef.current)
+      savedBadgeTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2400)
+    } catch (error) {
+      setReloadHotkeyMessage(errorMessage(error))
     }
   }
 
@@ -201,13 +264,28 @@ export function SettingsView({
         <div>
           <div className="eyebrow">设置</div>
           <h1>设置</h1>
-          <p className="muted">通用、游戏路径、导入行为和本地数据。所有配置只保存在本机。</p>
+          <p className="muted">通用、游戏路径、导入行为和本地数据。所有改动自动保存在本机。</p>
         </div>
         <div className="actions">
-          <button className="btn primary" onClick={save} disabled={saving}>
-            <Icon name="check" size={16} />
-            {saving ? '保存中…' : '保存设置'}
-          </button>
+          <span
+            className="muted small"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '999px',
+              background: 'var(--bg-elevated, rgba(255,255,255,0.04))',
+              border: '1px solid var(--line-soft)'
+            }}
+          >
+            <Icon name="check" size={14} />
+            {saveStatus === 'saving'
+              ? '正在自动保存…'
+              : saveStatus === 'saved'
+                ? '✓ 已自动保存'
+                : '修改即自动生效'}
+          </span>
         </div>
       </header>
 
@@ -224,15 +302,13 @@ export function SettingsView({
         ))}
       </div>
 
-      {message ? <div className="notice">{message}</div> : null}
-
       {tab === 'general' ? (
         <>
           <section className="section first-section">
             <div className="section-head">
               <h2>快捷窗口</h2>
               <p className="muted">
-                在游戏里按快捷键呼出紧凑的 Mod 开关面板。快捷键全局生效，冲突时请换一个。
+                在游戏里按快捷键呼出紧凑的 Mod 开关面板。点击输入框后直接按下组合键即可自动保存。
               </p>
             </div>
             <div className="hotkey-row">
@@ -244,8 +320,8 @@ export function SettingsView({
                 onKeyDown={captureHotkey}
                 onFocus={(event) => event.target.select()}
               />
-              <button className="btn" onClick={() => void applyHotkey(hotkeyDraft)}>
-                应用
+              <button className="btn ghost" onClick={() => void applyHotkey('Alt+Shift+M')}>
+                恢复默认
               </button>
               <button className="btn ghost" onClick={() => void applyHotkey('')}>
                 禁用
@@ -262,12 +338,7 @@ export function SettingsView({
               <input
                 type="checkbox"
                 checked={draft.ui.allowHotkeySend}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    ui: { ...current.ui, allowHotkeySend: event.target.checked }
-                  }))
-                }
+                onChange={(event) => updateUi({ allowHotkeySend: event.target.checked })}
               />
               <span>允许点击热键发送到游戏（游戏需要在前台）</span>
             </label>
@@ -276,8 +347,35 @@ export function SettingsView({
           <section className="section">
             <div className="section-head">
               <h2>游戏刷新与快捷行为</h2>
-              <p className="muted">控制切换 Mod 或预设后的游戏重载（F10）与快捷使用记录。</p>
+              <p className="muted">控制切换 Mod 或预设后的游戏重载热键（默认 F10）与快捷使用记录。</p>
             </div>
+
+            <div className="field" style={{ marginBottom: '10px' }}>
+              <span>3DMigoto 游戏重载快捷键（默认 F10，点击输入框后按键即可修改）</span>
+              <div className="hotkey-row">
+                <input
+                  className="input hotkey-input"
+                  value={reloadHotkeyDraft}
+                  placeholder="默认 F10"
+                  readOnly
+                  onKeyDown={captureReloadHotkey}
+                  onFocus={(event) => event.target.select()}
+                />
+                <button className="btn ghost" onClick={() => void applyReloadHotkey('F10')}>
+                  恢复默认 (F10)
+                </button>
+                <button
+                  className="btn ghost"
+                  onClick={() => {
+                    void window.moddeck.reloadF10()
+                  }}
+                >
+                  测试发送
+                </button>
+              </div>
+              {reloadHotkeyMessage ? <div className="hint">{reloadHotkeyMessage}</div> : null}
+            </div>
+
             <label className="check-row">
               <input
                 type="checkbox"
@@ -291,7 +389,7 @@ export function SettingsView({
                 }}
               />
               <span>
-                切换 Mod / 预设后自动发送 F10 热重载（800ms 防抖队列、前台为游戏时生效）
+                切换 Mod / 预设后自动发送 {draft.ui.reloadHotkey || 'F10'} 热重载（600ms 防抖队列、前台为游戏时生效）
               </span>
             </label>
             <label className="field">
@@ -302,7 +400,7 @@ export function SettingsView({
                 max="15"
                 step="1"
                 value={draft.ui.recentModCount}
-                onChange={(event) => updateUi({ recentModCount: Number(event.target.value) })}
+                onChange={(event) => updateUi({ recentModCount: Number(event.target.value) }, true)}
               />
             </label>
           </section>
@@ -383,7 +481,7 @@ export function SettingsView({
                         value={value?.modsPath ?? ''}
                         placeholder={`例如 D:/Games/XXMI/${game.loader} 或 D:/Games/XXMI/${game.loader}/Mods`}
                         onChange={(event) =>
-                          updateGame(game.id, { modsPath: event.target.value })
+                          updateGame(game.id, { modsPath: event.target.value }, true)
                         }
                       />
                       <button
@@ -406,7 +504,7 @@ export function SettingsView({
                         value={value?.gamePath ?? ''}
                         placeholder={game.exeHint}
                         onChange={(event) =>
-                          updateGame(game.id, { gamePath: event.target.value })
+                          updateGame(game.id, { gamePath: event.target.value }, true)
                         }
                       />
                       <button
@@ -429,7 +527,7 @@ export function SettingsView({
                         value={value?.loaderPath ?? ''}
                         placeholder="XXMI Launcher.exe"
                         onChange={(event) =>
-                          updateGame(game.id, { loaderPath: event.target.value })
+                          updateGame(game.id, { loaderPath: event.target.value }, true)
                         }
                       />
                       <button
@@ -451,20 +549,9 @@ export function SettingsView({
                       value={value?.launchArgs ?? ''}
                       placeholder="例如 -dx11"
                       onChange={(event) =>
-                        updateGame(game.id, { launchArgs: event.target.value })
+                        updateGame(game.id, { launchArgs: event.target.value }, true)
                       }
                     />
-                  </label>
-
-                  <label className="checkbox" style={{ marginTop: '4px' }}>
-                    <input
-                      type="checkbox"
-                      checked={value?.fastConfigReloadEnabled === true}
-                      onChange={(event) =>
-                        updateGame(game.id, { fastConfigReloadEnabled: event.target.checked })
-                      }
-                    />
-                    <span>开启预设切换错位极速重载 (仅重载配置参数，无感生效零掉帧)</span>
                   </label>
                 </div>
               )
@@ -544,48 +631,6 @@ export function SettingsView({
                           打开 EFMI 目录
                         </button>
                       </div>
-
-                      <div className="fast-reload-card">
-                        <div className="fast-reload-head">
-                          <strong>3DMigoto 重载模式诊断</strong>
-                          <span className={`chip${env?.isFastReloadConfigured ? ' ok' : ' warn'}`}
-                          >
-                            {env?.isFastReloadConfigured ? '⚡ 极速分离模式 (零掉帧)' : '⚠️ 标准合并模式'}
-                          </span>
-                        </div>
-                        <div className="fast-reload-keys">
-                          <div>
-                            <span className="muted small">着色器修复重载: </span>
-                            <code>{env?.reloadFixesKey || 'VK_F10'}</code>
-                          </div>
-                          <div>
-                            <span className="muted small">ini配置重载: </span>
-                            <code>{env?.reloadConfigKey || 'VK_F10'}</code>
-                          </div>
-                        </div>
-                        <p className="muted small" style={{ margin: '4px 0 8px 0' }}>
-                          {env?.isFastReloadConfigured
-                            ? '已将 reload_config 错位绑定为独立热键 (Alt+Shift+F10)。切换变体预设仅重载参数，无需重载着色器。'
-                            : '当前 reload_config 与 reload_fixes 相同，变体预设重载时会伴随全量着色器刷新。建议一键开启错位加速。'}
-                        </p>
-                        <div className="row">
-                          <button
-                            className={`btn ${env?.isFastReloadConfigured ? 'ghost' : 'primary'} small-btn`}
-                            onClick={async () => {
-                              const enable = !env?.isFastReloadConfigured
-                              const res = await window.moddeck.configureFastReload(game.id, enable)
-                              if (res.ok) {
-                                onNotify?.(enable ? '已配置错位极速重载 (Alt+Shift+F10)' : '已恢复标准合并重载模式', 'ok')
-                                void refreshEnvironment()
-                              } else {
-                                onNotify?.(res.error || '配置失败', 'err')
-                              }
-                            }}
-                          >
-                            {env?.isFastReloadConfigured ? '还原为默认合并模式' : '一键配置错位极速重载 (Alt+Shift+F10)'}
-                          </button>
-                        </div>
-                      </div>
                     </>
                   ) : (
                     <p className="muted small">
@@ -614,24 +659,14 @@ export function SettingsView({
                 <button
                   type="button"
                   className={(draft.import.mode ?? (draft.import.deleteArchiveAfter ? 'move' : 'copy')) === 'copy' ? 'active' : ''}
-                  onClick={() =>
-                    setDraft((current) => ({
-                      ...current,
-                      import: { ...current.import, mode: 'copy', deleteArchiveAfter: false }
-                    }))
-                  }
+                  onClick={() => updateImport({ mode: 'copy', deleteArchiveAfter: false })}
                 >
                   复制（保留原文件/文件夹）
                 </button>
                 <button
                   type="button"
                   className={(draft.import.mode ?? (draft.import.deleteArchiveAfter ? 'move' : 'copy')) === 'move' ? 'active' : ''}
-                  onClick={() =>
-                    setDraft((current) => ({
-                      ...current,
-                      import: { ...current.import, mode: 'move', deleteArchiveAfter: true }
-                    }))
-                  }
+                  onClick={() => updateImport({ mode: 'move', deleteArchiveAfter: true })}
                 >
                   移动（导入成功后删除原压缩包/文件夹）
                 </button>
@@ -641,12 +676,7 @@ export function SettingsView({
               <input
                 type="checkbox"
                 checked={draft.import.overwriteExisting}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    import: { ...current.import, overwriteExisting: event.target.checked }
-                  }))
-                }
+                onChange={(event) => updateImport({ overwriteExisting: event.target.checked })}
               />
               <span>同名时覆盖（旧目录会先移动到 backups；关闭则自动重命名）</span>
             </label>
@@ -667,10 +697,7 @@ export function SettingsView({
                   value={draft.import.rosterRemoteUrl ?? ''}
                   placeholder="https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/roster.json"
                   onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      import: { ...current.import, rosterRemoteUrl: event.target.value }
-                    }))
+                    updateImport({ rosterRemoteUrl: event.target.value }, true)
                   }
                 />
                 <button
@@ -736,6 +763,40 @@ export function SettingsView({
             </button>
           </div>
         </section>
+      ) : null}
+
+      {showF10WarningModal ? (
+        <Modal
+          title="开启自动重载确认"
+          onClose={() => setShowF10WarningModal(false)}
+          width={420}
+          footer={
+            <>
+              <button className="btn ghost" onClick={() => setShowF10WarningModal(false)}>
+                取消
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => {
+                  setShowF10WarningModal(false)
+                  updateUi({ autoReloadF10: true })
+                }}
+              >
+                确认开启
+              </button>
+            </>
+          }
+        >
+          <div className="danger-confirm-dialog">
+            <p>
+              开启后，每次切换 Mod 或应用预设都会在 600ms 防抖后自动向游戏发送{' '}
+              <code>{draft.ui.reloadHotkey || 'F10'}</code>。
+            </p>
+            <p className="muted small">
+              注意：当 Mods 目录下启用的 Mod 较多时，3DMigoto 执行每次重载大约会有数秒钟的画面停顿，属于加载器正常现象。
+            </p>
+          </div>
+        </Modal>
       ) : null}
     </div>
   )
