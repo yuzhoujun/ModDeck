@@ -38,6 +38,15 @@ export function SettingsView({
   const [envResults, setEnvResults] = useState<EnvironmentCheck[]>([])
   const [envChecking, setEnvChecking] = useState(false)
   const [rosterStatus, setRosterStatus] = useState<RosterSyncStatus | null>(null)
+  const [d3dxAutoSaveInterval, setD3dxAutoSaveInterval] = useState<number>(60)
+
+  useEffect(() => {
+    const targetGameId = draft.activeGameId || settings.activeGameId
+    if (targetGameId) {
+      window.moddeck.getD3dxAutoSaveInterval(targetGameId).then(setD3dxAutoSaveInterval).catch(() => undefined)
+    }
+  }, [draft.activeGameId, settings.activeGameId])
+
   const [rosterSyncing, setRosterSyncing] = useState(false)
   const [showF10WarningModal, setShowF10WarningModal] = useState(false)
   const [showDisablePresetReloadModal, setShowDisablePresetReloadModal] = useState<"modPreset" | "rosterPreset" | null>(null)
@@ -428,6 +437,47 @@ export function SettingsView({
                   切换全角色池方案后自动重载（<strong>推荐常开</strong>，一键全队阵容换装即时生效）
                 </span>
               </label>
+
+              <div className="field" style={{ marginTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span>3DMigoto 运行时变量自动刷盘间隔</span>
+                  <span className="muted small">实机 ini: {d3dxAutoSaveInterval === -1 ? '已禁用定时' : `${d3dxAutoSaveInterval}s`}</span>
+                </div>
+                <select
+                  className="select"
+                  value={d3dxAutoSaveInterval}
+                  onChange={async (e) => {
+                    const val = Number(e.target.value)
+                    setD3dxAutoSaveInterval(val)
+                    const gId = draft.activeGameId || settings.activeGameId
+                    if (gId) {
+                      setSaveStatus('saving')
+                      try {
+                        const res = await window.moddeck.setD3dxAutoSaveInterval(gId, val)
+                        if (res.ok) {
+                          setSaveStatus('saved')
+                          if (savedBadgeTimerRef.current) clearTimeout(savedBadgeTimerRef.current)
+                          savedBadgeTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
+                        } else {
+                          setSaveStatus('idle')
+                          onNotify(res.error || '保存 d3dx.ini 失败', 'err')
+                        }
+                      } catch (err) {
+                        setSaveStatus('idle')
+                        onNotify(String(err), 'err')
+                      }
+                    }
+                  }}
+                >
+                  <option value={10}>10 秒（极速同步，推荐实机热键调造型时使用）</option>
+                  <option value={30}>30 秒（均衡）</option>
+                  <option value={60}>60 秒（3DMigoto 官方出厂默认）</option>
+                  <option value={-1}>-1（禁用定时刷盘，仅在游戏退出或按 F10 时保存）</option>
+                </select>
+                <span className="muted small" style={{ marginTop: '4px' }}>
+                  控制 3DMigoto 在游戏后台自动将内存中的外观持久化变量刷入 d3dx_user.ini 的周期。数值越小，ModDeck 感知游戏内热键变化越灵敏。
+                </span>
+              </div>
             </div>
             <label className="field">
               <span>最近使用 Mod 数量：{draft.ui.recentModCount}</span>

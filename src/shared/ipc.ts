@@ -63,6 +63,8 @@ export const IPC = {
   saveRosterPreset: 'presets:save-roster-preset',
   applyRosterPreset: 'presets:apply-roster-preset',
   deleteRosterPreset: 'presets:delete-roster-preset',
+  getD3dxAutoSaveInterval: 'd3dx:get-auto-save-interval',
+  setD3dxAutoSaveInterval: 'd3dx:set-auto-save-interval',
   setModPreview: 'mods:set-preview',
   setModsEnabled: 'mods:set-enabled',
   reorderCharacters: 'character:reorder',
@@ -153,6 +155,8 @@ export interface ModDeckApi {
   saveRosterPreset(gameId: GameId, input: SaveRosterPresetInput): Promise<ToggleResult>
   applyRosterPreset(gameId: GameId, presetId: string): Promise<ToggleResult>
   deleteRosterPreset(gameId: GameId, presetId: string): Promise<ToggleResult>
+  getD3dxAutoSaveInterval(gameId: GameId): Promise<number>
+  setD3dxAutoSaveInterval(gameId: GameId, interval: number): Promise<ToggleResult>
   getModPresets(
     gameId: GameId,
     characterFolder: string,

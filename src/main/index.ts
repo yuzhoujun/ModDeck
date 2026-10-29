@@ -67,6 +67,8 @@ import {
   findD3dxUserIniPath,
   getPendingPresetCount,
   getPendingQueueEntries,
+  getD3dxAutoSaveInterval,
+  setD3dxAutoSaveInterval,
   markPendingQueueReloading,
   syncBridgeFileFromQueue
 } from './services/presets'
@@ -2202,6 +2204,20 @@ function registerIpc(): void {
       return res
     }
   )
+
+  register(IPC.getD3dxAutoSaveInterval, async (gameId: GameId) => {
+    requireGame(gameId)
+    const gameSettings = settings.games[gameId]
+    if (!gameSettings?.modsPath) return 60
+    return getD3dxAutoSaveInterval(gameSettings.modsPath)
+  })
+
+  register(IPC.setD3dxAutoSaveInterval, async (gameId: GameId, interval: number) => {
+    requireGame(gameId)
+    const gameSettings = settings.games[gameId]
+    if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+    return setD3dxAutoSaveInterval(gameSettings.modsPath, interval)
+  })
 
   register(
     IPC.deleteRosterPreset,

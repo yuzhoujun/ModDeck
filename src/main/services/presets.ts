@@ -238,6 +238,58 @@ export async function inspectModDefaultVariables(
 /**
  * 寻找游戏目录下的 d3dx_user.ini
  */
+/**
+ * 寻找游戏目录下的 d3dx.ini
+ */
+export async function findD3dxIniPath(modsPath: string): Promise<string | null> {
+  const parent = path.dirname(modsPath)
+  const candidate1 = path.join(parent, 'd3dx.ini')
+  if (await pathExists(candidate1)) return candidate1
+  const candidate2 = path.join(modsPath, 'd3dx.ini')
+  if (await pathExists(candidate2)) return candidate2
+  return null
+}
+
+/**
+ * 读取 d3dx.ini 中的 settings_auto_save_interval（默认 60 秒）
+ */
+export async function getD3dxAutoSaveInterval(modsPath: string): Promise<number> {
+  const iniPath = await findD3dxIniPath(modsPath)
+  if (!iniPath) return 60
+  try {
+    const content = await fs.readFile(iniPath, 'utf8')
+    const match = content.match(/^\s*settings_auto_save_interval\s*=\s*(-?\d+)/im)
+    if (match) return parseInt(match[1], 10)
+  } catch {
+    // ignore
+  }
+  return 60
+}
+
+/**
+ * 修改 d3dx.ini 中的 settings_auto_save_interval 配置
+ */
+export async function setD3dxAutoSaveInterval(
+  modsPath: string,
+  interval: number
+): Promise<ToggleResult> {
+  const iniPath = await findD3dxIniPath(modsPath)
+  if (!iniPath) return { ok: false, error: '未找到 d3dx.ini 配置文件' }
+  try {
+    let content = await fs.readFile(iniPath, 'utf8')
+    const regex = /^(\s*settings_auto_save_interval\s*=\s*)-?\d+/im
+    if (regex.test(content)) {
+      content = content.replace(regex, `$1${interval}`)
+    } else {
+      content += `\r\nsettings_auto_save_interval = ${interval}\r\n`
+    }
+    await fs.writeFile(iniPath, content, 'utf8')
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function findD3dxUserIniPath(modsPath: string): Promise<string | null> {
   const parent = path.dirname(modsPath)
   const candidate1 = path.join(parent, 'd3dx_user.ini')

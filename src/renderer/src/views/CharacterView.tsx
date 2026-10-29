@@ -7,6 +7,7 @@ import type {
   UiSettings
 } from '../../../shared/types'
 import { Icon } from '../components/Icon'
+import { ImportDropdown } from '../components/ImportDropdown'
 import { ModDetailsPanel } from '../components/ModDetailsPanel'
 import { ModRow } from '../components/ModRow'
 import { displayNameOf, initialOf, modMatches } from '../utils'
@@ -205,10 +206,7 @@ export function CharacterView({
             <Icon name="folder" size={15} />
             打开目录
           </button>
-          <button className="btn primary" onClick={onImport}>
-            <Icon name="upload" size={15} />
-            导入到该角色
-          </button>
+          <ImportDropdown label="导入到该角色" onImport={onImport} onImportFolder={onImportFolder} />
         </div>
       </header>
 
@@ -285,10 +283,7 @@ export function CharacterView({
           <Icon name="refresh" size={15} />
           刷新
         </button>
-        <button className="btn ghost" onClick={onImportFolder}>
-          <Icon name="folder" size={15} />
-          导入文件夹
-        </button>
+
       </div>
 
       <div className={`char-body${selectedName ? ' has-detail' : ''}`}>

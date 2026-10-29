@@ -38,6 +38,8 @@ export function RosterPresetModal({
   const [loadingPresetsMap, setLoadingPresetsMap] = useState<Record<string, boolean>>({})
   const [charFilter, setCharFilter] = useState('')
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
+  const [showDirtyWarningModal, setShowDirtyWarningModal] = useState(false)
+  const [dirtyWarningList, setDirtyWarningList] = useState<{ charName: string; modName: string }[]>([])
 
   // 1. 加载已有方案列表
   const fetchPresets = async () => {
@@ -116,26 +118,25 @@ export function RosterPresetModal({
           const list = await window.moddeck.getModPresets(game.id, charFolder, mod.folderName)
           setModPresetsMap((prev) => ({ ...prev, [`${charFolder}::${mod.name}`]: list }))
           const activeP = list.find((p) => p.isActive)
-          if (activeP) {
-            setSelectedAssignments((prev) => {
-              const curr = prev[charFolder]
-              const items = getAssignmentModItems(curr)
-              const idx = items.findIndex((i) => i.modName.toLowerCase() === mod.name.toLowerCase())
-              if (idx >= 0 && !items[idx].presetId) {
-                const nextItems = [...items]
-                nextItems[idx] = { ...nextItems[idx], presetId: activeP.id }
-                return {
-                  ...prev,
-                  [charFolder]: {
-                    modName: nextItems[0]?.modName,
-                    presetId: nextItems[0]?.presetId,
-                    mods: nextItems
-                  }
+          const targetPresetId = activeP ? activeP.id : (list.length > 0 ? '__dirty__' : '__default__')
+          setSelectedAssignments((prev) => {
+            const curr = prev[charFolder]
+            const items = getAssignmentModItems(curr)
+            const idx = items.findIndex((i) => i.modName.toLowerCase() === mod.name.toLowerCase())
+            if (idx >= 0 && (!items[idx].presetId || items[idx].presetId === '__dirty__')) {
+              const nextItems = [...items]
+              nextItems[idx] = { ...nextItems[idx], presetId: targetPresetId }
+              return {
+                ...prev,
+                [charFolder]: {
+                  modName: nextItems[0]?.modName,
+                  presetId: nextItems[0]?.presetId,
+                  mods: nextItems
                 }
               }
-              return prev
-            })
-          }
+            }
+            return prev
+          })
         } catch {
           // ignore
         }
@@ -183,7 +184,7 @@ export function RosterPresetModal({
   const handleSelectSingleMod = (charFolder: string, mod: ModInfo) => {
     const key = `${charFolder}::${mod.name}`
     const cached = modPresetsMap[key]
-    const defaultPId = cached?.find((p) => p.isActive)?.id || cached?.[0]?.id || '__default__'
+    const defaultPId = cached?.find((p) => p.isActive)?.id || (cached && cached.length > 0 ? '__dirty__' : '__default__')
     setSelectedAssignments((prev) => ({
       ...prev,
       [charFolder]: {
@@ -204,7 +205,7 @@ export function RosterPresetModal({
       if (checked) {
         const key = `${charFolder}::${mod.name}`
         const cached = modPresetsMap[key]
-        const defaultPId = cached?.find((p) => p.isActive)?.id || cached?.[0]?.id || '__default__'
+        const defaultPId = cached?.find((p) => p.isActive)?.id || (cached && cached.length > 0 ? '__dirty__' : '__default__')
         nextItems = [
           ...items.filter((i) => i.modName.toLowerCase() !== mod.name.toLowerCase()),
           { modName: mod.name, presetId: defaultPId }
@@ -313,23 +314,61 @@ export function RosterPresetModal({
     setCharModes((prev) => ({ ...prev, ...nextModes }))
   }
 
-  // 保存新方案
-  const handleSavePreset = async () => {
+  // 保存新方案（带未保存实机改动保护）
+  const handleSavePreset = async (forceReplaceDirtyWithDefault = false) => {
     const name = presetName.trim()
     if (!name) {
       onNotify?.('请输入预设方案名称', 'err')
       return
     }
+
+    // 检查是否存在未保存改动的实机脏状态
+    const dirtyItems: { charName: string; modName: string }[] = []
+    for (const [charFolder, assign] of Object.entries(selectedAssignments)) {
+      const charInfo = snapshot.characters.find((c) => c.folder === charFolder)
+      const items = getAssignmentModItems(assign)
+      for (const item of items) {
+        if (item.presetId === '__dirty__') {
+          dirtyItems.push({
+            charName: charInfo?.displayName || charFolder,
+            modName: item.modName
+          })
+        }
+      }
+    }
+
+    if (dirtyItems.length > 0 && !forceReplaceDirtyWithDefault) {
+      setDirtyWarningList(dirtyItems)
+      setShowDirtyWarningModal(true)
+      return // 拦截保存，弹窗提示！
+    }
+
+    // 若用户确认替换或本身无脏状态，将 __dirty__ 转为 __default__
+    const finalAssignments: Record<string, CharacterModAssignment> = {}
+    for (const [charFolder, assign] of Object.entries(selectedAssignments)) {
+      const items = getAssignmentModItems(assign)
+      const cleanedItems = items.map((i) =>
+        i.presetId === '__dirty__' ? { ...i, presetId: '__default__' } : i
+      )
+      finalAssignments[charFolder] = {
+        modName: cleanedItems[0]?.modName,
+        presetId: cleanedItems[0]?.presetId,
+        mods: cleanedItems
+      }
+    }
+
     try {
       setSaving(true)
       const res = await window.moddeck.saveRosterPreset(game.id, {
         name,
-        assignments: selectedAssignments
+        assignments: finalAssignments
       })
       if (res.ok) {
         onNotify?.(`已保存预设方案「${name}」`, 'ok')
+        setSelectedAssignments(finalAssignments)
         setPresetName('')
         setShowCreateForm(false)
+        setShowDirtyWarningModal(false)
         await fetchPresets()
       } else {
         onNotify?.(res.error || '保存失败', 'err')
@@ -632,13 +671,16 @@ export function RosterPresetModal({
                               ) : (
                                 <>
                                   <select
-                                    className="roster-mod-preset-select"
-                                    value={assignedItem?.presetId || '__default__'}
+                                    className={`roster-mod-preset-select${assignedItem?.presetId === '__dirty__' ? ' is-dirty' : ''}`}
+                                    value={assignedItem?.presetId || (presets.some((p) => p.isActive) ? presets.find((p) => p.isActive)?.id : '__dirty__')}
                                     onChange={(e) =>
                                       handleModPresetChange(char.folder, mod.name, e.target.value)
                                     }
                                     title="选择该方案生效时此 Mod 所应用的变体预设"
                                   >
+                                    {assignedItem?.presetId === '__dirty__' && (
+                                      <option value="__dirty__">⚠️ 当前实机 (未保存改动)</option>
+                                    )}
                                     {presets.map((p) => (
                                       <option key={p.id} value={p.id}>
                                         {p.id === '__default__' ? `默认 (${p.name})` : p.name}
@@ -646,6 +688,11 @@ export function RosterPresetModal({
                                       </option>
                                     ))}
                                   </select>
+                                  {assignedItem?.presetId === '__dirty__' && (
+                                    <span className="roster-dirty-pill" title="当前实机造型有微调，尚未保存为独立单 Mod 预设">
+                                      未保存
+                                    </span>
+                                  )}
                                   <button
                                     type="button"
                                     className="roster-preset-apply-btn"
@@ -674,6 +721,42 @@ export function RosterPresetModal({
           </div>
         </div>
       </div>
+
+      {showDirtyWarningModal && (
+        <Modal
+          title="⚠️ 检测到未保存的实机改动"
+          onClose={() => setShowDirtyWarningModal(false)}
+          width={480}
+        >
+          <div className="roster-dirty-modal-body">
+            <p>
+              方案中有 <strong>{dirtyWarningList.length}</strong> 个 Mod 当前处于现场实机微调状态（尚未保存为独立单 Mod 预设）：
+            </p>
+            <ul className="roster-dirty-list">
+              {dirtyWarningList.map((d, idx) => (
+                <li key={idx}>
+                  <span className="dirty-char-tag">{d.charName}</span>
+                  <span className="dirty-mod-tag">{d.modName}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="muted small">
+              全角色方案仅记录固定的变体预设。若继续保存，这些未保存项将自动以「<strong>出厂默认</strong>」存入方案。
+            </p>
+            <div className="roster-dirty-modal-actions">
+              <button className="btn" onClick={() => setShowDirtyWarningModal(false)}>
+                取消并返回
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => void handleSavePreset(true)}
+              >
+                替换为默认并继续保存
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </Modal>
   )
 }

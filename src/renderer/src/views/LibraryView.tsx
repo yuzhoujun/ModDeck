@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import type { CharacterInfo, GameDef, GameSnapshot, UiSettings } from '../../../shared/types'
 import { CharacterCard } from '../components/CharacterCard'
 import { Icon } from '../components/Icon'
+import { ImportDropdown } from '../components/ImportDropdown'
 
 function shortPath(value: string): string {
   const parts = value.split(/[\\/]/).filter(Boolean)
@@ -121,14 +122,7 @@ export function LibraryView({
             <Icon name="userPlus" size={16} />
             新增目录
           </button>
-          <button className="btn ghost" onClick={onImportFolder}>
-            <Icon name="folder" size={16} />
-            导入文件夹
-          </button>
-          <button className="btn primary" onClick={onImport}>
-            <Icon name="upload" size={16} />
-            导入 Mod
-          </button>
+          <ImportDropdown onImport={onImport} onImportFolder={onImportFolder} />
         </div>
       </header>
 
