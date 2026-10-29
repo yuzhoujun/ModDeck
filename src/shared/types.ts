@@ -41,6 +41,7 @@ export interface UiSettings {
   autoReloadModToggle: boolean
   autoReloadModPreset: boolean
   autoReloadRosterPreset: boolean
+  postReloadSyncDelay?: number
   recentModCount: number
   closeBehavior: 'quit' | 'minimize'
 }
