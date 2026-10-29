@@ -53,6 +53,11 @@ export function SettingsView({
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [showBenchmarkModal, setShowBenchmarkModal] = useState(false)
+  const [benchmarkStatus, setBenchmarkStatus] = useState<'idle' | 'running' | 'finished'>('idle')
+  const [benchmarkElapsed, setBenchmarkElapsed] = useState(0)
+  const benchmarkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const benchmarkStartRef = useRef<number>(0)
 
   useEffect(() => {
     setDraft(settings)
@@ -476,6 +481,43 @@ export function SettingsView({
                 </select>
                 <span className="muted small" style={{ marginTop: '4px' }}>
                   控制 3DMigoto 在游戏后台自动将内存中的外观持久化变量刷入 d3dx_user.ini 的周期。数值越小，ModDeck 感知游戏内热键变化越灵敏。
+                </span>
+              </div>
+
+              <div className="field" style={{ marginTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span>3DMigoto 重载缓冲同步延迟</span>
+                  <span className="muted small">当前: {draft.ui.postReloadSyncDelay ?? 6}s</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <input
+                    type="range"
+                    min="2"
+                    max="25"
+                    step="0.5"
+                    value={draft.ui.postReloadSyncDelay ?? 6}
+                    onChange={(e) => updateUi({ postReloadSyncDelay: Number(e.target.value) }, true)}
+                    style={{ flex: 1 }}
+                  />
+                  <span style={{ minWidth: '40px', textAlign: 'right', fontWeight: 600 }}>
+                    {draft.ui.postReloadSyncDelay ?? 6}s
+                  </span>
+                  <button
+                    type="button"
+                    className="btn ghost small"
+                    onClick={() => {
+                      setBenchmarkStatus('idle')
+                      setBenchmarkElapsed(0)
+                      setShowBenchmarkModal(true)
+                    }}
+                    title="在游戏运行中实测重载耗时并自动设置最适延迟"
+                  >
+                    <Icon name="refresh" size={14} />
+                    <span>测速校准</span>
+                  </button>
+                </div>
+                <span className="muted small" style={{ marginTop: '4px' }}>
+                  F10 重载后 ModDeck 等待游戏编译 Shader 及跨入渲染帧的缓冲时间（之后自动补写持久化配置并清除桥接）。Mod 库较大（10s+）请适度调大；亦可点击「测速校准」自动测量。
                 </span>
               </div>
             </div>
@@ -919,6 +961,132 @@ export function SettingsView({
             <p className="muted small">
               新预设将暂存为“待生效”状态（显示为蓝色脉冲光标），您可以在离线状态下挑选多个角色的不同预设，最后<strong>手动按下 {draft.ui.reloadHotkey || 'F10'}</strong>（或点击快捷窗口底部的“立即生效”按钮）一次性全部换装。
             </p>
+          </div>
+        </Modal>
+      ) : null}
+
+      {showBenchmarkModal ? (
+        <Modal
+          title="3DMigoto 重载耗时测速校准"
+          onClose={() => {
+            if (benchmarkTimerRef.current) clearInterval(benchmarkTimerRef.current)
+            benchmarkTimerRef.current = null
+            setShowBenchmarkModal(false)
+          }}
+          width={460}
+          footer={
+            benchmarkStatus === 'running' ? (
+              <button
+                className="btn primary"
+                style={{ width: '100%', height: '36px', fontSize: '14px', fontWeight: 600 }}
+                onClick={() => {
+                  if (benchmarkTimerRef.current) clearInterval(benchmarkTimerRef.current)
+                  benchmarkTimerRef.current = null
+                  const duration = Math.max(0.1, (Date.now() - benchmarkStartRef.current) / 1000)
+                  setBenchmarkElapsed(duration)
+                  setBenchmarkStatus('finished')
+                }}
+              >
+                ⏱️ 游戏已重载完毕，停止计时
+              </button>
+            ) : benchmarkStatus === 'finished' ? (
+              <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
+                <button
+                  className="btn ghost"
+                  onClick={() => {
+                    setBenchmarkStatus('idle')
+                    setBenchmarkElapsed(0)
+                  }}
+                >
+                  重新测速
+                </button>
+                <button
+                  className="btn primary"
+                  onClick={() => {
+                    const rec = Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))
+                    updateUi({ postReloadSyncDelay: rec })
+                    setShowBenchmarkModal(false)
+                  }}
+                >
+                  应用推荐值 ({Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))}s) 并保存
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
+                <button
+                  className="btn ghost"
+                  onClick={() => setShowBenchmarkModal(false)}
+                >
+                  取消
+                </button>
+                <button
+                  className="btn primary"
+                  onClick={async () => {
+                    setBenchmarkStatus('running')
+                    setBenchmarkElapsed(0)
+                    benchmarkStartRef.current = Date.now()
+                    benchmarkTimerRef.current = setInterval(() => {
+                      setBenchmarkElapsed((Date.now() - benchmarkStartRef.current) / 1000)
+                    }, 50)
+                    try {
+                      await window.moddeck.reloadF10()
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                >
+                  开始测速
+                </button>
+              </div>
+            )
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '4px 0' }}>
+            {benchmarkStatus === 'idle' ? (
+              <>
+                <p style={{ margin: 0, lineHeight: 1.6 }}>
+                  不同玩家的电脑配置与已装 Mod 数量/材质大小不同，3DMigoto 执行 F10 重载的实际耗时差异很大（通常在 1.1s 到 18s 不等）。
+                </p>
+                <div style={{ background: 'var(--bg-subtle, rgba(255,255,255,0.04))', padding: '10px 12px', borderRadius: '6px', fontSize: '13px' }}>
+                  <strong>测速说明：</strong>
+                  <ol style={{ margin: '6px 0 0 18px', padding: 0, lineHeight: 1.5 }}>
+                    <li>请确保<strong>游戏已在运行中</strong>且处于可游玩画面；</li>
+                    <li>点击下方「开始测速」，ModDeck 将向游戏发送 F10 重载按键并即时启动毫秒计时；</li>
+                    <li>观察游戏画面：当卡顿结束、左上角提示消失、画面恢复流畅时，立即点击「停止计时」；</li>
+                    <li>ModDeck 将自动根据您实测的重载耗时 + 1.5 秒安全余量，计算出最适合您的缓冲同步参数。</li>
+                  </ol>
+                </div>
+              </>
+            ) : benchmarkStatus === 'running' ? (
+              <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text-muted, #888)', marginBottom: '8px' }}>
+                  已向游戏发送 F10，正在重载...
+                </div>
+                <div style={{ fontSize: '42px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--accent, #6366f1)' }}>
+                  {benchmarkElapsed.toFixed(1)}s
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary, #aaa)', marginTop: '8px' }}>
+                  👀 请注意观察游戏画面：一旦画面恢复正常流动，请立即点击下方绿色大按钮！
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                <div style={{ fontSize: '14px', color: 'var(--text-secondary, #aaa)', marginBottom: '4px' }}>
+                  实机测量耗时
+                </div>
+                <div style={{ fontSize: '32px', fontWeight: 700, fontFamily: 'monospace' }}>
+                  {benchmarkElapsed.toFixed(2)} 秒
+                </div>
+                <div style={{ margin: '14px 0', padding: '10px', background: 'var(--bg-subtle, rgba(255,255,255,0.04))', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '14px' }}>
+                    推荐延迟：<strong style={{ color: 'var(--accent, #6366f1)', fontSize: '16px' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} 秒</strong>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted, #888)', marginTop: '4px' }}>
+                    （测得耗时 {benchmarkElapsed.toFixed(1)}s + 1.5s 安全余量，确保 Shader 编译完成并跨过 Present 帧）
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </Modal>
       ) : null}

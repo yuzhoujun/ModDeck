@@ -36,6 +36,7 @@ export function defaultSettings(): Settings {
       autoReloadModToggle: false,
       autoReloadModPreset: true,
       autoReloadRosterPreset: true,
+      postReloadSyncDelay: 6,
       recentModCount: 8,
       closeBehavior: 'quit'
     },

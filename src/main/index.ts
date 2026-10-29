@@ -1469,6 +1469,11 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
 
 function schedulePostReloadPresetSync(gameId?: GameId): void {
   if (postReloadBridgeTimer) clearTimeout(postReloadBridgeTimer)
+  const configuredSec =
+    typeof settings?.ui?.postReloadSyncDelay === 'number' && settings.ui.postReloadSyncDelay > 0
+      ? settings.ui.postReloadSyncDelay
+      : 6
+  const delayMs = Math.max(1000, Math.min(30000, Math.round(configuredSec * 1000)))
   postReloadBridgeTimer = setTimeout(async () => {
     postReloadBridgeTimer = null
     try {
@@ -1494,7 +1499,7 @@ function schedulePostReloadPresetSync(gameId?: GameId): void {
     } catch (error) {
       logError('post-reload-preset-sync', error)
     }
-  }, 6200)
+  }, delayMs)
 }
 
 async function reloadF10(): Promise<ToggleResult> {
