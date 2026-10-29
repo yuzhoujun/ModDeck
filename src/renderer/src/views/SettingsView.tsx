@@ -282,25 +282,16 @@ export function SettingsView({
           <p className="muted">通用、游戏路径、导入行为和本地数据。所有改动自动保存在本机。</p>
         </div>
         <div className="actions">
-          <span
-            className="muted small"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 12px',
-              borderRadius: '999px',
-              background: 'var(--bg-elevated, rgba(255,255,255,0.04))',
-              border: '1px solid var(--line-soft)'
-            }}
-          >
-            <Icon name="check" size={14} />
-            {saveStatus === 'saving'
-              ? '正在自动保存…'
-              : saveStatus === 'saved'
-                ? '已自动保存'
-                : '修改即自动生效'}
-          </span>
+          <div className={`settings-saved-pill ${saveStatus}`}>
+            <span className="status-dot-pulse" />
+            <span>
+              {saveStatus === 'saving'
+                ? '正在保存…'
+                : saveStatus === 'saved'
+                  ? '已自动保存'
+                  : '修改实时自动保存'}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -319,75 +310,109 @@ export function SettingsView({
 
       {tab === 'general' ? (
         <>
-          <section className="section first-section">
-            <div className="section-head">
-              <h2>快捷窗口</h2>
-              <p className="muted">
-                在游戏里按快捷键呼出紧凑的 Mod 开关面板。点击输入框后直接按下组合键即可自动保存。
-              </p>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div className="settings-card-icon">
+                <Icon name="settings" size={18} />
+              </div>
+              <div>
+                <h3>快捷窗口 (Quick Overlay)</h3>
+                <p className="muted">
+                  在游戏内使用浮动快捷窗口随时开关 Mod 与切换预设。点击输入框后直接按下组合键即可保存。
+                </p>
+              </div>
             </div>
-            <div className="hotkey-row">
-              <input
-                className="input hotkey-input"
-                value={hotkeyDraft}
-                placeholder="点击后按下组合键，例如 Alt+Shift+M"
-                readOnly
-                onKeyDown={captureHotkey}
-                onFocus={(event) => event.target.select()}
-              />
-              <button className="btn ghost" onClick={() => void applyHotkey('Alt+Shift+M')}>
-                恢复默认
-              </button>
-              <button className="btn ghost" onClick={() => void applyHotkey('')}>
-                禁用
-              </button>
-              <button className="btn ghost" onClick={() => window.moddeck.toggleOverlay()}>
-                测试
-              </button>
-            </div>
-            {hotkeyMessage ? <div className="hint">{hotkeyMessage}</div> : null}
-            <div className="muted small">
-              当前：{settings.ui.overlayHotkey || '未设置'} · 按 Esc 隐藏快捷窗口
-            </div>
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={draft.ui.allowHotkeySend}
-                onChange={(event) => updateUi({ allowHotkeySend: event.target.checked })}
-              />
-              <span>允许点击热键发送到游戏（游戏需要在前台）</span>
-            </label>
 
-            <div className="field" style={{ marginTop: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600 }}>快捷窗口最近使用 Mod 栏展示数量</span>
-                <span className="badge" style={{ fontSize: '12px', fontWeight: 700, padding: '2px 8px' }}>
-                  {draft.ui.recentModCount} 个
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <span className="setting-group-title">呼出快捷键</span>
+                <span className="muted small">
+                  当前：{settings.ui.overlayHotkey || '未设置'} · 按 Esc 隐藏快捷窗口
                 </span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="15"
-                step="1"
-                value={draft.ui.recentModCount}
-                onChange={(event) => updateUi({ recentModCount: Number(event.target.value) }, true)}
-                style={{ width: '100%' }}
-              />
-              <span className="muted small" style={{ marginTop: '4px', fontSize: '12px', lineHeight: '1.5' }}>
+              <div className="hotkey-row">
+                <input
+                  className="input hotkey-input"
+                  value={hotkeyDraft}
+                  placeholder="点击后按下组合键，例如 Alt+Shift+M"
+                  readOnly
+                  onKeyDown={captureHotkey}
+                  onFocus={(event) => event.target.select()}
+                />
+                <button className="btn ghost" onClick={() => void applyHotkey('Alt+Shift+M')}>
+                  恢复默认
+                </button>
+                <button className="btn ghost" onClick={() => void applyHotkey('')}>
+                  禁用
+                </button>
+                <button className="btn ghost" onClick={() => window.moddeck.toggleOverlay()}>
+                  测试呼出
+                </button>
+              </div>
+              {hotkeyMessage ? <div className="hint" style={{ marginTop: '8px' }}>{hotkeyMessage}</div> : null}
+            </div>
+
+            <div className="setting-group-box">
+              <label className="check-row-card">
+                <input
+                  type="checkbox"
+                  checked={draft.ui.allowHotkeySend}
+                  onChange={(event) => updateUi({ allowHotkeySend: event.target.checked })}
+                />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#f1f5f9' }}>允许点击热键发送到游戏</div>
+                  <div className="muted small" style={{ marginTop: '2px' }}>
+                    在快捷窗口内点击 Mod 变体热键胶囊时，自动向处于前台的游戏窗口发送物理按键信号。
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <span className="setting-group-title">快捷窗口最近使用 Mod 栏展示数量</span>
+                <span className="setting-val-badge">{draft.ui.recentModCount} 个</span>
+              </div>
+              <div className="setting-range-container">
+                <input
+                  type="range"
+                  className="setting-range"
+                  min="0"
+                  max="15"
+                  step="1"
+                  value={draft.ui.recentModCount}
+                  onChange={(event) => updateUi({ recentModCount: Number(event.target.value) }, true)}
+                />
+              </div>
+              <div className="setting-group-desc">
                 在游戏内浮动快捷窗口顶部展示的最近操作 Mod 快捷胶囊数量（设为 0 则在快捷窗口中完全隐藏最近使用栏）。
-              </span>
+              </div>
             </div>
           </section>
 
-          <section className="section">
-            <div className="section-head">
-              <h2>游戏刷新与快捷行为</h2>
-              <p className="muted">控制切换 Mod 或预设后的游戏重载热键（默认 F10）与快捷使用记录。</p>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  color: '#38bdf8',
+                  borderColor: 'rgba(56, 189, 248, 0.25)'
+                }}
+              >
+                <Icon name="refresh" size={18} />
+              </div>
+              <div>
+                <h3>游戏刷新与快捷行为</h3>
+                <p className="muted">控制 3DMigoto 游戏重载热键、预设自动换装策略及刷盘同步延迟。</p>
+              </div>
             </div>
 
-            <div className="field" style={{ marginBottom: '10px' }}>
-              <span>3DMigoto 游戏重载快捷键（默认 F10，点击输入框后按键即可修改）</span>
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <span className="setting-group-title">3DMigoto 游戏重载快捷键</span>
+                <span className="muted small">默认 F10，点击输入框后按键即可修改</span>
+              </div>
               <div className="hotkey-row">
                 <input
                   className="input hotkey-input"
@@ -409,98 +434,125 @@ export function SettingsView({
                   测试发送
                 </button>
               </div>
-              {reloadHotkeyMessage ? <div className="hint">{reloadHotkeyMessage}</div> : null}
+              {reloadHotkeyMessage ? <div className="hint" style={{ marginTop: '8px' }}>{reloadHotkeyMessage}</div> : null}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '6px 0 12px 0' }}>
-              <label className="check-row">
-                <input
-                  type="checkbox"
-                  checked={draft.ui.autoReloadModToggle === true}
-                  onChange={(event) => {
-                    if (event.target.checked) {
-                      setShowF10WarningModal(true)
-                    } else {
-                      updateUi({ autoReloadModToggle: false, autoReloadF10: false })
-                    }
-                  }}
-                />
-                <span>
-                  切换普通 Mod 启停后自动重载（默认关闭，避免理库连续操作导致游戏重复卡顿）
-                </span>
-              </label>
+            <div className="setting-group-box">
+              <div className="setting-group-header" style={{ marginBottom: '10px' }}>
+                <span className="setting-group-title">自动重载与换装生效策略</span>
+              </div>
 
-              <label className="check-row">
-                <input
-                  type="checkbox"
-                  checked={draft.ui.autoReloadModPreset !== false}
-                  onChange={(event) => {
-                    if (!event.target.checked) {
-                      setShowDisablePresetReloadModal('modPreset')
-                    } else {
-                      updateUi({ autoReloadModPreset: true })
-                    }
-                  }}
-                />
-                <span>
-                  切换单 Mod 变体预设后自动重载（<strong>推荐常开</strong>，点击预设即刻换装生效）
-                </span>
-              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label className="check-row-card">
+                  <input
+                    type="checkbox"
+                    checked={draft.ui.autoReloadModToggle === true}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setShowF10WarningModal(true)
+                      } else {
+                        updateUi({ autoReloadModToggle: false, autoReloadF10: false })
+                      }
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#f1f5f9' }}>切换普通 Mod 启停后自动重载</div>
+                    <div className="muted small" style={{ marginTop: '2px' }}>
+                      默认关闭。避免在 Mod 库批量启用/禁用 Mod 时导致游戏画面频繁停顿卡顿。
+                    </div>
+                  </div>
+                </label>
 
-              <label className="check-row">
-                <input
-                  type="checkbox"
-                  checked={draft.ui.autoReloadRosterPreset !== false}
-                  onChange={(event) => {
-                    if (!event.target.checked) {
-                      setShowDisablePresetReloadModal('rosterPreset')
-                    } else {
-                      updateUi({ autoReloadRosterPreset: true })
-                    }
-                  }}
-                />
-                <span>
-                  切换全角色池方案后自动重载（<strong>推荐常开</strong>，一键全队阵容换装即时生效）
-                </span>
-              </label>
+                <label className="check-row-card">
+                  <input
+                    type="checkbox"
+                    checked={draft.ui.autoReloadModPreset !== false}
+                    onChange={(event) => {
+                      if (!event.target.checked) {
+                        setShowDisablePresetReloadModal('modPreset')
+                      } else {
+                        updateUi({ autoReloadModPreset: true })
+                      }
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#f1f5f9' }}>
+                      切换单 Mod 变体预设后自动重载 <span className="tag ok" style={{ marginLeft: '6px' }}>推荐常开</span>
+                    </div>
+                    <div className="muted small" style={{ marginTop: '2px' }}>
+                      在主界面或快捷窗口点击单个 Mod 预设时，自动向游戏发送重载，即刻换装生效。
+                    </div>
+                  </div>
+                </label>
+
+                <label className="check-row-card">
+                  <input
+                    type="checkbox"
+                    checked={draft.ui.autoReloadRosterPreset !== false}
+                    onChange={(event) => {
+                      if (!event.target.checked) {
+                        setShowDisablePresetReloadModal('rosterPreset')
+                      } else {
+                        updateUi({ autoReloadRosterPreset: true })
+                      }
+                    }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#f1f5f9' }}>
+                      切换全角色池方案后自动重载 <span className="tag ok" style={{ marginLeft: '6px' }}>推荐常开</span>
+                    </div>
+                    <div className="muted small" style={{ marginTop: '2px' }}>
+                      在快捷窗口或主界面切换全局角色池方案时，自动向游戏发送重载，一键全队阵容换装。
+                    </div>
+                  </div>
+                </label>
+              </div>
 
               {(draft.ui.autoReloadModPreset === false || draft.ui.autoReloadRosterPreset === false) && (
                 <div
                   className="alert-box warning"
                   style={{
-                    margin: '8px 0',
-                    padding: '10px 14px',
-                    borderRadius: '8px',
-                    background: 'rgba(234, 179, 8, 0.1)',
-                    border: '1px solid rgba(234, 179, 8, 0.3)',
+                    marginTop: '12px',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    background: 'rgba(234, 179, 8, 0.08)',
+                    border: '1px solid rgba(234, 179, 8, 0.28)',
                     color: '#facc15',
-                    fontSize: '12px',
+                    fontSize: '12.5px',
                     lineHeight: '1.6'
                   }}
                 >
-                  <div style={{ fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Icon name="info" size={14} />
+                  <div style={{ fontWeight: 700, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                    <Icon name="info" size={15} />
                     <span>⚠️ 手动重载模式生效特别提醒</span>
                   </div>
                   <div>
                     您已关闭部分预设自动重载。挑选预设后，造型变量已预写入集中桥接文件，但<strong>实机画面仍需一次重载才能呈现</strong>。
                   </div>
-                  <div style={{ marginTop: '4px' }}>
-                    • <strong>强烈推荐重载方式</strong>：在游戏内按快捷键（默认 <code>{draft.ui.overlayHotkey || 'Alt+Shift+M'}</code>）呼出浮动快捷窗口，点击底部 <strong>「● 立即生效 (N)」</strong> 按钮。ModDeck 将启动安全缓冲同步，自动清空排队指示灯并保全冷启动数据。
+                  <div style={{ marginTop: '6px' }}>
+                    • <strong>推荐重载生效方式</strong>：在游戏内按快捷键（默认 <code>{draft.ui.overlayHotkey || 'Alt+Shift+M'}</code>）呼出浮动快捷窗口，点击底部的 <strong>「重载 F10 / 立即生效」</strong> 按钮（当有待生效预设排队时会显示为高亮脉冲 <strong>「● 立即生效 (N)」</strong>，平时显示为 <strong>「重载 F10」</strong>）。ModDeck 将启动安全缓冲同步，自动清空排队指示灯并保全冷启动数据。
                   </div>
-                  <div style={{ marginTop: '4px' }}>
-                    • <strong>物理 F10 疑问说明</strong>：若您在游戏内直接按键盘物理 <code>F10</code>，游戏画面会<strong>立即变身换装生效</strong>（一次性帧桥接已生效），但 ModDeck UI 状态不会自动猜键转绿。建议随时呼出快捷窗口点击生效，让指示灯与磁盘完全同步闭环。
+                  <div style={{ marginTop: '6px' }}>
+                    • <strong>物理键盘 F10 说明</strong>：若您在游戏内直接按键盘物理 <code>F10</code>，游戏画面会<strong>立即变身换装生效</strong>（集中桥接配置已被 3DMigoto 读取），但 ModDeck UI 状态由于 Windows 进程隔离无法自动截获键盘按键并转绿。建议您随时呼出快捷窗口点击生效，让指示灯与磁盘完全同步闭环。
                   </div>
                 </div>
               )}
+            </div>
 
-              <div className="field" style={{ marginTop: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>3DMigoto 运行时变量自动刷盘间隔</span>
-                  <span className="muted small">实机 ini: {d3dxAutoSaveInterval === -1 ? '已禁用定时' : `${d3dxAutoSaveInterval}s`}</span>
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="setting-group-title">3DMigoto 运行时变量自动刷盘间隔</span>
+                  <span className="tag warning">需 F10 重载生效</span>
                 </div>
+                <span className="muted small">
+                  实机 ini: {d3dxAutoSaveInterval === -1 ? '已禁用定时' : `${d3dxAutoSaveInterval}s`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
                 <select
                   className="select"
+                  style={{ flex: 1 }}
                   value={d3dxAutoSaveInterval}
                   onChange={async (e) => {
                     const val = Number(e.target.value)
@@ -530,62 +582,90 @@ export function SettingsView({
                   <option value={60}>60 秒（3DMigoto 官方出厂默认）</option>
                   <option value={-1}>-1（禁用定时刷盘，仅在游戏退出或按 F10 时保存）</option>
                 </select>
-                <span className="muted small" style={{ marginTop: '4px' }}>
-                  控制 3DMigoto 在游戏后台自动将内存中的外观持久化变量刷入 d3dx_user.ini 的周期。数值越小，ModDeck 感知游戏内热键变化越灵敏。
-                </span>
+                <button
+                  type="button"
+                  className="btn ghost small-btn"
+                  onClick={() => {
+                    void window.moddeck.reloadF10()
+                    onNotify('已向游戏发送 F10 重载，使 3DMigoto 读取新的刷盘周期')
+                  }}
+                  title="若游戏运行中修改，可点击向游戏发送重载，立即应用新刷盘周期"
+                >
+                  <Icon name="refresh" size={13} />
+                  <span>立即 F10 生效</span>
+                </button>
               </div>
+              <div className="setting-group-desc">
+                💡 控制 3DMigoto 在游戏后台自动将内存中的外观持久化变量刷入 <code>d3dx_user.ini</code> 的周期。数值越小，ModDeck 感知游戏内热键变化越灵敏。修改后会直接写回 <code>d3dx.ini</code>。若游戏正在运行中，需按 F10 重载一次以使 3DMigoto 读取并应用新周期；下次启动游戏亦会自动生效。
+              </div>
+            </div>
 
-              <div className="field" style={{ marginTop: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>3DMigoto 重载缓冲同步延迟</span>
-                    <span className="tag ok" style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px' }}>纯热生效 · 无需重载</span>
-                  </div>
-                  <span className="muted small">当前: {draft.ui.postReloadSyncDelay ?? 6}s</span>
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="setting-group-title">3DMigoto 重载缓冲同步延迟</span>
+                  <span className="tag ok">纯热生效 · 无需重载</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <input
-                    type="range"
-                    min="2"
-                    max="25"
-                    step="0.5"
-                    value={draft.ui.postReloadSyncDelay ?? 6}
-                    onChange={(e) => updateUi({ postReloadSyncDelay: Number(e.target.value) }, true)}
-                    style={{ flex: 1 }}
-                  />
-                  <span style={{ minWidth: '40px', textAlign: 'right', fontWeight: 600 }}>
-                    {draft.ui.postReloadSyncDelay ?? 6}s
-                  </span>
-                  <button
-                    type="button"
-                    className="btn ghost small"
-                    onClick={() => {
-                      setBenchmarkStatus('idle')
-                      setBenchmarkElapsed(0)
-                      setShowBenchmarkModal(true)
-                    }}
-                    title="在游戏运行中实测重载耗时并自动设置最适延迟"
-                  >
-                    <Icon name="refresh" size={14} />
-                    <span>测速校准</span>
-                  </button>
-                </div>
-                <span className="muted small" style={{ marginTop: '4px', lineHeight: '1.5' }}>
-                  💡 该参数为 ModDeck 内部的异步等待定时器，纯内存热生效，修改后无需按 F10 或重启游戏，下一次重载立刻按照新设时长计时。F10 重载后 ModDeck 等待游戏编译 Shader 及跨入渲染帧的缓冲时间（之后自动补写持久化配置并清除桥接）。Mod 库较大（10s+）请适度调大；亦可点击「测速校准」自动测量。
-                </span>
+                <span className="muted small">当前: {draft.ui.postReloadSyncDelay ?? 6}s</span>
+              </div>
+              <div className="setting-range-container">
+                <input
+                  type="range"
+                  className="setting-range"
+                  min="2"
+                  max="25"
+                  step="0.5"
+                  value={draft.ui.postReloadSyncDelay ?? 6}
+                  onChange={(e) => updateUi({ postReloadSyncDelay: Number(e.target.value) }, true)}
+                />
+                <span className="setting-val-badge">{draft.ui.postReloadSyncDelay ?? 6}s</span>
+                <button
+                  type="button"
+                  className="btn ghost small-btn"
+                  onClick={() => {
+                    setBenchmarkStatus('idle')
+                    setBenchmarkElapsed(0)
+                    setShowBenchmarkModal(true)
+                  }}
+                  title="在游戏运行中实测重载耗时并自动设置最适延迟"
+                >
+                  <Icon name="refresh" size={13} />
+                  <span>测速校准</span>
+                </button>
+              </div>
+              <div className="setting-group-desc">
+                💡 该参数为 ModDeck 内部的异步等待定时器，纯内存热生效，修改后无需按 F10 或重启游戏，下一次重载立刻按照新设时长计时。F10 重载后 ModDeck 等待游戏编译 Shader 及跨入渲染帧的缓冲时间（之后自动补写持久化配置并清除桥接）。Mod 库较大（10s+）请适度调大；亦可点击「测速校准」自动测量。
               </div>
             </div>
           </section>
 
-          <section className="section">
-            <div className="section-head">
-              <h2>关闭行为</h2>
-              <p className="muted">
-                最小化后 ModDeck 会留在托盘，全局快捷键和快捷窗口继续可用。
-              </p>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(168, 85, 247, 0.12)',
+                  color: '#c084fc',
+                  borderColor: 'rgba(168, 85, 247, 0.25)'
+                }}
+              >
+                <Icon name="close" size={18} />
+              </div>
+              <div>
+                <h3>关闭行为</h3>
+                <p className="muted">最小化后 ModDeck 会留在托盘，全局快捷键和快捷窗口继续可用。</p>
+              </div>
             </div>
-            <label className="field">
-              <span>关闭主窗口时</span>
+
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <span className="setting-group-title">关闭主窗口时</span>
+                <span className="muted small">
+                  {draft.ui.closeBehavior === 'minimize'
+                    ? '托盘菜单可打开管理器或退出'
+                    : '关闭主窗口会直接结束进程'}
+                </span>
+              </div>
               <select
                 className="select"
                 value={draft.ui.closeBehavior}
@@ -595,31 +675,37 @@ export function SettingsView({
                   })
                 }
               >
-                <option value="quit">直接退出</option>
-                <option value="minimize">最小化到托盘</option>
+                <option value="quit">直接退出 ModDeck</option>
+                <option value="minimize">最小化到系统托盘（推荐）</option>
               </select>
-            </label>
-            <div className="muted small">
-              当前：{draft.ui.closeBehavior === 'minimize' ? '最小化到托盘' : '直接退出'}
-              {draft.ui.closeBehavior === 'minimize'
-                ? ' · 托盘菜单可打开管理器或退出'
-                : ' · 关闭主窗口会结束进程'}
             </div>
           </section>
 
-          <section className="section">
-            <div className="section-head">
-              <h2>本地数据</h2>
-              <p className="muted">设置、角色元数据、封面和日志都保存在本机。</p>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(234, 179, 8, 0.12)',
+                  color: '#fbbf24',
+                  borderColor: 'rgba(234, 179, 8, 0.25)'
+                }}
+              >
+                <Icon name="folder" size={18} />
+              </div>
+              <div>
+                <h3>本地数据</h3>
+                <p className="muted">设置、角色元数据、封面、快照和日志都保存在本机，纯本地无云端泄露隐患。</p>
+              </div>
             </div>
             <div className="row">
               <button className="btn ghost" onClick={() => window.moddeck.openPath('data')}>
                 <Icon name="folder" size={16} />
-                打开数据目录
+                打开数据目录 (userData)
               </button>
               <button className="btn ghost" onClick={() => window.moddeck.openPath('logs')}>
                 <Icon name="folder" size={16} />
-                打开日志
+                打开运行日志 (logs)
               </button>
             </div>
           </section>
@@ -627,12 +713,17 @@ export function SettingsView({
       ) : null}
 
       {tab === 'games' ? (
-        <section className="section first-section">
-          <div className="section-head">
-            <h2>游戏与路径</h2>
-            <p className="muted">
-              只需要指向 Mods 目录；游戏程序和启动器用于顶部的“启动游戏 / 启动 XXMI”按钮。
-            </p>
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <div className="settings-card-icon" style={{ background: 'rgba(52, 211, 153, 0.12)', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.25)' }}>
+              <Icon name="folder" size={18} />
+            </div>
+            <div>
+              <h3>游戏与目录路径</h3>
+              <p className="muted">
+                只需要指向 Mods 目录；游戏程序和启动器用于顶部的“启动游戏 / 启动 XXMI”按钮。
+              </p>
+            </div>
           </div>
           <div className="game-settings">
             {games.map((game) => {
@@ -733,15 +824,20 @@ export function SettingsView({
       ) : null}
 
       {tab === 'environment' ? (
-        <section className="section first-section">
-          <div className="section-head">
-            <h2>MI 环境</h2>
-            <p className="muted">
-              当前只接入 EFMI 的环境检查。其他 MI 的配置位置已保留，后续版本补充。
-            </p>
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <div className="settings-card-icon" style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)' }}>
+              <Icon name="box" size={18} />
+            </div>
+            <div>
+              <h3>MI 运行环境检查</h3>
+              <p className="muted">
+                当前只接入 EFMI 的环境检查。其他 MI 的配置位置已保留，后续版本补充。
+              </p>
+            </div>
           </div>
 
-          <label className="check-row">
+          <label className="check-row-card" style={{ marginBottom: '14px' }}>
             <input
               type="checkbox"
               checked={draft.ui.envCheckEnabled}
@@ -750,9 +846,14 @@ export function SettingsView({
                 if (event.target.checked) void refreshEnvironment()
               }}
             />
-            <span>启动时检查 DISABLED 规则（默认开启）</span>
+            <div>
+              <div style={{ fontWeight: 600, color: '#f1f5f9' }}>启动时检查 DISABLED 规则（默认开启）</div>
+              <div className="muted small" style={{ marginTop: '2px' }}>
+                自动校验 d3dx.ini 中是否已包含 exclude_recursive = DISABLED* 规则。
+              </div>
+            </div>
           </label>
-          <div className="row">
+          <div className="row" style={{ marginBottom: '14px' }}>
             <button
               className="btn ghost small-btn"
               onClick={() => void refreshEnvironment()}
@@ -818,15 +919,22 @@ export function SettingsView({
 
       {tab === 'import' ? (
         <>
-          <section className="section first-section">
-            <div className="section-head">
-              <h2>导入行为</h2>
-              <p className="muted">
-                支持批量选择或拖入 .zip / .7z / .rar 压缩包与已解压的 Mod 文件夹。默认复制不删除原包。
-              </p>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div className="settings-card-icon" style={{ background: 'rgba(168, 85, 247, 0.12)', color: '#c084fc', borderColor: 'rgba(168, 85, 247, 0.25)' }}>
+                <Icon name="download" size={18} />
+              </div>
+              <div>
+                <h3>Mod 导入行为</h3>
+                <p className="muted">
+                  支持批量选择或拖入 .zip / .7z / .rar 压缩包与已解压的 Mod 文件夹。默认复制不删除原包。
+                </p>
+              </div>
             </div>
-            <div className="field">
-              <span>导入方式</span>
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <span className="setting-group-title">导入方式</span>
+              </div>
               <div className="segmented">
                 <button
                   type="button"
@@ -844,25 +952,40 @@ export function SettingsView({
                 </button>
               </div>
             </div>
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={draft.import.overwriteExisting}
-                onChange={(event) => updateImport({ overwriteExisting: event.target.checked })}
-              />
-              <span>同名时覆盖（旧目录会先移动到 backups；关闭则自动重命名）</span>
-            </label>
+            <div className="setting-group-box">
+              <label className="check-row-card">
+                <input
+                  type="checkbox"
+                  checked={draft.import.overwriteExisting}
+                  onChange={(event) => updateImport({ overwriteExisting: event.target.checked })}
+                />
+                <div>
+                  <div style={{ fontWeight: 600, color: '#f1f5f9' }}>同名时覆盖</div>
+                  <div className="muted small" style={{ marginTop: '2px' }}>
+                    旧目录会先自动安全备份到 backups 目录；关闭则自动重命名递增。
+                  </div>
+                </div>
+              </label>
+            </div>
           </section>
 
-          <section className="section">
-            <div className="section-head">
-              <h2>角色匹配词库（内置离线 + 云端增量合并）</h2>
-              <p className="muted">
-                内置完整离线角色词典（中英文、拼音、别名），开箱即用。点击更新可拉取远程 roster.json 并与内置词典做增量合并，不会丢失任何内置角色。
-              </p>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div className="settings-card-icon" style={{ background: 'rgba(52, 211, 153, 0.12)', color: '#34d399', borderColor: 'rgba(52, 211, 153, 0.25)' }}>
+                <Icon name="refresh" size={18} />
+              </div>
+              <div>
+                <h3>角色匹配词库（内置离线 + 云端增量合并）</h3>
+                <p className="muted">
+                  内置完整离线角色词典（中英文、拼音、别名），开箱即用。点击更新可拉取远程 roster.json 并与内置词典做增量合并，不会丢失任何内置角色。
+                </p>
+              </div>
             </div>
-            <label className="field">
-              <span>远程词库 JSON 地址（GitHub Raw 或镜像地址）</span>
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <span className="setting-group-title">远程词库 JSON 地址</span>
+                <span className="muted small">GitHub Raw 或自定义镜像地址</span>
+              </div>
               <div className="field-row">
                 <input
                   className="input"
@@ -882,27 +1005,32 @@ export function SettingsView({
                   {rosterSyncing ? '更新中…' : '一键更新词库'}
                 </button>
               </div>
-            </label>
-            {rosterStatus ? (
-              <div className="muted small">
-                当前词库状态：
-                {games
-                  .map((g) => `${g.shortName} ${rosterStatus.gameCounts[g.id] ?? 0} 项`)
-                  .join(' · ')}
-                {rosterStatus.updatedAt
-                  ? ` · 上次云端同步：${new Date(rosterStatus.updatedAt).toLocaleString()}`
-                  : ' · 当前使用内置离线词库'}
-              </div>
-            ) : null}
+              {rosterStatus ? (
+                <div className="setting-group-desc">
+                  当前词库状态：
+                  {games
+                    .map((g) => `${g.shortName} ${rosterStatus.gameCounts[g.id] ?? 0} 项`)
+                    .join(' · ')}
+                  {rosterStatus.updatedAt
+                    ? ` · 上次云端同步：${new Date(rosterStatus.updatedAt).toLocaleString()}`
+                    : ' · 当前使用内置离线词库'}
+                </div>
+              ) : null}
+            </div>
           </section>
         </>
       ) : null}
 
       {tab === 'about' ? (
-        <section className="section first-section">
-          <div className="section-head">
-            <h2>关于</h2>
-            <p className="muted">ModDeck · MIT License · 本地优先 (Local-First)</p>
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <div className="settings-card-icon" style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)' }}>
+              <Icon name="info" size={18} />
+            </div>
+            <div>
+              <h3>关于 ModDeck</h3>
+              <p className="muted">ModDeck · MIT License · 本地优先 (Local-First 架构)</p>
+            </div>
           </div>
           {info ? (
             <div className="kv">

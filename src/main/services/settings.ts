@@ -147,7 +147,10 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
           : 'name',
       showHidden: source.ui?.showHidden === true,
       characterFilter:
-        source.ui?.characterFilter === 'withMods' || source.ui?.characterFilter === 'empty'
+        source.ui?.characterFilter === 'withMods' ||
+        source.ui?.characterFilter === 'empty' ||
+        source.ui?.characterFilter === 'characters' ||
+        source.ui?.characterFilter === 'utility'
           ? source.ui.characterFilter
           : 'all',
       overlayHotkey:

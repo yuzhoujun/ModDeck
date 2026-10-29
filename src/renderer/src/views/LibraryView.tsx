@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { CharacterInfo, GameDef, GameSnapshot, UiSettings } from '../../../shared/types'
+import { isUtilityCategory } from '../../../shared/types'
 import { CharacterCard } from '../components/CharacterCard'
 import { Icon } from '../components/Icon'
 import { ImportDropdown } from '../components/ImportDropdown'
@@ -50,11 +51,23 @@ export function LibraryView({
 }) {
   const [dragFolder, setDragFolder] = useState<string | null>(null)
 
+  const { charCount, utilCount } = useMemo(() => {
+    let chars = 0
+    let utils = 0
+    for (const c of snapshot.characters) {
+      if (isUtilityCategory(c)) utils++
+      else chars++
+    }
+    return { charCount: chars, utilCount: utils }
+  }, [snapshot.characters])
+
   const characters = useMemo(() => {
     const value = query.trim().toLowerCase()
     return snapshot.characters.filter((character) => {
       if (filter === 'withMods' && character.modCount === 0) return false
       if (filter === 'empty' && character.modCount > 0) return false
+      if (filter === 'characters' && isUtilityCategory(character)) return false
+      if (filter === 'utility' && !isUtilityCategory(character)) return false
       if (!value) return true
       const haystack = [character.displayName, character.folder, ...character.aliases]
         .join(' ')
@@ -85,10 +98,10 @@ export function LibraryView({
           <div className="eyebrow" style={{ color: game.accent }}>
             {game.shortName} · {game.loader}
           </div>
-          <h1>角色库</h1>
+          <h1>Mod 库</h1>
           <p className="muted">
-            {snapshot.characters.length} 个角色 · {snapshot.totalMods} 个 Mod ·{' '}
-            {snapshot.enabledMods} 个启用
+            {snapshot.characters.length} 个分类项 ({charCount} 角色 / {utilCount} 功能与UI) ·{' '}
+            {snapshot.totalMods} 个 Mod · {snapshot.enabledMods} 个启用
           </p>
         </div>
         <div className="actions">
@@ -161,7 +174,9 @@ export function LibraryView({
               value={filter}
               onChange={(event) => onFilter(event.target.value as UiSettings['characterFilter'])}
             >
-              <option value="all">全部角色</option>
+              <option value="all">全部分类 ({snapshot.characters.length})</option>
+              <option value="characters">仅角色 ({charCount})</option>
+              <option value="utility">仅功能 / UI / 其他 ({utilCount})</option>
               <option value="withMods">仅有 Mod</option>
               <option value="empty">仅无 Mod</option>
             </select>
@@ -189,12 +204,16 @@ export function LibraryView({
             <div className="empty-panel">
               <h2>
                 {query
-                  ? '没有匹配的角色'
-                  : filter === 'withMods'
-                    ? '没有带 Mod 的角色'
-                    : filter === 'empty'
-                      ? '所有角色都已有 Mod'
-                      : 'Mods 目录是空的'}
+                  ? '没有匹配的项目'
+                  : filter === 'characters'
+                    ? '没有角色类分类项'
+                    : filter === 'utility'
+                      ? '没有功能/UI/其他类分类项'
+                      : filter === 'withMods'
+                        ? '没有带 Mod 的分类项'
+                        : filter === 'empty'
+                          ? '所有分类项都已有 Mod'
+                          : 'Mods 目录是空的'}
               </h2>
               <p className="muted">
                 {query ? '换个关键词试试。' : '可以切换筛选条件，或导入新的 Mod。'}

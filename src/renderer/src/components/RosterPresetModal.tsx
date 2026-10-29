@@ -8,16 +8,10 @@ import type {
   ModVariantPreset,
   RosterPreset
 } from '../../../shared/types'
-import { getAssignmentModItems } from '../../../shared/types'
+import { getAssignmentModItems, isUtilityCategory } from '../../../shared/types'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { ScrollTitle } from './ScrollTitle'
-
-export function isUtilityCategory(char: { displayName: string; folder: string; kind?: string }): boolean {
-  if (char.kind === 'utility') return true
-  const testStr = `${char.displayName} ${char.folder}`
-  return /(?:UI|界面|功能|工具|其他|其它|世界|大世界|NPC|武器|Weapon|Glider|Vehicle|Others?|Tools?|Function|OpenWorld)/i.test(testStr)
-}
 
 export function RosterPresetModal({
   game,

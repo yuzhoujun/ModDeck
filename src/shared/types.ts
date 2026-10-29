@@ -29,7 +29,7 @@ export interface UiSettings {
   sortCharacters: 'custom' | 'name' | 'count'
   sortMods: 'name' | 'recent' | 'enabled' | 'custom'
   showHidden: boolean
-  characterFilter: 'all' | 'withMods' | 'empty'
+  characterFilter: 'all' | 'withMods' | 'empty' | 'characters' | 'utility'
   overlayHotkey: string
   reloadHotkey: string
   overlayPinned: boolean
@@ -329,4 +329,13 @@ export interface RosterPreset {
 export interface SaveRosterPresetInput {
   name: string
   assignments: Record<string, CharacterModAssignment>
+}
+
+/**
+ * 判断是否为非独立角色的功能/工具/UI/世界等系统级分类目录
+ */
+export function isUtilityCategory(char: { displayName?: string; folder?: string; kind?: string }): boolean {
+  if (char.kind === 'utility') return true
+  const testStr = `${char.displayName || ''} ${char.folder || ''}`
+  return /(?:UI|界面|功能|工具|其他|其它|世界|大世界|NPC|武器|Weapon|Glider|Vehicle|Others?|Tools?|Function|OpenWorld)/i.test(testStr)
 }
