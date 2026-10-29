@@ -60,6 +60,8 @@ const api: ModDeckApi = {
   saveRosterPreset: (gameId, input) => ipcRenderer.invoke(IPC.saveRosterPreset, gameId, input),
   applyRosterPreset: (gameId, presetId) => ipcRenderer.invoke(IPC.applyRosterPreset, gameId, presetId),
   deleteRosterPreset: (gameId, presetId) => ipcRenderer.invoke(IPC.deleteRosterPreset, gameId, presetId),
+  getD3dxAutoSaveInterval: (gameId) => ipcRenderer.invoke(IPC.getD3dxAutoSaveInterval, gameId),
+  setD3dxAutoSaveInterval: (gameId, interval) => ipcRenderer.invoke(IPC.setD3dxAutoSaveInterval, gameId, interval),
   getModDetails: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.getModDetails, gameId, characterFolder, modFolder),
   setModPreview: (gameId, characterFolder, modFolder, sourcePath) =>
