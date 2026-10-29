@@ -67,6 +67,7 @@ import {
   findD3dxUserIniPath,
   getPendingPresetCount,
   getPendingQueueEntries,
+  markPendingQueueReloading,
   syncBridgeFileFromQueue
 } from './services/presets'
 import {
@@ -370,7 +371,15 @@ function refreshModsWatcher(): void {
           if (watchDebounceTimer) clearTimeout(watchDebounceTimer)
           watchDebounceTimer = setTimeout(() => {
             watchDebounceTimer = null
-            broadcastStateChanged({ gameId: settings?.activeGameId })
+            const gId = settings?.activeGameId
+            // 关键双向闭环：若当前队列中有待生效预设，且游戏主动写回了 d3dx_user.ini，
+            // 说明玩家在游戏内按下了物理按键触发了 F10 重载（3DMigoto 重载时触发了 SavePersistentSettings），
+            // 此时自动将队列标记为 reloading 并排期 post-reload sync 补写与清理 bridge！
+            if (getPendingPresetCount(gId) > 0) {
+              markPendingQueueReloading(gId)
+              schedulePostReloadPresetSync(gId)
+            }
+            broadcastStateChanged({ gameId: gId })
           }, 280)
         })
         d3dxWatcher.on('error', () => {
@@ -1492,9 +1501,12 @@ async function reloadF10(): Promise<ToggleResult> {
   if (!plan) return { ok: false, error: '按键生成失败' }
   const res = await executeKeyPlan(plan)
   if (res.ok) {
+    const gId = settings.activeGameId
     // 无论是手动在快捷窗口/设置中点击发送，还是自动发送，只要队列中有待生效预设，均启动同步与清理
-    if (getPendingPresetCount(settings.activeGameId) > 0) {
-      schedulePostReloadPresetSync(settings.activeGameId)
+    if (getPendingPresetCount(gId) > 0) {
+      markPendingQueueReloading(gId)
+      schedulePostReloadPresetSync(gId)
+      broadcastStateChanged({ gameId: gId })
     }
   }
   return res
