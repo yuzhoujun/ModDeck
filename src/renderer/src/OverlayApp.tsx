@@ -8,11 +8,12 @@ import type {
   RecentMod,
   RosterPreset
 } from '../../shared/types'
+import { isUtilityCategory } from '../../shared/types'
 import { Icon } from './components/Icon'
 import { ScrollTitle } from './components/ScrollTitle'
 import { errorMessage } from './utils'
 
-type CharacterFilter = 'all' | 'withMods' | 'empty'
+type CharacterFilter = 'all' | 'withMods' | 'empty' | 'characters' | 'utility'
 
 export function OverlayApp() {
   const [boot, setBoot] = useState<Bootstrap | null>(null)
@@ -151,6 +152,8 @@ export function OverlayApp() {
   const filteredCharacters = characters.filter((character) => {
     if (filter === 'withMods') return character.modCount > 0
     if (filter === 'empty') return character.modCount === 0
+    if (filter === 'characters') return !isUtilityCategory(character)
+    if (filter === 'utility') return isUtilityCategory(character)
     return true
   })
   const current = characters.find((character) => character.folder === selected) ?? null
@@ -378,9 +381,11 @@ export function OverlayApp() {
           className="select compact-select"
           value={filter}
           onChange={(event) => void changeFilter(event.target.value as CharacterFilter)}
-          title="角色筛选"
+          title="分类筛选"
         >
           <option value="all">全部</option>
+          <option value="characters">仅角色</option>
+          <option value="utility">仅功能/UI</option>
           <option value="withMods">有 Mod</option>
           <option value="empty">无 Mod</option>
         </select>
