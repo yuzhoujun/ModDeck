@@ -167,6 +167,10 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
       autoReloadModToggle: source.ui?.autoReloadModToggle === true,
       autoReloadModPreset: source.ui?.autoReloadModPreset !== false,
       autoReloadRosterPreset: source.ui?.autoReloadRosterPreset !== false,
+      postReloadSyncDelay:
+        typeof source.ui?.postReloadSyncDelay === 'number' && source.ui.postReloadSyncDelay > 0
+          ? source.ui.postReloadSyncDelay
+          : 6,
       recentModCount,
       closeBehavior: source.ui?.closeBehavior === 'minimize' ? 'minimize' : 'quit'
     },
