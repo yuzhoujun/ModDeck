@@ -609,6 +609,57 @@ export async function clearPresetBridgeIni(modsPath: string): Promise<void> {
 /**
  * 比较预设与当前环境的激活状态（自动忽略 transient 交互临时变量）
  */
+/**
+ * 比较两组外观变量是否数值等价（支持浮点精度容差 0.0005，过滤瞬态变量）
+ */
+export function areVariablesEqual(
+  varsA: Record<string, string> = {},
+  varsB: Record<string, string> = {}
+): boolean {
+  const keysA = Object.keys(varsA).filter((k) => !isTransientVariable(k))
+  const keysB = Object.keys(varsB).filter((k) => !isTransientVariable(k))
+  const allKeys = new Set([...keysA.map((k) => k.toLowerCase()), ...keysB.map((k) => k.toLowerCase())])
+
+  const mapA = new Map<string, string>()
+  for (const [k, v] of Object.entries(varsA)) mapA.set(k.toLowerCase(), v)
+  const mapB = new Map<string, string>()
+  for (const [k, v] of Object.entries(varsB)) mapB.set(k.toLowerCase(), v)
+
+  for (const k of allKeys) {
+    const valA = mapA.get(k)
+    const valB = mapB.get(k)
+    if (valA === undefined || valB === undefined) {
+      if (valA !== valB) return false
+      continue
+    }
+    const numA = Number(valA)
+    const numB = Number(valB)
+    if (!isNaN(numA) && !isNaN(numB)) {
+      if (Math.abs(numA - numB) > 0.0005) return false
+    } else if (valA.toLowerCase() !== valB.toLowerCase()) {
+      return false
+    }
+  }
+  return true
+}
+
+/**
+ * 判断某个预设与给定的 ini 列表及变量快照是否实质完全一致
+ */
+export function isPresetContentIdentical(
+  preset: ModVariantPreset,
+  activeInis: string[],
+  variables: Record<string, string>
+): boolean {
+  const inisA = new Set((preset.activeIniFiles || []).map((f) => f.replace(/\\/g, '/').toLowerCase()))
+  const inisB = new Set((activeInis || []).map((f) => f.replace(/\\/g, '/').toLowerCase()))
+  if (inisA.size !== inisB.size) return false
+  for (const item of inisA) {
+    if (!inisB.has(item)) return false
+  }
+  return areVariablesEqual(preset.variables || {}, variables || {})
+}
+
 function evaluatePresetActive(
   preset: ModVariantPreset,
   currentActiveInis: string[],
@@ -633,7 +684,7 @@ function evaluatePresetActive(
         const numA = Number(v)
         const numB = Number(effectiveVal)
         if (!isNaN(numA) && !isNaN(numB)) {
-          if (numA !== numB) return false
+          if (Math.abs(numA - numB) > 0.0005) return false
         } else if (v.toLowerCase() !== effectiveVal.toLowerCase()) {
           return false
         }
@@ -795,6 +846,18 @@ export async function saveModPreset(
   const list = (await readJsonSafe<ModVariantPreset[] | null>(filePath, null)) ?? []
 
   const existingIndex = list.findIndex((p) => p.name.toLowerCase() === name.toLowerCase())
+
+  // 检查是否与已有的某个预设内容完全一致（防止因浮点数误差或重复保存产生同质废案）
+  const duplicatePreset = list.find((p) => {
+    if (existingIndex >= 0 && p.id === list[existingIndex].id) return false
+    return isPresetContentIdentical(p, cleanActiveInis, currentSnapshotVars)
+  })
+  if (duplicatePreset) {
+    return {
+      ok: false,
+      error: `当前造型配置与已有预设「${duplicatePreset.name}」完全一致，无需重复保存`
+    }
+  }
   const newPreset: ModVariantPreset = {
     id: existingIndex >= 0 ? list[existingIndex].id : `preset_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     name,
