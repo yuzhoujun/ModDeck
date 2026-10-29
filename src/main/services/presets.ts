@@ -5,8 +5,10 @@ import type {
   ModVariantPreset,
   RosterPreset,
   SaveRosterPresetInput,
-  ToggleResult
+  ModAssignmentItem,
+  ToggleResult,
 } from '../../shared/types'
+import { getAssignmentModItems } from '../../shared/types'
 import { ensureDir, pathExists, readJsonSafe, writeJsonAtomic } from '../core/fsx'
 import { isSafeSegment } from '../core/safe-path'
 
@@ -756,8 +758,12 @@ export async function applyModPreset(
   skipBridge = false
 ): Promise<ToggleResult> {
   const filePath = await getModPresetFilePath(baseDir, gameId, characterFolder, modFolder)
-  const list = (await readJsonSafe<ModVariantPreset[] | null>(filePath, null)) ?? []
-  const targetPreset = list.find((p) => p.id === presetId)
+  let list = (await readJsonSafe<ModVariantPreset[] | null>(filePath, null)) ?? []
+  let targetPreset = list.find((p) => p.id === presetId || (presetId === 'default' && p.id === '__default__'))
+  if (!targetPreset) {
+    list = await getModPresets(baseDir, gameId, characterFolder, modFolder, modPath, modsPath)
+    targetPreset = list.find((p) => p.id === presetId || (presetId === 'default' && p.id === '__default__'))
+  }
   if (!targetPreset) return { ok: false, error: '未找到指定预设' }
 
   if (!(await pathExists(modPath))) return { ok: false, error: 'Mod 目录不存在' }
@@ -950,12 +956,19 @@ export async function applyRosterPreset(
     }
     if (!(await pathExists(charDir))) continue
 
+    const items = getAssignmentModItems(assignment)
+    const targetMap = new Map<string, ModAssignmentItem>()
+    for (const item of items) {
+      targetMap.set(item.modName.toLowerCase(), item)
+    }
+
     const entries = await fs.readdir(charDir, { withFileTypes: true }).catch(() => [])
     for (const entry of entries) {
       if (!entry.isDirectory()) continue
       const currentDirName = entry.name
       const cleanModName = currentDirName.replace(/^DISABLED_/i, '')
-      const shouldEnable = cleanModName.toLowerCase() === assignment.modName.toLowerCase()
+      const targetItem = targetMap.get(cleanModName.toLowerCase())
+      const shouldEnable = Boolean(targetItem)
 
       const srcPath = path.join(charDir, currentDirName)
       let activePath = srcPath
@@ -971,7 +984,7 @@ export async function applyRosterPreset(
       }
 
       // 若选中的 Mod 绑定了单 Mod 变体预设，同时加入聚合队列（跳过单独写 bridge，最后批量合成写入）
-      if (shouldEnable && assignment.presetId) {
+      if (shouldEnable && targetItem?.presetId) {
         await applyModPreset(
           baseDir,
           gameId,
@@ -979,7 +992,7 @@ export async function applyRosterPreset(
           cleanModName,
           activePath,
           modsPath,
-          assignment.presetId,
+          targetItem.presetId,
           true
         ).catch(() => undefined)
       }

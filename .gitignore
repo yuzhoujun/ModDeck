@@ -10,3 +10,5 @@ ModDeck-logs/
 Thumbs.db
 .env
 .env.local
+
+.agents/

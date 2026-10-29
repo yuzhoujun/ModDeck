@@ -293,9 +293,28 @@ export interface SaveModPresetInput {
   variables?: Record<string, string>
 }
 
-export interface CharacterModAssignment {
+export interface ModAssignmentItem {
   modName: string // 纯净名（不带 DISABLED_）
-  presetId?: string // 绑定的单 Mod 变体预设 id
+  presetId?: string // 绑定的单 Mod 变体预设 id（如 '__default__' 或 自定义预设 id）
+}
+
+export interface CharacterModAssignment {
+  modName?: string // 兼容旧版单一 Mod 纯净名
+  presetId?: string // 兼容旧版单一预设 id
+  mods?: ModAssignmentItem[] // 新版支持多 Mod 配置列表（单选或多选）
+}
+
+export function getAssignmentModItems(
+  assignment?: CharacterModAssignment | null
+): ModAssignmentItem[] {
+  if (!assignment) return []
+  if (Array.isArray(assignment.mods) && assignment.mods.length > 0) {
+    return assignment.mods.filter((m) => !!m.modName)
+  }
+  if (assignment.modName) {
+    return [{ modName: assignment.modName, presetId: assignment.presetId }]
+  }
+  return []
 }
 
 export interface RosterPreset {
