@@ -461,7 +461,7 @@ export function OverlayApp() {
       {showPresetDrawer ? (
         <div className="overlay-preset-drawer">
           <div className="overlay-preset-head">
-            <strong>选择角色池方案 (互斥单选)</strong>
+            <strong>选择全角色预设方案</strong>
             <button className="icon-btn" onClick={() => setShowPresetDrawer(false)}>
               <Icon name="close" size={14} />
             </button>
@@ -483,7 +483,7 @@ export function OverlayApp() {
                     <span className="preset-dot" />
                     <span className="overlay-preset-name">{p.name}</span>
                     <span className="muted small">
-                      {Object.keys(p.assignments).length} 角色
+                      {Object.keys(p.assignments).length} 角色 · {Object.values(p.assignments).reduce((acc, a) => acc + (a?.mods?.length ? a.mods.length : (a?.modName ? 1 : 0)), 0)} Mod
                     </span>
                   </button>
                 )

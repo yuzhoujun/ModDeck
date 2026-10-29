@@ -2194,9 +2194,9 @@ code {
 
 .roster-characters-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
-  max-height: 360px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  max-height: 440px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -2217,36 +2217,123 @@ code {
   justify-content: space-between;
   border-bottom: 1px solid var(--line-soft);
   padding-bottom: 6px;
+  gap: 8px;
+}
+
+.roster-char-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
 }
 
 .roster-char-name {
   font-weight: 600;
   font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.roster-mode-switch {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  padding: 1px;
+  flex-shrink: 0;
+}
+
+.roster-mode-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roster-mode-btn:hover {
+  color: var(--text);
+}
+
+.roster-mode-btn.is-active {
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.roster-multi-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 6px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  margin-bottom: 2px;
+}
+
+.roster-mini-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  padding: 2px 6px;
+  cursor: pointer;
+  margin-right: 4px;
+  transition: all 0.15s ease;
+}
+
+.roster-mini-btn:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .roster-char-mods {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 140px;
+  max-height: 190px;
   overflow-y: auto;
 }
 
-.roster-mod-radio {
+.roster-mod-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 3px 4px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.roster-mod-item.is-selected {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.roster-mod-radio,
+.roster-mod-checkbox {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 11.5px;
   cursor: pointer;
-  padding: 3px 4px;
+  padding: 2px 2px;
   border-radius: 4px;
+  user-select: none;
 }
 
-.roster-mod-radio:hover {
-  background: rgba(255, 255, 255, 0.04);
+.roster-mod-radio:hover,
+.roster-mod-checkbox:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
-.roster-mod-radio.is-checked {
+.roster-mod-radio.is-checked,
+.roster-mod-checkbox.is-checked {
   color: #6ee7b7;
   font-weight: 500;
 }
@@ -2255,6 +2342,64 @@ code {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+}
+
+.roster-mod-presets-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 20px;
+  padding-bottom: 2px;
+}
+
+.roster-mod-presets-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.roster-mod-preset-select {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 1px 6px;
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.roster-mod-preset-select:focus {
+  border-color: #34d399;
+  outline: none;
+}
+
+.roster-preset-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--line-soft);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.roster-preset-apply-btn:hover {
+  color: #34d399;
+  border-color: #34d399;
+  background: rgba(52, 211, 153, 0.1);
 }
 
 /* 快捷窗口预设抽屉 */

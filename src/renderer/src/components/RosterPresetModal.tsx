@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import type {
-  CharacterInfo,
+  CharacterModAssignment,
   GameDef,
   GameSnapshot,
+  ModAssignmentItem,
   ModInfo,
+  ModVariantPreset,
   RosterPreset
 } from '../../../shared/types'
+import { getAssignmentModItems } from '../../../shared/types'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { ScrollTitle } from './ScrollTitle'
@@ -28,8 +31,11 @@ export function RosterPresetModal({
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [characterModsMap, setCharacterModsMap] = useState<Record<string, ModInfo[]>>({})
   const [selectedAssignments, setSelectedAssignments] = useState<
-    Record<string, { modName: string }>
+    Record<string, CharacterModAssignment>
   >({})
+  const [charModes, setCharModes] = useState<Record<string, 'single' | 'multi'>>({})
+  const [modPresetsMap, setModPresetsMap] = useState<Record<string, ModVariantPreset[]>>({})
+  const [loadingPresetsMap, setLoadingPresetsMap] = useState<Record<string, boolean>>({})
   const [charFilter, setCharFilter] = useState('')
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
 
@@ -46,33 +52,266 @@ export function RosterPresetModal({
     }
   }
 
-  // 2. 加载各角色的 Mod 列表以供配置选择
+  // 2. 按需加载指定 Mod 的单 Mod 变体预设
+  const loadModPresets = async (charFolder: string, mod: ModInfo): Promise<ModVariantPreset[]> => {
+    const key = `${charFolder}::${mod.name}`
+    if (modPresetsMap[key]) return modPresetsMap[key]
+    setLoadingPresetsMap((prev) => ({ ...prev, [key]: true }))
+    try {
+      const list = await window.moddeck.getModPresets(game.id, charFolder, mod.folderName)
+      setModPresetsMap((prev) => ({ ...prev, [key]: list }))
+      return list
+    } catch {
+      setModPresetsMap((prev) => ({ ...prev, [key]: [] }))
+      return []
+    } finally {
+      setLoadingPresetsMap((prev) => ({ ...prev, [key]: false }))
+    }
+  }
+
+  // 3. 加载各角色的 Mod 列表以供配置选择
   const fetchCharacterMods = async () => {
     const map: Record<string, ModInfo[]> = {}
-    const currentAssignments: Record<string, { modName: string }> = {}
+    const currentAssignments: Record<string, CharacterModAssignment> = {}
+    const initialModes: Record<string, 'single' | 'multi'> = {}
+    const modsToPreload: { charFolder: string; mod: ModInfo }[] = []
 
     for (const char of snapshot.characters) {
       if (char.modCount === 0) continue
       try {
         const list = await window.moddeck.getMods(game.id, char.folder)
         map[char.folder] = list
-        // 自动提取当前正激活的 Mod（若有）
-        const enabledMod = list.find((m) => m.enabled)
-        if (enabledMod) {
-          currentAssignments[char.folder] = { modName: enabledMod.name }
+
+        const enabledMods = list.filter((m) => m.enabled)
+        // 初始单多选规则：若当前启用的 Mod 数量 > 1，则初始为多选；否则为单选
+        initialModes[char.folder] = enabledMods.length > 1 ? 'multi' : 'single'
+
+        if (enabledMods.length > 0) {
+          const items: ModAssignmentItem[] = enabledMods.map((m) => ({
+            modName: m.name
+          }))
+          currentAssignments[char.folder] = {
+            modName: items[0]?.modName,
+            presetId: items[0]?.presetId,
+            mods: items
+          }
+          for (const m of enabledMods) {
+            modsToPreload.push({ charFolder: char.folder, mod: m })
+          }
+        } else {
+          currentAssignments[char.folder] = { mods: [] }
         }
       } catch {
         // ignore
       }
     }
     setCharacterModsMap(map)
+    setCharModes(initialModes)
     setSelectedAssignments(currentAssignments)
+
+    // 异步预加载所有已启用 Mod 的预设，并绑定其当前实机活跃预设
+    for (const { charFolder, mod } of modsToPreload) {
+      void (async () => {
+        try {
+          const list = await window.moddeck.getModPresets(game.id, charFolder, mod.folderName)
+          setModPresetsMap((prev) => ({ ...prev, [`${charFolder}::${mod.name}`]: list }))
+          const activeP = list.find((p) => p.isActive)
+          if (activeP) {
+            setSelectedAssignments((prev) => {
+              const curr = prev[charFolder]
+              const items = getAssignmentModItems(curr)
+              const idx = items.findIndex((i) => i.modName.toLowerCase() === mod.name.toLowerCase())
+              if (idx >= 0 && !items[idx].presetId) {
+                const nextItems = [...items]
+                nextItems[idx] = { ...nextItems[idx], presetId: activeP.id }
+                return {
+                  ...prev,
+                  [charFolder]: {
+                    modName: nextItems[0]?.modName,
+                    presetId: nextItems[0]?.presetId,
+                    mods: nextItems
+                  }
+                }
+              }
+              return prev
+            })
+          }
+        } catch {
+          // ignore
+        }
+      })()
+    }
   }
 
   useEffect(() => {
     void fetchPresets()
     void fetchCharacterMods()
   }, [game.id])
+
+  // 单角色单多选模式切换
+  const toggleCharMode = (charFolder: string, targetMode: 'single' | 'multi') => {
+    setCharModes((prev) => ({ ...prev, [charFolder]: targetMode }))
+    if (targetMode === 'single') {
+      setSelectedAssignments((prev) => {
+        const curr = prev[charFolder]
+        const items = getAssignmentModItems(curr)
+        if (items.length > 1) {
+          const first = items[0]
+          return {
+            ...prev,
+            [charFolder]: {
+              modName: first.modName,
+              presetId: first.presetId,
+              mods: [first]
+            }
+          }
+        }
+        return prev
+      })
+    }
+  }
+
+  // 单选：选择原生（清空）
+  const handleSelectNative = (charFolder: string) => {
+    setSelectedAssignments((prev) => ({
+      ...prev,
+      [charFolder]: { mods: [] }
+    }))
+  }
+
+  // 单选：选择某个 Mod
+  const handleSelectSingleMod = (charFolder: string, mod: ModInfo) => {
+    const key = `${charFolder}::${mod.name}`
+    const cached = modPresetsMap[key]
+    const defaultPId = cached?.find((p) => p.isActive)?.id || cached?.[0]?.id || '__default__'
+    setSelectedAssignments((prev) => ({
+      ...prev,
+      [charFolder]: {
+        modName: mod.name,
+        presetId: defaultPId,
+        mods: [{ modName: mod.name, presetId: defaultPId }]
+      }
+    }))
+    void loadModPresets(charFolder, mod)
+  }
+
+  // 多选：复选框勾选切换
+  const handleToggleMultiMod = (charFolder: string, mod: ModInfo, checked: boolean) => {
+    setSelectedAssignments((prev) => {
+      const curr = prev[charFolder]
+      const items = getAssignmentModItems(curr)
+      let nextItems: ModAssignmentItem[]
+      if (checked) {
+        const key = `${charFolder}::${mod.name}`
+        const cached = modPresetsMap[key]
+        const defaultPId = cached?.find((p) => p.isActive)?.id || cached?.[0]?.id || '__default__'
+        nextItems = [
+          ...items.filter((i) => i.modName.toLowerCase() !== mod.name.toLowerCase()),
+          { modName: mod.name, presetId: defaultPId }
+        ]
+        void loadModPresets(charFolder, mod)
+      } else {
+        nextItems = items.filter((i) => i.modName.toLowerCase() !== mod.name.toLowerCase())
+      }
+      return {
+        ...prev,
+        [charFolder]: {
+          modName: nextItems[0]?.modName,
+          presetId: nextItems[0]?.presetId,
+          mods: nextItems
+        }
+      }
+    })
+  }
+
+  // 多选：全选
+  const handleSelectAllMods = (charFolder: string, mods: ModInfo[]) => {
+    const nextItems: ModAssignmentItem[] = mods.map((m) => {
+      const key = `${charFolder}::${m.name}`
+      const cached = modPresetsMap[key]
+      const defaultPId = cached?.find((p) => p.isActive)?.id || cached?.[0]?.id || '__default__'
+      void loadModPresets(charFolder, m)
+      return { modName: m.name, presetId: defaultPId }
+    })
+    setSelectedAssignments((prev) => ({
+      ...prev,
+      [charFolder]: {
+        modName: nextItems[0]?.modName,
+        presetId: nextItems[0]?.presetId,
+        mods: nextItems
+      }
+    }))
+  }
+
+  // 多选：全清
+  const handleClearAllMods = (charFolder: string) => {
+    setSelectedAssignments((prev) => ({
+      ...prev,
+      [charFolder]: { mods: [] }
+    }))
+  }
+
+  // 变更 Mod 的专属预设
+  const handleModPresetChange = (charFolder: string, modName: string, presetId: string) => {
+    setSelectedAssignments((prev) => {
+      const curr = prev[charFolder]
+      const items = getAssignmentModItems(curr)
+      const nextItems = items.map((i) =>
+        i.modName.toLowerCase() === modName.toLowerCase() ? { ...i, presetId } : i
+      )
+      return {
+        ...prev,
+        [charFolder]: {
+          modName: nextItems[0]?.modName,
+          presetId: nextItems[0]?.presetId,
+          mods: nextItems
+        }
+      }
+    })
+  }
+
+  // 在游戏内立即切换该 Mod 预设（现场试穿）
+  const handleApplySingleModPreset = async (
+    charFolder: string,
+    mod: ModInfo,
+    presetId: string
+  ) => {
+    try {
+      const res = await window.moddeck.applyModPreset(
+        game.id,
+        charFolder,
+        mod.folderName,
+        presetId
+      )
+      if (res.ok) {
+        onNotify?.(`已在游戏内切换 ${mod.name} 预设`, 'ok')
+        const list = await window.moddeck.getModPresets(game.id, charFolder, mod.folderName)
+        setModPresetsMap((prev) => ({ ...prev, [`${charFolder}::${mod.name}`]: list }))
+      } else {
+        onNotify?.(res.error || '切换预设失败', 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
+  // 点击方案标签：载入方案至工作台查看并应用
+  const handleInspectPreset = (preset: RosterPreset) => {
+    setActivePresetId(preset.id)
+    setPresetName(preset.name)
+    setSelectedAssignments(preset.assignments)
+    const nextModes: Record<string, 'single' | 'multi'> = {}
+    for (const [charFolder, assign] of Object.entries(preset.assignments)) {
+      const items = getAssignmentModItems(assign)
+      nextModes[charFolder] = items.length > 1 ? 'multi' : 'single'
+      const charMods = characterModsMap[charFolder] || []
+      for (const item of items) {
+        const m = charMods.find((x) => x.name.toLowerCase() === item.modName.toLowerCase())
+        if (m) void loadModPresets(charFolder, m)
+      }
+    }
+    setCharModes((prev) => ({ ...prev, ...nextModes }))
+  }
 
   // 保存新方案
   const handleSavePreset = async () => {
@@ -148,11 +387,11 @@ export function RosterPresetModal({
     <Modal
       title={`角色池预设方案管理 · ${game.shortName}`}
       onClose={onClose}
-      width={780}
+      width={840}
       footer={
         <div className="modal-foot-between">
           <div className="muted small">
-            预设只记录各角色激活配置，毫秒级快速切换，绝不复制实体文件。
+            预设只记录各角色/Mod 激活与变体变量配置，毫秒级快速切换，绝不复制实体文件。
           </div>
           <button className="btn" onClick={onClose}>
             关闭
@@ -200,10 +439,16 @@ export function RosterPresetModal({
             {loading ? (
               <span className="muted small">加载预设中…</span>
             ) : presets.length === 0 ? (
-              <span className="muted small">暂无方案，请先勾选下方角色 Mod 后点击右上角存为新方案</span>
+              <span className="muted small">暂无方案，请在下方配置各角色 Mod 与预设后点击右上角保存</span>
             ) : (
               presets.map((p) => {
                 const isActive = activePresetId === p.id
+                const charCount = Object.keys(p.assignments).length
+                const totalModCount = Object.values(p.assignments).reduce((acc, a) => {
+                  const items = getAssignmentModItems(a)
+                  return acc + items.length
+                }, 0)
+
                 return (
                   <div
                     key={p.id}
@@ -211,18 +456,26 @@ export function RosterPresetModal({
                   >
                     <button
                       className="roster-preset-chip-btn"
-                      onClick={() => void handleApplyPreset(p)}
-                      title={`一键应用「${p.name}」并刷新`}
+                      onClick={() => {
+                        handleInspectPreset(p)
+                        void handleApplyPreset(p)
+                      }}
+                      title={`应用「${p.name}」并刷新（单击也可在下方查看/调校配置）`}
                     >
                       <span className="preset-dot" />
-                      <span style={{ minWidth: 0, overflow: 'hidden' }}><ScrollTitle text={p.name} /></span>
+                      <span style={{ minWidth: 0, overflow: 'hidden' }}>
+                        <ScrollTitle text={p.name} />
+                      </span>
                       <span className="muted small">
-                        ({Object.keys(p.assignments).length} 人)
+                        ({charCount}人·{totalModCount}Mod)
                       </span>
                     </button>
                     <button
                       className="icon-btn danger preset-del-btn"
-                      onClick={() => void handleDeletePreset(p)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void handleDeletePreset(p)
+                      }}
                       title="删除该方案"
                     >
                       <Icon name="close" size={12} />
@@ -234,10 +487,10 @@ export function RosterPresetModal({
           </div>
         </div>
 
-        {/* 角色与 Mod 互斥单选区域 */}
+        {/* 角色与 Mod 方案配置区域 */}
         <div className="roster-config-section">
           <div className="roster-config-head">
-            <strong>角色 Mod 方案配置（单选互斥保护）</strong>
+            <strong>角色 Mod 与变体预设方案配置</strong>
             <input
               className="input roster-search-input"
               placeholder="快速过滤角色…"
@@ -249,52 +502,169 @@ export function RosterPresetModal({
           <div className="roster-characters-grid">
             {validCharacters.map((char) => {
               const charMods = characterModsMap[char.folder] || []
-              const currentChoice = selectedAssignments[char.folder]?.modName
+              const mode = charModes[char.folder] || 'single'
+              const assignedItems = getAssignmentModItems(selectedAssignments[char.folder])
+              const assignedMap = new Map(assignedItems.map((i) => [i.modName.toLowerCase(), i]))
 
               return (
                 <div key={char.folder} className="roster-char-card">
                   <div className="roster-char-head">
-                    <span className="roster-char-name">{char.displayName}</span>
-                    <span className="muted small">({charMods.length} 个 Mod)</span>
+                    <div className="roster-char-title-wrap">
+                      <span className="roster-char-name" title={char.displayName}>
+                        {char.displayName}
+                      </span>
+                      <span className="muted small">({charMods.length})</span>
+                    </div>
+
+                    <div className="roster-mode-switch">
+                      <button
+                        type="button"
+                        className={`roster-mode-btn${mode === 'single' ? ' is-active' : ''}`}
+                        onClick={() => toggleCharMode(char.folder, 'single')}
+                        title="单选模式（互斥保护，同时只生效一个 Mod）"
+                      >
+                        单选
+                      </button>
+                      <button
+                        type="button"
+                        className={`roster-mode-btn${mode === 'multi' ? ' is-active' : ''}`}
+                        onClick={() => toggleCharMode(char.folder, 'multi')}
+                        title="多选模式（共存允许，可同时勾选多个 Mod）"
+                      >
+                        多选
+                      </button>
+                    </div>
                   </div>
 
+                  {mode === 'multi' && (
+                    <div className="roster-multi-toolbar">
+                      <div>
+                        <button
+                          type="button"
+                          className="roster-mini-btn"
+                          onClick={() => handleSelectAllMods(char.folder, charMods)}
+                        >
+                          全选
+                        </button>
+                        <button
+                          type="button"
+                          className="roster-mini-btn"
+                          onClick={() => handleClearAllMods(char.folder)}
+                        >
+                          全清
+                        </button>
+                      </div>
+                      <span className="muted small">
+                        已选 {assignedItems.length} / {charMods.length}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="roster-char-mods">
-                    <label className="roster-mod-radio">
-                      <input
-                        type="radio"
-                        name={`roster_${char.folder}`}
-                        checked={!currentChoice}
-                        onChange={() => {
-                          setSelectedAssignments((prev) => {
-                            const next = { ...prev }
-                            delete next[char.folder]
-                            return next
-                          })
-                        }}
-                      />
-                      <span className="muted">不启用任何 Mod（保持原生）</span>
-                    </label>
+                    {mode === 'single' && (
+                      <label className="roster-mod-radio">
+                        <input
+                          type="radio"
+                          name={`roster_${char.folder}`}
+                          checked={assignedItems.length === 0}
+                          onChange={() => handleSelectNative(char.folder)}
+                        />
+                        <span className="muted">不启用任何 Mod（保持原生）</span>
+                      </label>
+                    )}
 
                     {charMods.map((mod) => {
-                      const isChecked = currentChoice === mod.name
+                      const isChecked = assignedMap.has(mod.name.toLowerCase())
+                      const assignedItem = assignedMap.get(mod.name.toLowerCase())
+                      const key = `${char.folder}::${mod.name}`
+                      const presets = modPresetsMap[key] || []
+                      const isLoadingPresets = Boolean(loadingPresetsMap[key])
+
                       return (
-                        <label
+                        <div
                           key={mod.folderName}
-                          className={`roster-mod-radio${isChecked ? ' is-checked' : ''}`}
+                          className={`roster-mod-item${isChecked ? ' is-selected' : ''}`}
                         >
-                          <input
-                            type="radio"
-                            name={`roster_${char.folder}`}
-                            checked={isChecked}
-                            onChange={() => {
-                              setSelectedAssignments((prev) => ({
-                                ...prev,
-                                [char.folder]: { modName: mod.name }
-                              }))
-                            }}
-                          />
-                          <span className="roster-mod-name-label" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}><ScrollTitle text={mod.name} /></span>
-                        </label>
+                          {mode === 'single' ? (
+                            <label className={`roster-mod-radio${isChecked ? ' is-checked' : ''}`}>
+                              <input
+                                type="radio"
+                                name={`roster_${char.folder}`}
+                                checked={isChecked}
+                                onChange={() => handleSelectSingleMod(char.folder, mod)}
+                              />
+                              <span
+                                className="roster-mod-name-label"
+                                style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}
+                              >
+                                <ScrollTitle text={mod.name} />
+                              </span>
+                            </label>
+                          ) : (
+                            <label className={`roster-mod-checkbox${isChecked ? ' is-checked' : ''}`}>
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) =>
+                                  handleToggleMultiMod(char.folder, mod, e.target.checked)
+                                }
+                              />
+                              <span
+                                className="roster-mod-name-label"
+                                style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}
+                              >
+                                <ScrollTitle text={mod.name} />
+                              </span>
+                            </label>
+                          )}
+
+                          {/* 变体预设选择行（当 Mod 选中时展开） */}
+                          {isChecked && (
+                            <div className="roster-mod-presets-row">
+                              <span className="roster-mod-presets-label">
+                                <Icon name="box" size={12} />
+                                预设:
+                              </span>
+                              {isLoadingPresets && presets.length === 0 ? (
+                                <span className="muted small">加载中…</span>
+                              ) : presets.length === 0 ? (
+                                <span className="muted small">默认初始</span>
+                              ) : (
+                                <>
+                                  <select
+                                    className="roster-mod-preset-select"
+                                    value={assignedItem?.presetId || '__default__'}
+                                    onChange={(e) =>
+                                      handleModPresetChange(char.folder, mod.name, e.target.value)
+                                    }
+                                    title="选择该方案生效时此 Mod 所应用的变体预设"
+                                  >
+                                    {presets.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.id === '__default__' ? `默认 (${p.name})` : p.name}
+                                        {p.isActive ? ' · 当前实机' : ''}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    className="roster-preset-apply-btn"
+                                    title="在游戏内立即切换至该预设并热重载（现场试穿）"
+                                    onClick={() =>
+                                      void handleApplySingleModPreset(
+                                        char.folder,
+                                        mod,
+                                        assignedItem?.presetId || presets[0]?.id || '__default__'
+                                      )
+                                    }
+                                  >
+                                    <Icon name="refresh" size={11} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
