@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   Bootstrap,
   CharacterInfo,
@@ -30,6 +30,17 @@ export function OverlayApp() {
   const [showPresetDrawer, setShowPresetDrawer] = useState(false)
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
+  const [showBenchmark, setShowBenchmark] = useState(false)
+  const [benchmarkStatus, setBenchmarkStatus] = useState<'idle' | 'running' | 'finished'>('idle')
+  const [benchmarkElapsed, setBenchmarkElapsed] = useState(0)
+  const benchmarkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const benchmarkStartRef = useRef<number>(0)
+
+  useEffect(() => {
+    return () => {
+      if (benchmarkTimerRef.current) clearInterval(benchmarkTimerRef.current)
+    }
+  }, [])
 
 
   useEffect(() => {
@@ -116,6 +127,14 @@ export function OverlayApp() {
             if (active) setMods(nextMods)
           } else {
             setMods([])
+          }
+
+          // 关键：实时同步全角色池方案列表
+          try {
+            const latestPresets = await window.moddeck.getRosterPresets(data.snapshot.game.id)
+            if (active) setRosterPresets(latestPresets)
+          } catch {
+            // ignore
           }
         } catch {
           // ignore background sync errors
@@ -492,6 +511,104 @@ export function OverlayApp() {
           </div>
         </div>
       ) : null}
+
+      {showBenchmark ? (
+        <div className="overlay-preset-drawer" style={{ maxHeight: '280px' }}>
+          <div className="overlay-preset-head">
+            <strong>⏱️ 浮动实机重载测速校准</strong>
+            <button className="icon-btn" onClick={() => setShowBenchmark(false)}>
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+          <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {benchmarkStatus === 'idle' ? (
+              <>
+                <div className="muted small" style={{ lineHeight: 1.5 }}>
+                  浮于游戏窗口之上直接测量，<strong>杜绝 Alt+Tab 切屏反应误差</strong>！
+                </div>
+                <div style={{ fontSize: '12px', background: 'rgba(255,255,255,0.04)', padding: '8px 10px', borderRadius: '4px' }}>
+                  点击下方「开始测速」，ModDeck 将向游戏发送 F10。请直接观察下方游戏画面，当重载卡顿结束、画面恢复流畅时，立即点击「停止计时」！
+                </div>
+                <button
+                  className="btn primary small-btn"
+                  style={{ alignSelf: 'flex-end', marginTop: '4px' }}
+                  onClick={async () => {
+                    setBenchmarkStatus('running')
+                    setBenchmarkElapsed(0)
+                    benchmarkStartRef.current = Date.now()
+                    benchmarkTimerRef.current = setInterval(() => {
+                      setBenchmarkElapsed((Date.now() - benchmarkStartRef.current) / 1000)
+                    }, 50)
+                    try {
+                      await window.moddeck.reloadF10()
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                >
+                  开始测速 (触发 F10)
+                </button>
+              </>
+            ) : benchmarkStatus === 'running' ? (
+              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <div className="muted small" style={{ marginBottom: '6px' }}>
+                  已向游戏发送 F10，正在重载计时...
+                </div>
+                <div style={{ fontSize: '36px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--accent, #6366f1)' }}>
+                  {benchmarkElapsed.toFixed(1)}s
+                </div>
+                <button
+                  className="btn primary"
+                  style={{ width: '100%', height: '36px', marginTop: '10px', fontWeight: 600 }}
+                  onClick={() => {
+                    if (benchmarkTimerRef.current) clearInterval(benchmarkTimerRef.current)
+                    benchmarkTimerRef.current = null
+                    const duration = Math.max(0.1, (Date.now() - benchmarkStartRef.current) / 1000)
+                    setBenchmarkElapsed(duration)
+                    setBenchmarkStatus('finished')
+                  }}
+                >
+                  ⏱️ 画面已恢复流畅，停止计时
+                </button>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '6px 0' }}>
+                <div className="muted small">实测游戏重载耗时</div>
+                <div style={{ fontSize: '26px', fontWeight: 700, fontFamily: 'monospace', margin: '4px 0' }}>
+                  {benchmarkElapsed.toFixed(2)} 秒
+                </div>
+                <div style={{ fontSize: '13px', margin: '8px 0', padding: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                  推荐缓冲延迟：<strong style={{ color: 'var(--accent, #6366f1)' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} 秒</strong>
+                  <span className="muted small" style={{ display: 'block', marginTop: '2px' }}>
+                    （实测耗时 + 1.5s 安全余量）
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button
+                    className="btn ghost small-btn"
+                    onClick={() => {
+                      setBenchmarkStatus('idle')
+                      setBenchmarkElapsed(0)
+                    }}
+                  >
+                    重新测速
+                  </button>
+                  <button
+                    className="btn primary small-btn"
+                    onClick={async () => {
+                      const rec = Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))
+                      await window.moddeck.saveSettings({ ui: { postReloadSyncDelay: rec } })
+                      setShowBenchmark(false)
+                    }}
+                  >
+                    应用推荐值 ({Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))}s)
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
       <footer className="overlay-foot">
         <span className="muted">
           快捷键 {boot?.settings.ui.overlayHotkey || '未设置'} · Esc 隐藏
@@ -499,10 +616,28 @@ export function OverlayApp() {
         <div className="overlay-foot-actions">
           <button
             className={`btn ghost small-btn${showPresetDrawer ? ' active' : ''}`}
-            onClick={() => setShowPresetDrawer(!showPresetDrawer)}
+            onClick={() => {
+              setShowPresetDrawer(!showPresetDrawer)
+              if (!showPresetDrawer && snapshot) {
+                window.moddeck.getRosterPresets(snapshot.game.id).then(setRosterPresets).catch(() => undefined)
+              }
+              setShowBenchmark(false)
+            }}
             title="一键切换全角色池方案"
           >
             方案 ({rosterPresets.length})
+          </button>
+          <button
+            className={`btn ghost small-btn${showBenchmark ? ' active' : ''}`}
+            onClick={() => {
+              setShowBenchmark(!showBenchmark)
+              setBenchmarkStatus('idle')
+              setBenchmarkElapsed(0)
+              setShowPresetDrawer(false)
+            }}
+            title="浮动实机测速：无需切屏，直接观察游戏重载并精确校准缓冲延迟"
+          >
+            ⏱️ 测速
           </button>
           <button
             className={`btn ghost small-btn${pendingCount > 0 ? ' btn-pending-pulse' : ''}`}

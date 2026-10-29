@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type {
   CharacterModAssignment,
   GameDef,
@@ -296,6 +296,36 @@ export function RosterPresetModal({
     }
   }
 
+  // 计算当前工作台配置是否与已有的某个方案完全一致
+  const matchingExistingPreset = useMemo(() => {
+    const normalize = (assignments: Record<string, CharacterModAssignment>) => {
+      const entries: Array<{ charFolder: string; modName: string; presetId: string }> = []
+      for (const [charFolder, assign] of Object.entries(assignments)) {
+        const items = getAssignmentModItems(assign)
+        for (const item of items) {
+          if (!item.modName) continue
+          entries.push({
+            charFolder,
+            modName: item.modName.toLowerCase(),
+            presetId: item.presetId || '__default__'
+          })
+        }
+      }
+      entries.sort((a, b) => (a.charFolder + a.modName).localeCompare(b.charFolder + b.modName))
+      return JSON.stringify(entries)
+    }
+
+    const currentKey = normalize(selectedAssignments)
+    if (currentKey === '[]') return null
+
+    for (const p of presets) {
+      if (normalize(p.assignments) === currentKey) {
+        return p
+      }
+    }
+    return null
+  }, [selectedAssignments, presets])
+
   // 点击方案标签：载入方案至工作台查看并应用
   const handleInspectPreset = (preset: RosterPreset) => {
     setActivePresetId(preset.id)
@@ -445,7 +475,13 @@ export function RosterPresetModal({
             <strong>已存方案 ({presets.length})</strong>
             <button
               className="btn small-btn primary"
+              disabled={!showCreateForm && Boolean(matchingExistingPreset)}
               onClick={() => setShowCreateForm(!showCreateForm)}
+              title={
+                matchingExistingPreset
+                  ? `当前配置与方案「${matchingExistingPreset.name}」完全一致，无需重复保存`
+                  : '将当前工作台配置保存为新方案'
+              }
             >
               <Icon name="plus" size={14} />
               {showCreateForm ? '取消' : '存为新方案'}
@@ -466,8 +502,13 @@ export function RosterPresetModal({
               />
               <button
                 className="btn primary small-btn"
-                disabled={saving}
+                disabled={saving || Boolean(matchingExistingPreset)}
                 onClick={() => void handleSavePreset()}
+                title={
+                  matchingExistingPreset
+                    ? `当前配置已与方案「${matchingExistingPreset.name}」完全一致`
+                    : undefined
+                }
               >
                 {saving ? '保存中…' : '保存当前配置'}
               </button>
@@ -497,9 +538,8 @@ export function RosterPresetModal({
                       className="roster-preset-chip-btn"
                       onClick={() => {
                         handleInspectPreset(p)
-                        void handleApplyPreset(p)
                       }}
-                      title={`应用「${p.name}」并刷新（单击也可在下方查看/调校配置）`}
+                      title={`在下方工作台查看/调校「${p.name}」配置`}
                     >
                       <span className="preset-dot" />
                       <span style={{ minWidth: 0, overflow: 'hidden' }}>

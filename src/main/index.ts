@@ -374,13 +374,7 @@ function refreshModsWatcher(): void {
           watchDebounceTimer = setTimeout(() => {
             watchDebounceTimer = null
             const gId = settings?.activeGameId
-            // 关键双向闭环：若当前队列中有待生效预设，且游戏主动写回了 d3dx_user.ini，
-            // 说明玩家在游戏内按下了物理按键触发了 F10 重载（3DMigoto 重载时触发了 SavePersistentSettings），
-            // 此时自动将队列标记为 reloading 并排期 post-reload sync 补写与清理 bridge！
-            if (getPendingPresetCount(gId) > 0) {
-              markPendingQueueReloading(gId)
-              schedulePostReloadPresetSync(gId)
-            }
+            // 仅感知变量变化并向 UI 广播状态，绝不在定时自动刷盘时误删或误结待生效队列
             broadcastStateChanged({ gameId: gId })
           }, 280)
         })
@@ -2082,48 +2076,6 @@ function registerIpc(): void {
         targetModDir = path.join(characterDir, altFolder)
       }
 
-      // 保存预设前先确保桥接文件处于静默态，避免旧桥接干扰
-      if (postReloadBridgeTimer) {
-        clearTimeout(postReloadBridgeTimer)
-        postReloadBridgeTimer = null
-      }
-      clearPendingPresetQueue(gameId)
-      await clearPresetBridgeIni(gameSettings.modsPath)
-
-      // 若游戏正在运行且允许热键发送，先触发一次 F10 让 3DMigoto 将当前内存变量实时刷入 d3dx_user.ini（<200ms 完成落盘）
-      if (settings.ui.allowHotkeySend && (await isGameRunning())) {
-        const userIni = await findD3dxUserIniPath(gameSettings.modsPath)
-        let prevMtime = 0
-        if (userIni) {
-          try {
-            prevMtime = fsSync.statSync(userIni).mtimeMs
-          } catch {
-            prevMtime = 0
-          }
-        }
-        const hotkey = (settings.ui.reloadHotkey || 'F10').trim() || 'F10'
-        const plan = toKeyPlan(hotkey)
-        if (plan) {
-          markInternalFsMutation()
-          await executeKeyPlan(plan)
-          if (userIni) {
-            const deadline = Date.now() + 1500
-            while (Date.now() < deadline) {
-              await new Promise((r) => setTimeout(r, 80))
-              try {
-                const curMtime = fsSync.statSync(userIni).mtimeMs
-                if (curMtime > prevMtime) {
-                  await new Promise((r) => setTimeout(r, 120))
-                  break
-                }
-              } catch {
-                // ignore
-              }
-            }
-          }
-        }
-      }
-
       const res = await saveModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, gameSettings.modsPath, presetName)
       if (res.ok) {
         broadcastStateChanged({ gameId, characterFolder })
@@ -2180,7 +2132,11 @@ function registerIpc(): void {
     IPC.saveRosterPreset,
     async (gameId: GameId, input: SaveRosterPresetInput) => {
       requireGame(gameId)
-      return saveRosterPreset(baseDir(), gameId, input)
+      const res = await saveRosterPreset(baseDir(), gameId, input)
+      if (res.ok) {
+        broadcastStateChanged({ gameId })
+      }
+      return res
     }
   )
 
@@ -2228,7 +2184,11 @@ function registerIpc(): void {
     IPC.deleteRosterPreset,
     async (gameId: GameId, presetId: string) => {
       requireGame(gameId)
-      return deleteRosterPreset(baseDir(), gameId, presetId)
+      const res = await deleteRosterPreset(baseDir(), gameId, presetId)
+      if (res.ok) {
+        broadcastStateChanged({ gameId })
+      }
+      return res
     }
   )
 
