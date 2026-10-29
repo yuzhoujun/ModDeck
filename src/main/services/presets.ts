@@ -47,6 +47,7 @@ export interface PendingPresetEntry {
   modsPath: string
   variables: Record<string, string>
   updatedAt: number
+  status?: 'pending' | 'reloading'
 }
 
 // 内存中的待生效聚合队列：Key 为 `${gameId}:${characterFolder.toLowerCase()}:${cleanModName.toLowerCase()}`
@@ -60,6 +61,18 @@ function makeQueueKey(gameId: GameId, characterFolder: string, modFolder: string
 /**
  * 获取当前游戏待生效（等待手动 F10）的预设数量
  */
+/**
+ * 将待生效队列标记为正在重载生效中（触发乐观内存缓存）
+ */
+export function markPendingQueueReloading(gameId?: GameId): void {
+  const prefix = gameId ? `${gameId}:` : ''
+  for (const [key, entry] of pendingPresetQueue.entries()) {
+    if (!prefix || key.startsWith(prefix)) {
+      entry.status = 'reloading'
+    }
+  }
+}
+
 export function getPendingPresetCount(gameId?: GameId): number {
   if (!gameId) return pendingPresetQueue.size
   let count = 0
@@ -627,6 +640,13 @@ export async function getModPresets(
   const queueKey = makeQueueKey(gameId, characterFolder, modFolder)
   const pendingEntry = pendingPresetQueue.get(queueKey)
 
+  // 内存乐观缓存：若正在执行重载生效阶段（status === 'reloading'），将目标预设变量直接融入当前有效变量中
+  if (pendingEntry && pendingEntry.status === 'reloading') {
+    for (const [k, v] of Object.entries(pendingEntry.variables)) {
+      currentEffectiveVars[k.toLowerCase()] = v
+    }
+  }
+
   // 确保存在「默认 (初始)」出厂预设，并始终同步最新解析出的 persist 默认变量
   let defaultPreset = list.find((p) => p.id === '__default__')
   let listModified = false
@@ -669,7 +689,7 @@ export async function getModPresets(
   // 计算每一个预设的 isActive 与 isPending 状态
   for (const p of list) {
     p.isActive = evaluatePresetActive(p, currentActiveInis, currentEffectiveVars)
-    p.isPending = Boolean(pendingEntry && pendingEntry.presetId === p.id)
+    p.isPending = Boolean(pendingEntry && pendingEntry.status !== 'reloading' && pendingEntry.presetId === p.id)
   }
 
   return list
@@ -821,7 +841,8 @@ export async function applyModPreset(
       cleanModName,
       modsPath,
       variables: mergedVars,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      status: 'pending'
     })
 
     // 全量合成写入全局 bridge.ini
