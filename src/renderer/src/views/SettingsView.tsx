@@ -298,7 +298,7 @@ export function SettingsView({
             {saveStatus === 'saving'
               ? '正在自动保存…'
               : saveStatus === 'saved'
-                ? '✓ 已自动保存'
+                ? '已自动保存'
                 : '修改即自动生效'}
           </span>
         </div>
@@ -357,6 +357,27 @@ export function SettingsView({
               />
               <span>允许点击热键发送到游戏（游戏需要在前台）</span>
             </label>
+
+            <div className="field" style={{ marginTop: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600 }}>快捷窗口最近使用 Mod 栏展示数量</span>
+                <span className="badge" style={{ fontSize: '12px', fontWeight: 700, padding: '2px 8px' }}>
+                  {draft.ui.recentModCount} 个
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="15"
+                step="1"
+                value={draft.ui.recentModCount}
+                onChange={(event) => updateUi({ recentModCount: Number(event.target.value) }, true)}
+                style={{ width: '100%' }}
+              />
+              <span className="muted small" style={{ marginTop: '4px', fontSize: '12px', lineHeight: '1.5' }}>
+                在游戏内浮动快捷窗口顶部展示的最近操作 Mod 快捷胶囊数量（设为 0 则在快捷窗口中完全隐藏最近使用栏）。
+              </span>
+            </div>
           </section>
 
           <section className="section">
@@ -443,6 +464,36 @@ export function SettingsView({
                 </span>
               </label>
 
+              {(draft.ui.autoReloadModPreset === false || draft.ui.autoReloadRosterPreset === false) && (
+                <div
+                  className="alert-box warning"
+                  style={{
+                    margin: '8px 0',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(234, 179, 8, 0.1)',
+                    border: '1px solid rgba(234, 179, 8, 0.3)',
+                    color: '#facc15',
+                    fontSize: '12px',
+                    lineHeight: '1.6'
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Icon name="info" size={14} />
+                    <span>⚠️ 手动重载模式生效特别提醒</span>
+                  </div>
+                  <div>
+                    您已关闭部分预设自动重载。挑选预设后，造型变量已预写入集中桥接文件，但<strong>实机画面仍需一次重载才能呈现</strong>。
+                  </div>
+                  <div style={{ marginTop: '4px' }}>
+                    • <strong>强烈推荐重载方式</strong>：在游戏内按快捷键（默认 <code>{draft.ui.overlayHotkey || 'Alt+Shift+M'}</code>）呼出浮动快捷窗口，点击底部 <strong>「● 立即生效 (N)」</strong> 按钮。ModDeck 将启动安全缓冲同步，自动清空排队指示灯并保全冷启动数据。
+                  </div>
+                  <div style={{ marginTop: '4px' }}>
+                    • <strong>物理 F10 疑问说明</strong>：若您在游戏内直接按键盘物理 <code>F10</code>，游戏画面会<strong>立即变身换装生效</strong>（一次性帧桥接已生效），但 ModDeck UI 状态不会自动猜键转绿。建议随时呼出快捷窗口点击生效，让指示灯与磁盘完全同步闭环。
+                  </div>
+                </div>
+              )}
+
               <div className="field" style={{ marginTop: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                   <span>3DMigoto 运行时变量自动刷盘间隔</span>
@@ -486,7 +537,10 @@ export function SettingsView({
 
               <div className="field" style={{ marginTop: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span>3DMigoto 重载缓冲同步延迟</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>3DMigoto 重载缓冲同步延迟</span>
+                    <span className="tag ok" style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '4px' }}>纯热生效 · 无需重载</span>
+                  </div>
                   <span className="muted small">当前: {draft.ui.postReloadSyncDelay ?? 6}s</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -516,22 +570,11 @@ export function SettingsView({
                     <span>测速校准</span>
                   </button>
                 </div>
-                <span className="muted small" style={{ marginTop: '4px' }}>
-                  F10 重载后 ModDeck 等待游戏编译 Shader 及跨入渲染帧的缓冲时间（之后自动补写持久化配置并清除桥接）。Mod 库较大（10s+）请适度调大；亦可点击「测速校准」自动测量。
+                <span className="muted small" style={{ marginTop: '4px', lineHeight: '1.5' }}>
+                  💡 该参数为 ModDeck 内部的异步等待定时器，纯内存热生效，修改后无需按 F10 或重启游戏，下一次重载立刻按照新设时长计时。F10 重载后 ModDeck 等待游戏编译 Shader 及跨入渲染帧的缓冲时间（之后自动补写持久化配置并清除桥接）。Mod 库较大（10s+）请适度调大；亦可点击「测速校准」自动测量。
                 </span>
               </div>
             </div>
-            <label className="field">
-              <span>最近使用 Mod 数量：{draft.ui.recentModCount}</span>
-              <input
-                type="range"
-                min="0"
-                max="15"
-                step="1"
-                value={draft.ui.recentModCount}
-                onChange={(event) => updateUi({ recentModCount: Number(event.target.value) }, true)}
-              />
-            </label>
           </section>
 
           <section className="section">

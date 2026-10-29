@@ -13,6 +13,12 @@ import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { ScrollTitle } from './ScrollTitle'
 
+export function isUtilityCategory(char: { displayName: string; folder: string; kind?: string }): boolean {
+  if (char.kind === 'utility') return true
+  const testStr = `${char.displayName} ${char.folder}`
+  return /(?:UI|界面|功能|工具|其他|其它|世界|大世界|NPC|武器|Weapon|Glider|Vehicle|Others?|Tools?|Function|OpenWorld)/i.test(testStr)
+}
+
 export function RosterPresetModal({
   game,
   snapshot,
@@ -38,6 +44,7 @@ export function RosterPresetModal({
   const [loadingPresetsMap, setLoadingPresetsMap] = useState<Record<string, boolean>>({})
   const [charFilter, setCharFilter] = useState('')
   const [activePresetId, setActivePresetId] = useState<string | null>(null)
+  const [activePoolTab, setActivePoolTab] = useState<'character' | 'utility' | 'all'>('character')
   const [showDirtyWarningModal, setShowDirtyWarningModal] = useState(false)
   const [dirtyWarningList, setDirtyWarningList] = useState<{ charName: string; modName: string }[]>([])
 
@@ -452,6 +459,94 @@ export function RosterPresetModal({
     )
   })
 
+  const { charPool, utilPool } = useMemo(() => {
+    const chars: typeof validCharacters = []
+    const utils: typeof validCharacters = []
+    for (const c of validCharacters) {
+      if (isUtilityCategory(c)) {
+        utils.push(c)
+      } else {
+        chars.push(c)
+      }
+    }
+    return { charPool: chars, utilPool: utils }
+  }, [validCharacters])
+
+  const displayedCharacters = useMemo(() => {
+    if (activePoolTab === 'character') return charPool
+    if (activePoolTab === 'utility') return utilPool
+    return validCharacters
+  }, [activePoolTab, charPool, utilPool, validCharacters])
+
+  // 一键全部不启用（保持原生）
+  const handleBatchSetNative = (targetChars: typeof validCharacters) => {
+    setSelectedAssignments((prev) => {
+      const next = { ...prev }
+      for (const char of targetChars) {
+        next[char.folder] = { mods: [] }
+      }
+      return next
+    })
+    const poolName = activePoolTab === 'character' ? '角色分池' : activePoolTab === 'utility' ? '其他/功能UI分池' : '全池'
+    onNotify?.(`已将${poolName}（${targetChars.length} 项）设置为全部保持原生`, 'info')
+  }
+
+  // 一键选中当前实机使用中的预设
+  const handleBatchSetCurrentActive = (targetChars: typeof validCharacters) => {
+    setSelectedAssignments((prev) => {
+      const next = { ...prev }
+      for (const char of targetChars) {
+        const charMods = characterModsMap[char.folder] || []
+        const enabledMods = charMods.filter((m) => m.enabled)
+        if (enabledMods.length === 0) {
+          next[char.folder] = { mods: [] }
+          continue
+        }
+        const items: ModAssignmentItem[] = enabledMods.map((m) => {
+          const key = `${char.folder}::${m.name}`
+          const cached = modPresetsMap[key]
+          const activeP = cached?.find((p) => p.isActive)
+          return {
+            modName: m.name,
+            presetId: activeP ? activeP.id : '__default__'
+          }
+        })
+        next[char.folder] = {
+          modName: items[0]?.modName,
+          presetId: items[0]?.presetId,
+          mods: items
+        }
+      }
+      return next
+    })
+    setCharModes((prev) => {
+      const next = { ...prev }
+      for (const char of targetChars) {
+        const charMods = characterModsMap[char.folder] || []
+        const enabledCount = charMods.filter((m) => m.enabled).length
+        next[char.folder] = enabledCount > 1 ? 'multi' : 'single'
+      }
+      return next
+    })
+    const poolName = activePoolTab === 'character' ? '角色分池' : activePoolTab === 'utility' ? '其他/功能UI分池' : '全池'
+    onNotify?.(`已将${poolName}（${targetChars.length} 项）恢复为游戏当前实机配置`, 'ok')
+  }
+
+  // 快捷键监听：Alt+U 一键不启用，Alt+R 一键选中使用中
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && e.key.toLowerCase() === 'u') {
+        e.preventDefault()
+        handleBatchSetNative(displayedCharacters)
+      } else if (e.altKey && e.key.toLowerCase() === 'r') {
+        e.preventDefault()
+        handleBatchSetCurrentActive(displayedCharacters)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [displayedCharacters, characterModsMap, modPresetsMap, activePoolTab])
+
   return (
     <Modal
       title={`角色池预设方案管理 · ${game.shortName}`}
@@ -572,14 +667,81 @@ export function RosterPresetModal({
             <strong>角色 Mod 与变体预设方案配置</strong>
             <input
               className="input roster-search-input"
-              placeholder="快速过滤角色…"
+              placeholder="快速过滤角色/分类…"
               value={charFilter}
               onChange={(e) => setCharFilter(e.target.value)}
             />
           </div>
 
+          {/* 分池切换栏与快捷操作工具条 */}
+          <div className="roster-pool-tabs-bar">
+            <div className="roster-pool-tabs">
+              <button
+                type="button"
+                className={`roster-pool-tab${activePoolTab === 'character' ? ' is-active' : ''}`}
+                onClick={() => setActivePoolTab('character')}
+              >
+                🎭 角色预设 ({charPool.length})
+              </button>
+              <button
+                type="button"
+                className={`roster-pool-tab${activePoolTab === 'utility' ? ' is-active' : ''}`}
+                onClick={() => setActivePoolTab('utility')}
+              >
+                🧩 功能/UI/其他 ({utilPool.length})
+              </button>
+              <button
+                type="button"
+                className={`roster-pool-tab${activePoolTab === 'all' ? ' is-active' : ''}`}
+                onClick={() => setActivePoolTab('all')}
+              >
+                📋 全部 ({validCharacters.length})
+              </button>
+            </div>
+
+            <div className="roster-pool-actions">
+              <button
+                type="button"
+                className="roster-pool-btn"
+                onClick={() => handleBatchSetNative(displayedCharacters)}
+                title="将当前分池中全部项目设置为不启用任何 Mod（保持游戏原生）[快捷键 Alt+U]"
+              >
+                <Icon name="close" size={12} />
+                <span>一键全部不启用</span>
+                <kbd className="kbd-shortcut">Alt+U</kbd>
+              </button>
+              <button
+                type="button"
+                className="roster-pool-btn primary-ghost"
+                onClick={() => handleBatchSetCurrentActive(displayedCharacters)}
+                title="将当前分池中全部项目恢复为游戏实机当前正在使用的 Mod 与预设 [快捷键 Alt+R]"
+              >
+                <Icon name="refresh" size={12} />
+                <span>一键选中当前使用中</span>
+                <kbd className="kbd-shortcut">Alt+R</kbd>
+              </button>
+            </div>
+          </div>
+
           <div className="roster-characters-grid">
-            {validCharacters.map((char) => {
+            {displayedCharacters.length === 0 ? (
+              <div
+                style={{
+                  gridColumn: '1 / -1',
+                  textAlign: 'center',
+                  padding: '36px 12px',
+                  color: 'var(--text-muted)',
+                  fontSize: '13px'
+                }}
+              >
+                {charFilter
+                  ? '未找到匹配的项目'
+                  : activePoolTab === 'character'
+                    ? '当前分池暂无角色类 Mod'
+                    : '当前分池暂无功能/UI/其他类 Mod'}
+              </div>
+            ) : (
+              displayedCharacters.map((char) => {
               const charMods = characterModsMap[char.folder] || []
               const mode = charModes[char.folder] || 'single'
               const assignedItems = getAssignmentModItems(selectedAssignments[char.folder])
@@ -757,7 +919,8 @@ export function RosterPresetModal({
                   </div>
                 </div>
               )
-            })}
+            })
+            )}
           </div>
         </div>
       </div>

@@ -2192,6 +2192,100 @@ code {
   font-size: 12px;
 }
 
+.roster-pool-tabs-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.roster-pool-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.roster-pool-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.roster-pool-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.roster-pool-tab.is-active {
+  background: var(--bg-card);
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.3);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.roster-pool-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roster-pool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.roster-pool-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.roster-pool-btn.primary-ghost {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.3);
+}
+
+.roster-pool-btn.primary-ghost:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: #bfdbfe;
+  border-color: #60a5fa;
+}
+
+.kbd-shortcut {
+  display: inline-block;
+  padding: 1px 4px;
+  font-size: 10px;
+  font-family: inherit;
+  line-height: 1;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
 .roster-characters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
