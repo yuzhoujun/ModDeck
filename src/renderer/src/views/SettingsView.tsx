@@ -277,9 +277,9 @@ export function SettingsView({
     <div className="view">
       <header className="view-head">
         <div>
-          <div className="eyebrow">设置</div>
+          <div className="eyebrow">首选项</div>
           <h1>设置</h1>
-          <p className="muted">通用、游戏路径、导入行为和本地数据。所有改动自动保存在本机。</p>
+          <p className="muted">通用行为、游戏路径、环境检测与导入设置。所有改动实时自动保存在本机。</p>
         </div>
         <div className="actions">
           <div className={`settings-saved-pill ${saveStatus}`}>
