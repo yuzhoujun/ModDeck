@@ -3,6 +3,7 @@ import type { CharacterInfo } from '../../../shared/types'
 import { CoverCropper } from './CoverCropper'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
+import { useI18n } from '../i18n'
 
 export function EditCharacterModal({
   character,
@@ -19,6 +20,7 @@ export function EditCharacterModal({
   onSaveCover: (dataUrl: string) => Promise<void>
   onRemoveCover: () => Promise<void>
 }) {
+  const { t } = useI18n()
   const [name, setName] = useState(character.displayName)
   const [aliases, setAliases] = useState(character.aliases.join('，'))
   const [order, setOrder] = useState(
@@ -51,11 +53,11 @@ export function EditCharacterModal({
   function chooseFile(file: File | undefined) {
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      setCoverError('请选择图片文件')
+      setCoverError(t('character.errSelectImage'))
       return
     }
     if (file.size > 15 * 1024 * 1024) {
-      setCoverError('图片过大（>15MB）')
+      setCoverError(t('character.errImageTooLarge'))
       return
     }
     setCoverError(null)
@@ -90,20 +92,14 @@ export function EditCharacterModal({
   return (
     <>
       <Modal
-        title="编辑角色"
+        title={t('character.editModalTitle')}
         onClose={onClose}
         footer={
           <>
-            <button className="btn ghost" onClick={onReset} disabled={saving || coverBusy}>
-              恢复默认
-            </button>
+            <button className="btn ghost" onClick={onReset} disabled={saving || coverBusy}>{t('character.restoreDefault')}</button>
             <div className="grow" />
-            <button className="btn ghost" onClick={onClose} disabled={saving || coverBusy}>
-              取消
-            </button>
-            <button className="btn primary" onClick={save} disabled={saving || coverBusy}>
-              保存
-            </button>
+            <button className="btn ghost" onClick={onClose} disabled={saving || coverBusy}>{t('common.cancel')}</button>
+            <button className="btn primary" onClick={save} disabled={saving || coverBusy}>{t('common.save')}</button>
           </>
         }
       >
@@ -126,14 +122,14 @@ export function EditCharacterModal({
             ) : (
               <div className="cover-placeholder">
                 <Icon name="image" size={26} />
-                <span>拖入图片</span>
+                <span>{t('character.dropImage')}</span>
               </div>
             )}
           </div>
           <div className="cover-side">
-            <strong>角色封面</strong>
+            <strong>{t('character.coverTitle')}</strong>
             <p className="muted small">
-              拖入图片，或点击选择；会裁剪成 1:1 并保存为角色目录下的
+              {t('character.coverDesc')}
               <code>.preview.png</code>。
             </p>
             <div className="row">
@@ -142,14 +138,10 @@ export function EditCharacterModal({
                 onClick={() => fileInput.current?.click()}
                 disabled={coverBusy}
               >
-                <Icon name="image" size={15} />
-                选择图片
-              </button>
+                <Icon name="image" size={15} />{t('character.selectImage')}</button>
               {coverPreview ? (
                 <button className="btn ghost danger-text" onClick={removeCover} disabled={coverBusy}>
-                  <Icon name="trash" size={15} />
-                  移除
-                </button>
+                  <Icon name="trash" size={15} />{t('character.removeCover')}</button>
               ) : null}
             </div>
             {coverError ? <div className="error-text">{coverError}</div> : null}
@@ -167,7 +159,7 @@ export function EditCharacterModal({
         </div>
 
         <label className="field">
-          <span>显示名称</span>
+          <span>{t('character.displayNameLabel')}</span>
           <input
             className="input"
             value={name}
@@ -176,16 +168,16 @@ export function EditCharacterModal({
           />
         </label>
         <label className="field">
-          <span>别名（用逗号分隔，用于搜索和合并中英日名）</span>
+          <span>{t('character.aliasesEditLabel')}</span>
           <input
             className="input"
             value={aliases}
             onChange={(event) => setAliases(event.target.value)}
-            placeholder="例如 Aemeath，爱弥斯"
+            placeholder={t('character.aliasesEditPlaceholder')}
           />
         </label>
         <label className="field">
-          <span>排序权重（越小越靠前，可留空）</span>
+          <span>{t('character.orderLabel')}</span>
           <input
             className="input"
             value={order}
@@ -194,7 +186,7 @@ export function EditCharacterModal({
           />
         </label>
         <p className="muted small">
-          目录名 <code>{character.folder}</code> 不会改变，只影响显示和搜索。
+          <span>{character.folder}</span> {t('character.editTip', { folder: '' })}
         </p>
       </Modal>
 

@@ -174,7 +174,7 @@ export default function App() {
 
   async function refreshSnapshot(gameId: GameId): Promise<GameSnapshot> {
     const snap = await window.moddeck.scanGame(gameId)
-    if (!snap) throw new Error('扫描失败')
+    if (!snap) throw new Error(t('common.scanFailed'))
     setSnapshot(snap)
     return snap
   }
@@ -241,7 +241,7 @@ export default function App() {
         exclusive
       )
       if (!result.ok) {
-        notify(result.error || '切换失败', 'err')
+        notify(result.error || t('common.switchFailed'), 'err')
         await loadModsFor(gameId, selected)
         return
       }
@@ -257,7 +257,7 @@ export default function App() {
 
   async function deleteMod(mod: ModInfo) {
     if (!selected || !snapshot) return
-    if (!window.confirm(`确定把「${mod.name}」移到回收站？`)) return
+    if (!window.confirm(t('common.confirmDeleteMod', { name: mod.name }))) return
     try {
       const result = await window.moddeck.deleteMod(
         snapshot.game.id,
@@ -265,7 +265,7 @@ export default function App() {
         mod.folderName
       )
       if (!result.ok) {
-        notify(result.error || '删除失败', 'err')
+        notify(result.error || t('common.deleteFailed'), 'err')
         return
       }
       setMods((list) => list.filter((item) => item.folderName !== mod.folderName))
@@ -290,7 +290,7 @@ export default function App() {
   async function openImportPreview(paths: string[], targetCharacter?: string) {
     if (!snapshot || paths.length === 0) return
     if (!snapshot.modsPathExists) {
-      notify('请先在设置里配置当前游戏的 Mods 目录', 'err')
+      notify(t('common.modsDirNotConfigured'), 'err')
       return
     }
     setBusy(true)
@@ -302,7 +302,7 @@ export default function App() {
       })
       if (parsed.candidates.length === 0) {
         await window.moddeck.importDiscard(parsed.sessionId)
-        const msg = parsed.errors[0]?.message || '未在所选内容中找到可导入的 Mod'
+        const msg = parsed.errors[0]?.message || t('common.noModsFoundInImport')
         notify(msg, 'err')
         return
       }
@@ -341,14 +341,14 @@ export default function App() {
       if (result.importedMods > 0) {
         const created =
           result.createdCharacters.length > 0
-            ? `，新增角色：${result.createdCharacters.join('、')}`
+            ? t('common.createdCharactersSummary', { chars: result.createdCharacters.join('、') })
             : ''
-        notify(`已导入 ${result.importedMods} 个 Mod${created}`)
+        notify(t('common.importedModsSummary', { count: result.importedMods, created }))
       }
       if (failed.length > 0) {
-        notify(failed[0].message || '部分文件导入失败', 'err')
+        notify(failed[0].message || t('common.someImportsFailed'), 'err')
       } else if (result.importedMods === 0) {
-        notify('没有导入任何内容', 'info')
+        notify(t('common.noContentImported'), 'info')
       }
       const snap = await refreshSnapshot(gameId)
       if (view === 'character' && selected) {
@@ -423,7 +423,7 @@ export default function App() {
         setSelected(updated)
       }
       setEditing(null)
-      notify('角色信息已保存')
+      notify(t('common.characterSaved'))
     } catch (error) {
       notify(errorMessage(error), 'err')
     }
@@ -442,7 +442,7 @@ export default function App() {
         setSelected(updated)
       }
       setEditing(null)
-      notify('已恢复默认')
+      notify(t('common.restoredDefault'))
     } catch (error) {
       notify(errorMessage(error), 'err')
     }
@@ -453,7 +453,7 @@ export default function App() {
     try {
       const result = await window.moddeck.setCharacterCover(snapshot.game.id, selected.folder)
       if (!result.ok) {
-        if (result.error !== '已取消') notify(result.error || '设置封面失败', 'err')
+        if (result.error !== '已取消' && result.error !== 'Canceled') notify(result.error || t('common.setCoverFailed'), 'err')
         return
       }
       const snap = await refreshSnapshot(snapshot.game.id)
@@ -477,7 +477,7 @@ export default function App() {
       setSelected(updated)
       setEditing(updated)
     }
-    notify('封面已保存')
+    notify(t('common.coverSaved'))
   }
 
   async function removeCharacterCover() {
@@ -489,7 +489,7 @@ export default function App() {
       setSelected(updated)
       setEditing(updated)
     }
-    notify('封面已移除')
+    notify(t('common.coverRemoved'))
   }
 
   async function createCharacter(input: {
@@ -509,7 +509,7 @@ export default function App() {
       setView('character')
       await loadModsFor(snap.game.id, created)
     }
-    notify(`已创建 ${created?.displayName || input.folder}`)
+    notify(t('common.characterCreated', { name: created?.displayName || input.folder }))
   }
 
   async function setModsEnabled(folders: string[], enable: boolean) {
@@ -522,7 +522,7 @@ export default function App() {
         enable
       )
       if (!result.ok) {
-        notify(result.error || '批量操作失败', 'err')
+        notify(result.error || t('common.batchOpFailed'), 'err')
       }
       await loadModsFor(snapshot.game.id, selected)
       const snap = await refreshSnapshot(snapshot.game.id)
@@ -590,7 +590,7 @@ export default function App() {
         kind === 'game'
           ? await window.moddeck.launchGame(snapshot.game.id)
           : await window.moddeck.launchLoader(snapshot.game.id)
-      if (!result.ok) notify(result.error || '启动失败', 'err')
+      if (!result.ok) notify(result.error || t('common.startupFailed'), 'err')
     } catch (error) {
       notify(errorMessage(error), 'err')
     }
@@ -601,7 +601,7 @@ export default function App() {
     try {
       const result = await window.moddeck.reorderCharacters(snapshot.game.id, folders)
       if (!result.ok) {
-        notify(result.error || '排序保存失败', 'err')
+        notify(result.error || t('common.sortSaveFailed'), 'err')
         return
       }
       await refreshSnapshot(snapshot.game.id)
@@ -619,7 +619,7 @@ export default function App() {
         folders
       )
       if (!result.ok) {
-        notify(result.error || '排序保存失败', 'err')
+        notify(result.error || t('common.sortSaveFailed'), 'err')
         return
       }
       setMods(await window.moddeck.getMods(snapshot.game.id, selected.folder))
@@ -642,7 +642,7 @@ export default function App() {
       <div className="boot-screen">
         <div className="brand-mark large">M</div>
         <div className="spinner" />
-        <p className="muted">正在读取本地库…</p>
+        <p className="muted">{t('common.readingLibrary')}</p>
       </div>
     )
   }
@@ -651,11 +651,9 @@ export default function App() {
     return (
       <div className="boot-screen">
         <div className="brand-mark large">M</div>
-        <h2>启动失败</h2>
-        <p className="muted">{fatal || '无法读取配置'}</p>
-        <button className="btn" onClick={() => window.location.reload()}>
-          重试
-        </button>
+        <h2>{t('common.startupFailed')}</h2>
+        <p className="muted">{fatal || t('common.startupFailed')}</p>
+        <button className="btn" onClick={() => window.location.reload()}>{t('common.retry')}</button>
       </div>
     )
   }
@@ -721,10 +719,10 @@ export default function App() {
               <Icon name="upload" size={28} />
               <strong>
                 {view === 'character' && selected
-                  ? `松开鼠标导入到「${selected.displayName}」`
-                  : `松开鼠标解析并导入 Mod 到「${snapshot.game.shortName}」`}
+                  ? t('common.dropToImportCharacter', { name: selected.displayName })
+                  : t('common.dropToImportGame', { game: getLocaleGameShortName(snapshot.game, effectiveLocale) })}
               </strong>
-              <span>支持拖入多个 .zip / .7z / .rar 压缩包或已解压的 Mod 文件夹</span>
+              <span>{t('common.dropSupportHint')}</span>
             </div>
           </div>
         ) : null}
@@ -733,9 +731,9 @@ export default function App() {
             <div className="env-banner-main">
               <Icon name="box" size={18} />
               <div>
-                <strong>EFMI 配置检查</strong>
+                <strong>{t('common.efmiNoticeTitle')}</strong>
                 <span>
-                  {envWarning.detail || 'd3dx.ini 缺少 DISABLED_ 排除规则，禁用 Mod 可能不会生效。'}
+                  {envWarning.detail || t('common.efmiNoticeDefault')}
                 </span>
               </div>
             </div>
@@ -743,29 +741,23 @@ export default function App() {
               <button
                 className="btn ghost small-btn"
                 onClick={() => void window.moddeck.openEnvironmentFolder(envWarning.gameId)}
-              >
-                打开目录
-              </button>
+              >{t('common.openDir')}</button>
               <button
                 className="btn ghost small-btn"
                 onClick={() => {
                   setEnvWarning(null)
                   setSettingsTab('environment'); setView('settings');
                 }}
-              >
-                设置
-              </button>
+              >{t('sidebar.settings')}</button>
               <button
                 className="btn ghost small-btn"
                 onClick={() => void dismissEnvWarning(true)}
-                title="写入设置，以后启动不再提示"
-              >
-                不再提示
-              </button>
+                title={t('common.dontShowAgainTip')}
+              >{t('common.dontShowAgain')}</button>
               <button
                 className="icon-btn"
                 onClick={() => void dismissEnvWarning(false)}
-                title="本次关闭"
+                title={t('common.closeThisTime')}
               >
                 <Icon name="close" size={15} />
               </button>

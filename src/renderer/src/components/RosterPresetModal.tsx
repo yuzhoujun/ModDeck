@@ -288,11 +288,11 @@ export function RosterPresetModal({
         presetId
       )
       if (res.ok) {
-        onNotify?.(`已在游戏内切换 ${mod.name} 预设`, 'ok')
+        onNotify?.(t('preset.presetSwitched', { name: mod.name }), 'ok')
         const list = await window.moddeck.getModPresets(game.id, charFolder, mod.folderName)
         setModPresetsMap((prev) => ({ ...prev, [`${charFolder}::${mod.name}`]: list }))
       } else {
-        onNotify?.(res.error || '切换预设失败', 'err')
+        onNotify?.(res.error || t('preset.presetSwitchFailed'), 'err')
       }
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : String(err), 'err')
@@ -351,7 +351,7 @@ export function RosterPresetModal({
   const handleSavePreset = async (forceReplaceDirtyWithDefault = false) => {
     const name = presetName.trim()
     if (!name) {
-      onNotify?.('请输入预设方案名称', 'err')
+      onNotify?.(t('preset.enterSchemeNameErr'), 'err')
       return
     }
 
@@ -373,7 +373,7 @@ export function RosterPresetModal({
     if (dirtyItems.length > 0 && !forceReplaceDirtyWithDefault) {
       setDirtyWarningList(dirtyItems)
       setShowDirtyWarningModal(true)
-      return // 拦截保存，弹窗提示！
+      return
     }
 
     // 若用户确认替换或本身无脏状态，将 __dirty__ 转为 __default__
@@ -397,14 +397,14 @@ export function RosterPresetModal({
         assignments: finalAssignments
       })
       if (res.ok) {
-        onNotify?.(`已保存预设方案「${name}」`, 'ok')
+        onNotify?.(t('preset.schemeSaved', { name }), 'ok')
         setSelectedAssignments(finalAssignments)
         setPresetName('')
         setShowCreateForm(false)
         setShowDirtyWarningModal(false)
         await fetchPresets()
       } else {
-        onNotify?.(res.error || '保存失败', 'err')
+        onNotify?.(res.error || t('preset.schemeSaveFailed'), 'err')
       }
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : String(err), 'err')
@@ -419,9 +419,9 @@ export function RosterPresetModal({
       const res = await window.moddeck.applyRosterPreset(game.id, preset.id)
       if (res.ok) {
         setActivePresetId(preset.id)
-        onNotify?.(`已切换至预设方案「${preset.name}」`, 'ok')
+        onNotify?.(t('preset.schemeSwitched', { name: preset.name }), 'ok')
       } else {
-        onNotify?.(res.error || '切换方案失败', 'err')
+        onNotify?.(res.error || t('preset.schemeSwitchFailed'), 'err')
       }
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : String(err), 'err')
@@ -433,11 +433,11 @@ export function RosterPresetModal({
     try {
       const res = await window.moddeck.deleteRosterPreset(game.id, preset.id)
       if (res.ok) {
-        onNotify?.(`已删除预设方案「${preset.name}」`, 'info')
+        onNotify?.(t('preset.schemeDeleted', { name: preset.name }), 'info')
         if (activePresetId === preset.id) setActivePresetId(null)
         await fetchPresets()
       } else {
-        onNotify?.(res.error || '删除方案失败', 'err')
+        onNotify?.(res.error || t('preset.schemeDeleteFailed'), 'err')
       }
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : String(err), 'err')
@@ -483,8 +483,8 @@ export function RosterPresetModal({
       }
       return next
     })
-    const poolName = activePoolTab === 'character' ? '角色分池' : activePoolTab === 'utility' ? '其他/功能UI分池' : '全池'
-    onNotify?.(`已将${poolName}（${targetChars.length} 项）设置为全部保持原生`, 'info')
+    const poolName = activePoolTab === 'character' ? t('preset.poolCharacter') : activePoolTab === 'utility' ? t('preset.poolUtility') : t('preset.poolAll')
+    onNotify?.(t('preset.setPoolKeepNative', { pool: poolName, count: targetChars.length }), 'info')
   }
 
   // 一键选中当前实机使用中的预设
@@ -524,8 +524,8 @@ export function RosterPresetModal({
       }
       return next
     })
-    const poolName = activePoolTab === 'character' ? '角色分池' : activePoolTab === 'utility' ? '其他/功能UI分池' : '全池'
-    onNotify?.(`已将${poolName}（${targetChars.length} 项）恢复为游戏当前实机配置`, 'ok')
+    const poolName = activePoolTab === 'character' ? t('preset.poolCharacter') : activePoolTab === 'utility' ? t('preset.poolUtility') : t('preset.poolAll')
+    onNotify?.(t('preset.setPoolLiveConfig', { pool: poolName, count: targetChars.length }), 'ok')
   }
 
   // 快捷键监听：Alt+U 一键不启用，Alt+R 一键选中使用中
@@ -570,8 +570,8 @@ export function RosterPresetModal({
               onClick={() => setShowCreateForm(!showCreateForm)}
               title={
                 matchingExistingPreset
-                  ? `当前配置与方案「${matchingExistingPreset.name}」完全一致，无需重复保存`
-                  : '将当前工作台配置保存为新方案'
+                  ? t('preset.schemeIdenticalNotice', { name: matchingExistingPreset.name })
+                  : t('preset.saveWorkbenchAsNewTooltip')
               }
             >
               <Icon name="plus" size={14} />
@@ -597,20 +597,20 @@ export function RosterPresetModal({
                 onClick={() => void handleSavePreset()}
                 title={
                   matchingExistingPreset
-                    ? `当前配置已与方案「${matchingExistingPreset.name}」完全一致`
+                    ? t('preset.schemeIdenticalNotice', { name: matchingExistingPreset.name })
                     : undefined
                 }
               >
-                {saving ? '保存中…' : '保存当前配置'}
+                {saving ? t('preset.savingConfig') : t('preset.saveCurrentConfig')}
               </button>
             </div>
           ) : null}
 
           <div className="roster-presets-chips">
             {loading ? (
-              <span className="muted small">加载预设中…</span>
+              <span className="muted small">{t('preset.loadingPresets')}</span>
             ) : presets.length === 0 ? (
-              <span className="muted small">暂无方案，请在下方配置各角色 Mod 与预设后点击右上角保存</span>
+              <span className="muted small">{t('preset.noSchemesHint')}</span>
             ) : (
               presets.map((p) => {
                 const isActive = activePresetId === p.id
@@ -630,14 +630,14 @@ export function RosterPresetModal({
                       onClick={() => {
                         handleInspectPreset(p)
                       }}
-                      title={`在下方工作台查看/调校「${p.name}」配置`}
+                      title={t('preset.inspectWorkbenchTooltip', { name: p.name })}
                     >
                       <span className="preset-dot" />
                       <span style={{ minWidth: 0, overflow: 'hidden' }}>
                         <ScrollTitle text={p.name} />
                       </span>
                       <span className="muted small">
-                        ({charCount}人·{totalModCount}Mod)
+                        ({charCount} · {totalModCount})
                       </span>
                     </button>
                     <button
@@ -646,7 +646,7 @@ export function RosterPresetModal({
                         e.stopPropagation()
                         void handleDeletePreset(p)
                       }}
-                      title="删除该方案"
+                      title={t('preset.deleteSchemeTooltip')}
                     >
                       <Icon name="close" size={12} />
                     </button>
@@ -700,7 +700,7 @@ export function RosterPresetModal({
                 type="button"
                 className="roster-pool-btn"
                 onClick={() => handleBatchSetNative(displayedCharacters)}
-                title="将当前分池中全部项目设置为不启用任何 Mod（保持游戏原生）[快捷键 Alt+U]"
+                title={t('preset.keepNativeTooltip')}
               >
                 <Icon name="close" size={12} />
                 <span>{t('preset.disableAllInPool')}</span>
@@ -710,7 +710,7 @@ export function RosterPresetModal({
                 type="button"
                 className="roster-pool-btn primary-ghost"
                 onClick={() => handleBatchSetCurrentActive(displayedCharacters)}
-                title="将当前分池中全部项目恢复为游戏实机当前正在使用的 Mod 与预设 [快捷键 Alt+R]"
+                title={t('preset.restoreLiveTooltip')}
               >
                 <Icon name="refresh" size={12} />
                 <span>{t('preset.selectCurrentInPool')}</span>
@@ -731,10 +731,10 @@ export function RosterPresetModal({
                 }}
               >
                 {charFilter
-                  ? '未找到匹配的项目'
+                  ? t('preset.noMatchingItems')
                   : activePoolTab === 'character'
-                    ? '当前分池暂无角色类 Mod'
-                    : '当前分池暂无功能/UI/其他类 Mod'}
+                    ? t('preset.poolEmptyChar')
+                    : t('preset.poolEmptyUtility')}
               </div>
             ) : (
               displayedCharacters.map((char) => {
@@ -758,7 +758,7 @@ export function RosterPresetModal({
                         type="button"
                         className={`roster-mode-btn${mode === 'single' ? ' is-active' : ''}`}
                         onClick={() => toggleCharMode(char.folder, 'single')}
-                        title="单选模式（互斥保护，同时只生效一个 Mod）"
+                        title={t('preset.singleModeTooltip')}
                       >
                         {t('preset.single')}
                       </button>
@@ -766,7 +766,7 @@ export function RosterPresetModal({
                         type="button"
                         className={`roster-mode-btn${mode === 'multi' ? ' is-active' : ''}`}
                         onClick={() => toggleCharMode(char.folder, 'multi')}
-                        title="多选模式（共存允许，可同时勾选多个 Mod）"
+                        title={t('preset.multiModeTooltip')}
                       >
                         {t('preset.multi')}
                       </button>
@@ -792,7 +792,7 @@ export function RosterPresetModal({
                         </button>
                       </div>
                       <span className="muted small">
-                        已选 {assignedItems.length} / {charMods.length}
+                        {t('preset.selectedFraction', { selected: assignedItems.length, total: charMods.length })}
                       </span>
                     </div>
                   )}
@@ -863,9 +863,9 @@ export function RosterPresetModal({
                                 {t('preset.presetPrefix')}
                               </span>
                               {isLoadingPresets && presets.length === 0 ? (
-                                <span className="muted small">加载中…</span>
+                                <span className="muted small">{t('common.loading')}</span>
                               ) : presets.length === 0 ? (
-                                <span className="muted small">默认初始</span>
+                                <span className="muted small">{t('preset.defaultInitial')}</span>
                               ) : (
                                 <>
                                   <select
@@ -874,7 +874,7 @@ export function RosterPresetModal({
                                     onChange={(e) =>
                                       handleModPresetChange(char.folder, mod.name, e.target.value)
                                     }
-                                    title="选择该方案生效时此 Mod 所应用的变体预设"
+                                    title={t('preset.choosePresetForModTooltip')}
                                   >
                                     {assignedItem?.presetId === '__dirty__' && (
                                       <option value="__dirty__">⚠️ {t('preset.dirtyLiveOption')}</option>
@@ -894,7 +894,7 @@ export function RosterPresetModal({
                                   <button
                                     type="button"
                                     className="roster-preset-apply-btn"
-                                    title="在游戏内立即切换至该预设并热重载（现场试穿）"
+                                    title={t('preset.testPresetTooltip')}
                                     onClick={() =>
                                       void handleApplySingleModPreset(
                                         char.folder,
@@ -923,13 +923,13 @@ export function RosterPresetModal({
 
       {showDirtyWarningModal && (
         <Modal
-          title="⚠️ 检测到未保存的实机改动"
+          title={t('preset.dirtyWarningTitle')}
           onClose={() => setShowDirtyWarningModal(false)}
           width={480}
         >
           <div className="roster-dirty-modal-body">
             <p>
-              方案中有 <strong>{dirtyWarningList.length}</strong> 个 Mod 当前处于现场实机微调状态（尚未保存为独立单 Mod 预设）：
+              {t('preset.dirtyWarningDesc', { count: dirtyWarningList.length })}
             </p>
             <ul className="roster-dirty-list">
               {dirtyWarningList.map((d, idx) => (
@@ -940,18 +940,14 @@ export function RosterPresetModal({
               ))}
             </ul>
             <p className="muted small">
-              全角色方案仅记录固定的变体预设。若继续保存，这些未保存项将自动以「<strong>出厂默认</strong>」存入方案。
+              {t('preset.dirtyWarningNote')}
             </p>
             <div className="roster-dirty-modal-actions">
-              <button className="btn" onClick={() => setShowDirtyWarningModal(false)}>
-                取消并返回
-              </button>
+              <button className="btn" onClick={() => setShowDirtyWarningModal(false)}>{t('preset.cancelAndReturn')}</button>
               <button
                 className="btn primary"
                 onClick={() => void handleSavePreset(true)}
-              >
-                替换为默认并继续保存
-              </button>
+              >{t('preset.replaceWithDefaultAndSave')}</button>
             </div>
           </div>
         </Modal>

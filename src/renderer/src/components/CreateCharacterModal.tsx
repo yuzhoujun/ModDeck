@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { CharacterKind, CreateCharacterInput, GameDef } from '../../../shared/types'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
+import { useI18n, getLocaleGameName } from '../i18n'
 
 function folderFromName(value: string): string {
   return value
@@ -21,6 +22,7 @@ export function CreateCharacterModal({
   onClose: () => void
   onCreate: (input: CreateCharacterInput) => Promise<void>
 }) {
+  const { t, effectiveLocale } = useI18n()
   const [kind, setKind] = useState<CharacterKind>('character')
   const [name, setName] = useState('')
   const [folder, setFolder] = useState('')
@@ -37,21 +39,21 @@ export function CreateCharacterModal({
   async function create() {
     const finalFolder = folder.trim()
     if (!finalFolder) {
-      setError('请填写目录名')
+      setError(t('character.errEnterFolderName'))
       return
     }
     if (finalFolder.startsWith('.') || finalFolder.startsWith('_')) {
-      setError('目录名不能以 . 或 _ 开头')
+      setError(t('character.errNoDotOrUnderscore'))
       return
     }
     if (/[\\/:*?"<>|]/.test(finalFolder)) {
-      setError('目录名不能包含 \\ / : * ? " < > |')
+      setError(t('character.errInvalidChars'))
       return
     }
     if (
       existingFolders.some((item) => item.toLowerCase() === finalFolder.toLowerCase())
     ) {
-      setError('同名目录已存在')
+      setError(t('character.errFolderExists'))
       return
     }
 
@@ -76,16 +78,14 @@ export function CreateCharacterModal({
 
   return (
     <Modal
-      title="新增目录"
+      title={t('character.createModalTitle')}
       onClose={onClose}
       footer={
         <>
           <div className="grow" />
-          <button className="btn ghost" onClick={onClose} disabled={creating}>
-            取消
-          </button>
+          <button className="btn ghost" onClick={onClose} disabled={creating}>{t('common.cancel')}</button>
           <button className="btn primary" onClick={create} disabled={creating}>
-            {creating ? '创建中…' : '创建'}
+            {creating ? t('character.creating') : t('character.create')}
           </button>
         </>
       }
@@ -95,35 +95,29 @@ export function CreateCharacterModal({
           className={kind === 'character' ? 'active' : ''}
           onClick={() => setKind('character')}
         >
-          <Icon name="userPlus" size={15} />
-          新角色
-        </button>
+          <Icon name="userPlus" size={15} />{t('character.tabNewCharacter')}</button>
         <button
           className={kind === 'utility' ? 'active' : ''}
           onClick={() => setKind('utility')}
         >
-          <Icon name="box" size={15} />
-          功能 Mod 目录
-        </button>
+          <Icon name="box" size={15} />{t('character.tabUtility')}</button>
       </div>
       <p className="muted small">
-        {kind === 'character'
-          ? `在 ${game.name} 的 Mods 下创建一个角色目录，之后再往里面放 Mod。`
-          : '功能 Mod 目录用于存放不属于某个角色的通用 Mod；管理方式和角色一样。'}
+        {kind === 'character' ? t('character.charDesc', { game: getLocaleGameName(game, effectiveLocale) }) : t('character.utilityDesc')}
       </p>
 
       <label className="field">
-        <span>显示名称</span>
+        <span>{t('character.displayNameLabel')}</span>
         <input
           className="input"
           value={name}
           onChange={(event) => changeName(event.target.value)}
-          placeholder={kind === 'character' ? '例如 新角色' : '例如 通用功能'}
+          placeholder={kind === 'character' ? t('character.displayNameCharPlaceholder') : t('character.displayNameUtilityPlaceholder')}
           autoFocus
         />
       </label>
       <label className="field">
-        <span>目录名（会创建在 Mods 目录下）</span>
+        <span>{t('character.folderLabel')}</span>
         <input
           className="input"
           value={folder}
@@ -131,21 +125,19 @@ export function CreateCharacterModal({
             setFolder(event.target.value)
             setFolderTouched(true)
           }}
-          placeholder="例如 NewCharacter"
+          placeholder={t('character.folderPlaceholder')}
         />
       </label>
       <label className="field">
-        <span>别名（可选，用逗号分隔）</span>
+        <span>{t('character.aliasesLabel')}</span>
         <input
           className="input"
           value={aliases}
           onChange={(event) => setAliases(event.target.value)}
-          placeholder="用于搜索"
+          placeholder={t('character.aliasesPlaceholder')}
         />
       </label>
-      <p className="muted small">
-        目录名创建后不会自动改名；封面可以在创建后点角色卡片的“编辑”里设置。
-      </p>
+      <p className="muted small">{t('character.createTip')}</p>
       {error ? <div className="error-text">{error}</div> : null}
     </Modal>
   )

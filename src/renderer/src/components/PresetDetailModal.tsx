@@ -1,6 +1,7 @@
 import { ScrollTitle } from './ScrollTitle'
 import type { ModVariantPreset } from '../../../shared/types'
 import { Modal } from './Modal'
+import { useI18n } from '../i18n'
 
 export function PresetDetailModal({
   preset,
@@ -9,46 +10,45 @@ export function PresetDetailModal({
   preset: ModVariantPreset
   onClose: () => void
 }) {
+  const { t } = useI18n()
   const vars = preset.variables ? Object.entries(preset.variables) : []
 
   return (
     <Modal
-      title={`预设详情 · ${preset.name}`}
+      title={t('preset.detailTitle', { name: preset.name })}
       onClose={onClose}
       width={520}
       footer={
         <div className="actions right">
-          <button className="btn primary" onClick={onClose}>
-            关闭
-          </button>
+          <button className="btn primary" onClick={onClose}>{t('common.close')}</button>
         </div>
       }
     >
       <div className="preset-detail-dialog">
         <div className="preset-detail-summary">
           <div>
-            <span className="muted small">所属 Mod</span>
+            <span className="muted small">{t('preset.belongsToMod')}</span>
             <div style={{ marginTop: 2, fontWeight: 600 }}><ScrollTitle text={preset.modName} /></div>
           </div>
           <div>
-            <span className="muted small">预设类型</span>
-            <span className="chip ok">{preset.id === '__default__' ? '出厂默认' : '自定义快照'}</span>
+            <span className="muted small">{t('preset.presetType')}</span>
+            <span className="chip ok">{preset.id === '__default__' ? t('preset.typeDefault') : t('preset.typeCustom')}</span>
           </div>
         </div>
 
         <div className="detail-section" style={{ marginTop: '12px' }}>
           <div className="detail-section-title">
-            3DMigoto / XXMI 变量快照 ({vars.length})
+            {t('preset.varSnapshotTitle', { count: vars.length })}
           </div>
           {vars.length === 0 ? (
             <div className="muted small" style={{ padding: '8px 0' }}>
-              此 Mod 未声明运行时 persist 变量，仅包含实体 ini 文件切换。
+              {t('preset.noVarsNotice')}
             </div>
           ) : (
             <div className="preset-vars-table">
               <div className="preset-var-row head">
-                <span>变量名 (Key)</span>
-                <span>设定值 (Value)</span>
+                <span>{t('preset.varKeyLabel')}</span>
+                <span>{t('preset.varValLabel')}</span>
               </div>
               {vars.map(([k, v]) => {
                 // 美化展示：提取末级变量名
@@ -72,7 +72,7 @@ export function PresetDetailModal({
 
         <div className="detail-section" style={{ marginTop: '14px' }}>
           <div className="detail-section-title">
-            激活的 INI 文件 ({preset.activeIniFiles.length})
+            {t('preset.activeIniTitle', { count: preset.activeIniFiles.length })}
           </div>
           <div className="detail-ini" style={{ maxHeight: '100px' }}>
             {preset.activeIniFiles.map((file) => (
