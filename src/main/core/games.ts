@@ -4,7 +4,9 @@ export const GAMES: GameDef[] = [
   {
     id: 'wuthering-waves',
     name: '鸣潮',
+    nameEn: 'Wuthering Waves',
     shortName: '鸣潮',
+    shortNameEn: 'WuWa',
     loader: 'WWMI',
     exeHint: 'Wuthering Waves.exe',
     accent: '#5eead4'
@@ -12,7 +14,9 @@ export const GAMES: GameDef[] = [
   {
     id: 'honkai-star-rail',
     name: '崩坏：星穹铁道',
+    nameEn: 'Honkai: Star Rail',
     shortName: '星穹铁道',
+    shortNameEn: 'Star Rail',
     loader: 'SRMI',
     exeHint: 'StarRail.exe',
     accent: '#a78bfa'
@@ -20,7 +24,9 @@ export const GAMES: GameDef[] = [
   {
     id: 'zzz',
     name: '绝区零',
+    nameEn: 'Zenless Zone Zero',
     shortName: '绝区零',
+    shortNameEn: 'ZZZ',
     loader: 'ZZMI',
     exeHint: 'ZenlessZoneZero.exe',
     accent: '#facc15'
@@ -28,7 +34,9 @@ export const GAMES: GameDef[] = [
   {
     id: 'endfield',
     name: '明日方舟：终末地',
+    nameEn: 'Arknights: Endfield',
     shortName: '终末地',
+    shortNameEn: 'Endfield',
     loader: 'EFMI',
     exeHint: 'Endfield.exe',
     accent: '#fb923c'
@@ -36,7 +44,9 @@ export const GAMES: GameDef[] = [
   {
     id: 'neverness-to-everness',
     name: '异环',
+    nameEn: 'Neverness to Everness',
     shortName: '异环',
+    shortNameEn: 'NTE',
     loader: 'NEMI',
     exeHint: 'NTELauncher.exe',
     accent: '#38bdf8'

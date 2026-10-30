@@ -4,7 +4,7 @@ import { isUtilityCategory } from '../../../shared/types'
 import { CharacterCard } from '../components/CharacterCard'
 import { Icon } from '../components/Icon'
 import { ImportDropdown } from '../components/ImportDropdown'
-import { useI18n, getLocaleCharacterName } from '../i18n'
+import { useI18n, getLocaleCharacterName, getLocaleGameShortName } from '../i18n'
 
 function shortPath(value: string): string {
   const parts = value.split(/[\\/]/).filter(Boolean)
@@ -43,7 +43,7 @@ export function LibraryView({
   onImport: () => void
   onImportFolder: () => void
   onRefresh: () => void
-  onOpenSettings: (tab?: 'general' | 'games' | 'environment' | 'import' | 'about') => void
+  onOpenSettings: (tab?: 'general' | 'advanced' | 'games' | 'environment' | 'import' | 'about') => void
   onLaunchGame: () => void
   onLaunchLoader: () => void
   onReorderCharacters: (folders: string[]) => void
@@ -105,7 +105,7 @@ export function LibraryView({
       <header className="view-head">
         <div>
           <div className="eyebrow" style={{ color: game.accent }}>
-            {game.shortName} · {game.loader}
+            {getLocaleGameShortName(game, effectiveLocale)} · {game.loader}
           </div>
           <h1>{t('library.title')}</h1>
           <p className="muted">

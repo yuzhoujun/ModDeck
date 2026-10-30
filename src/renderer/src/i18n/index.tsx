@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { SupportedLocale, TranslationDict, TranslationParams } from '../../../shared/i18n/types'
-import type { CharacterInfo } from '../../../shared/types'
+import type { CharacterInfo, GameDef } from '../../../shared/types'
 import zhCN from '../../../shared/i18n/locales/zh-CN.json'
 import enUS from '../../../shared/i18n/locales/en-US.json'
 
@@ -153,3 +153,14 @@ export function getLocaleCharacterName(char: CharacterInfo, effectiveLocale: str
   }
   return char.displayName || char.folder
 }
+
+export function getLocaleGameName(game: GameDef, effectiveLocale: string): string {
+  if (effectiveLocale === 'zh-CN') return game.name
+  return game.nameEn || game.name
+}
+
+export function getLocaleGameShortName(game: GameDef, effectiveLocale: string): string {
+  if (effectiveLocale === 'zh-CN') return game.shortName
+  return game.shortNameEn || game.shortName
+}
+

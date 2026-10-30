@@ -20,7 +20,7 @@ import { CharacterView } from './views/CharacterView'
 import { LibraryView } from './views/LibraryView'
 import { SettingsView } from './views/SettingsView'
 import { errorMessage } from './utils'
-import { useI18n } from './i18n'
+import { useI18n, getLocaleGameShortName } from './i18n'
 
 type View = 'library' | 'character' | 'settings'
 type ToastKind = 'ok' | 'err' | 'info'
@@ -31,13 +31,13 @@ interface Toast {
 }
 
 export default function App() {
-  const { t } = useI18n()
+  const { t, effectiveLocale } = useI18n()
   const [boot, setBoot] = useState<Bootstrap | null>(null)
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null)
   const [booting, setBooting] = useState(true)
   const [fatal, setFatal] = useState<string | null>(null)
   const [view, setView] = useState<View>('library')
-  const [settingsTab, setSettingsTab] = useState<'general' | 'games' | 'environment' | 'import' | 'about'>('general')
+  const [settingsTab, setSettingsTab] = useState<'general' | 'advanced' | 'games' | 'environment' | 'import' | 'about'>('general')
   const [selected, setSelected] = useState<CharacterInfo | null>(null)
   const [mods, setMods] = useState<ModInfo[]>([])
   const [modsLoading, setModsLoading] = useState(false)
@@ -683,10 +683,10 @@ export default function App() {
                 style={active ? { borderColor: `${game.accent}55` } : undefined}
                 role="radio"
                 aria-checked={active}
-                title={active ? '当前游戏' : `切换到 ${game.name}`}
+                title={active ? (effectiveLocale === 'zh-CN' ? '当前游戏' : 'Current game') : (effectiveLocale === 'zh-CN' ? `切换到 ${game.name}` : `Switch to ${game.nameEn || game.name}`)}
               >
                 <span className="dot" style={{ background: game.accent }} />
-                <span className="grow">{game.shortName}</span>
+                <span className="grow">{getLocaleGameShortName(game, effectiveLocale)}</span>
                 {active ? (
                   <span className="game-count">
                     {snapshot.totalMods}

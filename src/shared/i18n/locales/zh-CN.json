@@ -56,7 +56,8 @@
     "emptyNoModsTitle": "所有分类项都已有 Mod",
     "emptyFolderTitle": "Mods 目录是空的",
     "emptySearchDesc": "换个关键词试试。",
-    "emptyFilterDesc": "可以切换筛选条件，或导入新的 Mod。"
+    "emptyFilterDesc": "可以切换筛选条件，或导入新的 Mod。",
+    "importToCharacter": "导入到该角色"
   },
   "character": {
     "back": "返回 Mod 库",
@@ -94,7 +95,16 @@
     "moveToTrash": "移至回收站",
     "moveToTrashConfirm": "确定要将 Mod「{name}」移至系统回收站吗？",
     "overwriteConfirmTitle": "覆盖预设确认",
-    "overwriteConfirmDesc": "当前实机状态已被调整。是否将最新实机参数保存并覆盖预设「{name}」？"
+    "overwriteConfirmDesc": "当前实机状态已被调整。是否将最新实机参数保存并覆盖预设「{name}」？",
+    "files": "文件",
+    "size": "大小",
+    "updated": "更新",
+    "ini": "INI",
+    "noPresets": "暂无独立预设，点击右上角可将当前状态存为预设",
+    "noHotkeys": "没有在 ini 里找到 key",
+    "iniFiles": "INI 文件",
+    "noIni": "没有 ini",
+    "selectToView": "选择一个 Mod 查看详情"
   },
   "preset": {
     "modalTitle": "全角色池方案管理",
@@ -141,7 +151,11 @@
     "reloadBtn": "重载 {hotkey}",
     "applyNowBtn": "● 立即生效 ({count})",
     "openManagerBtn": "打开管理器",
-    "pendingCountHint": "有 {count} 个预设待生效，点击立即刷新实机画面"
+    "pendingCountHint": "有 {count} 个预设待生效，点击立即刷新实机画面",
+    "emptyModForChar": "这个角色没有匹配的 Mod",
+    "emptyCharList": "没有可显示的角色",
+    "footerHint": "快捷键 {hotkey} · Esc 隐藏",
+    "noMatchingChar": "没有匹配角色"
   },
   "benchmark": {
     "modalTitle": "3DMigoto 重载耗时测速校准",
@@ -280,6 +294,11 @@
       "openDataFolder": "打开数据目录 (userData)",
       "openLogsFolder": "打开运行日志 (logs)",
       "storageTip": "💡 包含 ModDeck 配置、角色匹配数据、预设方案快照及运行日志。在重装系统或迁移设备时，直接打包复制该文件夹即可完整保留所有设置与预设。"
+    },
+    "tabAdvanced": "高级",
+    "advanced": {
+      "title": "高级设置",
+      "desc": "管理游戏内快捷悬浮窗、3DMigoto 重载热键、自动换装策略与刷盘同步延迟。"
     }
   }
 }

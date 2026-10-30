@@ -12,7 +12,7 @@ import { isUtilityCategory } from '../../shared/types'
 import { Icon } from './components/Icon'
 import { ScrollTitle } from './components/ScrollTitle'
 import { errorMessage } from './utils'
-import { useI18n, getLocaleCharacterName } from './i18n'
+import { useI18n, getLocaleCharacterName, getLocaleGameName } from './i18n'
 
 type CharacterFilter = 'all' | 'withMods' | 'empty' | 'characters' | 'utility'
 
@@ -344,7 +344,7 @@ export function OverlayApp() {
               {!snapshot ? <option value="">未配置游戏</option> : null}
               {boot?.games.map((game) => (
                 <option key={game.id} value={game.id}>
-                  {game.shortName} · {game.loader}
+                  {getLocaleGameName(game, effectiveLocale)} · {game.loader}
                 </option>
               ))}
             </select>
@@ -354,11 +354,11 @@ export function OverlayApp() {
           <button
             className={`icon-btn${pinned ? ' is-active' : ''}`}
             onClick={() => void setPinnedState(!pinned)}
-            title={pinned ? '取消置顶' : '固定最顶层'}
+            title={pinned ? (effectiveLocale === 'zh-CN' ? '取消置顶' : 'Unpin') : (effectiveLocale === 'zh-CN' ? '固定最顶层' : 'Pin on top')}
           >
             <Icon name={pinned ? 'pin' : 'pinOff'} size={16} />
           </button>
-          <button className="icon-btn" onClick={() => window.moddeck.toggleOverlay()} title="隐藏">
+          <button className="icon-btn" onClick={() => window.moddeck.toggleOverlay()} title={t('common.close')}>
             <Icon name="close" size={16} />
           </button>
         </div>
@@ -372,7 +372,7 @@ export function OverlayApp() {
           value={selected}
           onChange={(event) => void selectCharacter(event.target.value)}
         >
-          {filteredCharacters.length === 0 ? <option value="">没有匹配角色</option> : null}
+          {filteredCharacters.length === 0 ? <option value="">{t('overlay.noMatchingChar')}</option> : null}
           {filteredCharacters.map((character) => (
             <option key={character.folder} value={character.folder}>
               {getLocaleCharacterName(character, effectiveLocale)} ({character.modCount})
@@ -446,7 +446,7 @@ export function OverlayApp() {
         ) : visibleMods.length === 0 ? (
           <div className="overlay-empty">
             <Icon name="box" size={24} />
-            <span>{current ? '这个角色没有匹配的 Mod' : '没有可显示的角色'}</span>
+            <span>{current ? t('overlay.emptyModForChar') : t('overlay.emptyCharList')}</span>
           </div>
         ) : (
           visibleMods.map((mod) => (
@@ -618,7 +618,7 @@ export function OverlayApp() {
       ) : null}
       <footer className="overlay-foot">
         <span className="muted">
-          快捷键 {boot?.settings.ui.overlayHotkey || '未设置'} · Esc 隐藏
+          {t('overlay.footerHint', { hotkey: boot?.settings.ui.overlayHotkey || (effectiveLocale === 'zh-CN' ? '未设置' : 'None') })}
         </span>
         <div className="overlay-foot-actions">
           <button
