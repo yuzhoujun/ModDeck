@@ -3,8 +3,10 @@
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck?label=release&cacheSeconds=300)](https://github.com/yuzhoujun/ModDeck/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4)](#五环境要求与兼容说明)
-[![Language](https://img.shields.io/badge/language-C%2B%2B-blue.svg)](zh-CN)
+[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4?logo=windows&logoColor=white)](#五环境要求与兼容说明)
+[![Language](https://img.shields.io/badge/language-TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Framework](https://img.shields.io/badge/framework-Electron%20%7C%20React-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![Architecture](https://img.shields.io/badge/architecture-Local--First-8B5CF6)](docs/ARCHITECTURE.md)
 
 面向 3DMigoto / XXMI 系游戏的开源、现代、本地优先（Local-First）Windows Mod 管理器与游戏内全功能快捷悬浮工作台。
 
