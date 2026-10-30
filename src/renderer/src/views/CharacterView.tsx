@@ -147,7 +147,7 @@ export function CharacterView({
       )
       setDetails(nextDetails)
       onRefresh()
-      onNotify?.('Mod 预览图已更新', 'ok')
+      onNotify?.(t('character.previewUpdated'), 'ok')
     } catch (error) {
       onNotify?.(error instanceof Error ? error.message : String(error), 'err')
     }
@@ -176,7 +176,7 @@ export function CharacterView({
         <button
           className="char-avatar"
           onClick={onCover}
-          title="更换封面"
+          title={t('character.changeCover')}
           style={{ borderColor: `${game.accent}66` }}
         >
           {character.coverUrl ? (
@@ -196,7 +196,7 @@ export function CharacterView({
             {character.hiddenCount > 0 ? (
               <span className="chip">{character.hiddenCount} {t('common.disabled')}</span>
             ) : null}
-            {!character.known ? <span className="chip new">{effectiveLocale === 'zh-CN' ? '新角色' : 'NEW'}</span> : null}
+            {!character.known ? <span className="chip new">{t('character.tagNew')}</span> : null}
           </div>
         </div>
         <div className="actions">
@@ -208,7 +208,7 @@ export function CharacterView({
             <Icon name="folder" size={15} />
             {t('character.openFolder')}
           </button>
-          <ImportDropdown label={effectiveLocale === 'zh-CN' ? '导入到该角色' : 'Import to category'} onImport={onImport} onImportFolder={onImportFolder} />
+          <ImportDropdown label={t('character.importToCategory')} onImport={onImport} onImportFolder={onImportFolder} />
         </div>
       </header>
 
@@ -228,8 +228,8 @@ export function CharacterView({
           onChange={(event) => onSort(event.target.value as UiSettings['sortMods'])}
         >
           <option value="name">{t('library.sortByName')}</option>
-          <option value="recent">{effectiveLocale === 'zh-CN' ? '按更新时间' : 'By Date'}</option>
-          <option value="enabled">{effectiveLocale === 'zh-CN' ? '启用的优先' : 'Enabled First'}</option>
+          <option value="recent">{t('character.sortByRecent')}</option>
+          <option value="enabled">{t('character.sortByEnabled')}</option>
           <option value="custom">{t('library.sortByCustom')}</option>
         </select>
         <div className="segmented compact">
@@ -239,21 +239,21 @@ export function CharacterView({
               onSelectMode('single')
               setChecked(new Set())
             }}
-            title="启用一个 Mod 时自动关闭其他 Mod"
+            title={t('character.singleModTooltip')}
           >
             {t('preset.single')}
           </button>
           <button
             className={selectMode === 'multi' ? 'active' : ''}
             onClick={() => onSelectMode('multi')}
-            title="可以同时启用多个 Mod"
+            title={t('character.multiModTooltip')}
           >
             {t('preset.multi')}
           </button>
         </div>
         {selectMode === 'multi' && checked.size > 0 ? (
           <>
-            <span className="hint">已选 {checked.size}</span>
+            <span className="hint">{t('character.selectedCount', { count: checked.size })}</span>
             <button
               className="btn ghost"
               onClick={() => {
@@ -264,7 +264,7 @@ export function CharacterView({
                 setChecked(new Set())
               }}
             >
-              {effectiveLocale === 'zh-CN' ? '启用选中' : 'Enable Selected'}
+              {t('character.enableSelected')}
             </button>
             <button
               className="btn ghost"
@@ -276,11 +276,11 @@ export function CharacterView({
                 setChecked(new Set())
               }}
             >
-              {effectiveLocale === 'zh-CN' ? '禁用选中' : 'Disable Selected'}
+              {t('character.disableSelected')}
             </button>
           </>
         ) : null}
-        {sort === 'custom' ? <span className="hint">拖动 Mod 排序</span> : null}
+        {sort === 'custom' ? <span className="hint">{t('character.dragToSort')}</span> : null}
         <button className="btn ghost" onClick={onRefresh}>
           <Icon name="refresh" size={15} />
           {t('common.refresh')}
@@ -300,7 +300,7 @@ export function CharacterView({
               <div className="empty-icon">
                 <Icon name="box" size={28} />
               </div>
-              <h2>{query ? (effectiveLocale === 'zh-CN' ? '没有匹配的 Mod' : 'No matching mods') : t('character.emptyModsTitle')}</h2>
+              <h2>{query ? t('common.noMatchingMods') : t('character.emptyModsTitle')}</h2>
               <p className="muted">{query ? t('library.emptySearchDesc') : t('character.emptyModsDesc')}</p>
             </div>
           ) : (

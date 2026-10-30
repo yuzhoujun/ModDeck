@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Modal } from './Modal'
+import { useI18n } from '../i18n'
 
 const STAGE = 320
 const OUTPUT = 800
@@ -10,9 +11,11 @@ export function CoverCropper({
   onApply
 }: {
   file: File
+  // i18n hook injected
   onCancel: () => void
   onApply: (dataUrl: string) => void
 }) {
+  const { t } = useI18n()
   const [image, setImage] = useState<HTMLImageElement | null>(null)
   const [zoom, setZoom] = useState(1)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
@@ -79,16 +82,16 @@ export function CoverCropper({
 
   return (
     <Modal
-      title="裁剪角色封面"
+      title={t('cover.title')}
       onClose={onCancel}
       footer={
         <>
           <div className="grow" />
           <button className="btn ghost" onClick={onCancel}>
-            取消
+            {t('common.cancel')}
           </button>
           <button className="btn primary" onClick={apply} disabled={!image}>
-            应用封面
+            {t('cover.apply')}
           </button>
         </>
       }
@@ -127,12 +130,12 @@ export function CoverCropper({
             }}
           />
         ) : (
-          <span className="muted">读取图片…</span>
+          <span className="muted">{t('cover.reading')}</span>
         )}
         <div className="crop-grid" />
       </div>
       <label className="field">
-        <span>缩放</span>
+        <span>{t('cover.zoom')}</span>
         <input
           type="range"
           min="1"
@@ -142,7 +145,7 @@ export function CoverCropper({
           onChange={(event) => changeZoom(Number(event.target.value))}
         />
       </label>
-      <p className="muted small">拖动图片调整位置，滑块缩放；保存为 800 × 800 的 PNG。</p>
+      <p className="muted small">{t('cover.hint')}</p>
     </Modal>
   )
 }

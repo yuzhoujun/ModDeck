@@ -4,7 +4,7 @@ import { isUtilityCategory } from '../../../shared/types'
 import { CharacterCard } from '../components/CharacterCard'
 import { Icon } from '../components/Icon'
 import { ImportDropdown } from '../components/ImportDropdown'
-import { useI18n, getLocaleCharacterName, getLocaleGameShortName } from '../i18n'
+import { useI18n, getLocaleCharacterName, getLocaleGameName, getLocaleGameShortName } from '../i18n'
 
 function shortPath(value: string): string {
   const parts = value.split(/[\\/]/).filter(Boolean)
@@ -123,7 +123,7 @@ export function LibraryView({
             className="btn ghost"
             onClick={onLaunchGame}
             disabled={!canLaunchGame}
-            title={canLaunchGame ? t('library.launchGame') : t('library.launchGameHint') || '请先在设置里配置游戏程序'}
+            title={canLaunchGame ? t('library.launchGame') : t('library.launchGameHint')}
           >
             <Icon name="external" size={16} />
             {t('library.launchGame')}
@@ -132,7 +132,7 @@ export function LibraryView({
             className="btn ghost"
             onClick={onLaunchLoader}
             disabled={!canLaunchLoader}
-            title={canLaunchLoader ? t('library.launchLoader', { loader: game.loader }) : t('library.launchLoaderHint') || '请先在设置里配置启动器'}
+            title={canLaunchLoader ? t('library.launchLoader', { loader: game.loader }) : t('library.launchLoaderHint')}
           >
             <Icon name="external" size={16} />
             {t('library.launchLoader', { loader: game.loader })}
@@ -158,11 +158,11 @@ export function LibraryView({
           <div className="empty-icon">
             <Icon name="box" size={30} />
           </div>
-          <h2>{snapshot.settings.modsPath ? t('library.modsDirNotExist') || 'Mods 目录不存在' : t('library.modsDirNotConfigured') || '还没有配置 Mods 目录'}</h2>
+          <h2>{snapshot.settings.modsPath ? t('library.modsDirNotExist') : t('library.modsDirNotConfigured')}</h2>
           <p className="muted">
             {snapshot.settings.modsPath
               ? shortPath(snapshot.settings.modsPath)
-              : t('library.modsDirDesc', { game: game.name }) || `选择 ${game.name} 的 Mods 文件夹后，ModDeck 会自动扫描角色和 Mod。`}
+              : t('library.modsDirDesc', { game: getLocaleGameName(game, effectiveLocale) })}
           </p>
           <div className="actions center">
             <button className="btn primary" onClick={() => onOpenSettings('games')}>

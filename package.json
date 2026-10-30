@@ -1,6 +1,6 @@
 {
   "name": "moddeck",
-  "version": "2.3.1-patch.4",
+  "version": "2.3.1-patch.5",
   "private": true,
   "description": "Open-source local mod manager for 3DMigoto / XXMI games",
   "author": "ModDeck contributors",
@@ -15,7 +15,8 @@
     "package:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-portable.ps1",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "i18n:check": "node scripts/i18n.mjs check",
-    "i18n:sync": "node scripts/i18n.mjs sync"
+    "i18n:sync": "node scripts/i18n.mjs sync",
+    "i18n:extract": "node scripts/i18n.mjs extract"
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",

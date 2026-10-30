@@ -8,7 +8,7 @@ export function initialOf(value: string): string {
 }
 
 export function formatDate(timestamp: number): string {
-  if (!timestamp) return '未知'
+  if (!timestamp) return '-'
   const date = new Date(timestamp)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
     date.getDate()
@@ -20,7 +20,7 @@ export function displayNameOf(character: CharacterInfo): string {
 }
 
 export function modCountLabel(count: number): string {
-  return `${count} 个 Mod`
+  return count === 1 ? '1 Mod' : `${count} Mods`
 }
 
 export function errorMessage(error: unknown): string {

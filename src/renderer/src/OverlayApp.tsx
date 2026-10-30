@@ -188,7 +188,7 @@ export function OverlayApp() {
           setMods(list)
         }
       } else {
-        setError(res.error || '切换预设失败')
+        setError(res.error || t('preset.presetSwitchFailed'))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -251,7 +251,7 @@ export function OverlayApp() {
         exclusive
       )
       if (!result.ok || exclusive) {
-        if (!result.ok) setError(result.error || '切换失败')
+        if (!result.ok) setError(result.error || t('common.switchFailed'))
         setMods(await window.moddeck.getMods(snapshot.game.id, selected))
       }
       if (result.ok) {
@@ -288,7 +288,7 @@ export function OverlayApp() {
     const list = await window.moddeck.getMods(snapshot.game.id, item.characterFolder)
     const mod = list.find((entry) => entry.name === item.name)
     if (!mod) {
-      setError('这个 Mod 已经不在目录里')
+      setError(t('overlay.modNotInFolder'))
       return
     }
     void window.moddeck.showOverlayDetail({
@@ -305,7 +305,7 @@ export function OverlayApp() {
     try {
       const next = await window.moddeck.switchGame(gameId)
       if (!next) {
-        setError('无法切换到这个游戏')
+        setError(t('overlay.cannotSwitchGame'))
         return
       }
       setSnapshot(next)
@@ -354,9 +354,9 @@ export function OverlayApp() {
               className="overlay-game-select"
               value={snapshot?.game.id ?? ''}
               onChange={(event) => void changeGame(event.target.value as GameId)}
-              title="切换当前游戏"
+              title={t('overlay.switchGameTitle')}
             >
-              {!snapshot ? <option value="">未配置游戏</option> : null}
+              {!snapshot ? <option value="">{t('overlay.noGameConfigured')}</option> : null}
               {boot?.games.map((game) => (
                 <option key={game.id} value={game.id}>
                   {getLocaleGameName(game, effectiveLocale)} · {game.loader}
@@ -369,7 +369,7 @@ export function OverlayApp() {
           <button
             className={`icon-btn${pinned ? ' is-active' : ''}`}
             onClick={() => void setPinnedState(!pinned)}
-            title={pinned ? (effectiveLocale === 'zh-CN' ? '取消置顶' : 'Unpin') : (effectiveLocale === 'zh-CN' ? '固定最顶层' : 'Pin on top')}
+            title={pinned ? t('overlay.unpinTooltip') : t('overlay.pinOnTopTooltip')}
           >
             <Icon name={pinned ? 'pin' : 'pinOff'} size={16} />
           </button>
@@ -398,7 +398,7 @@ export function OverlayApp() {
           className="select compact-select"
           value={filter}
           onChange={(event) => void changeFilter(event.target.value as CharacterFilter)}
-          title="分类筛选"
+          title={t('overlay.filterCategoryTooltip')}
         >
           <option value="all">{t('overlay.filterAll')}</option>
           <option value="characters">{t('overlay.filterCharacters')}</option>
@@ -476,11 +476,11 @@ export function OverlayApp() {
                   modFolder: mod.folderName
                 })
               }}
-              title="点击查看热键"
+              title={t('overlay.clickToViewHotkeysTooltip')}
             >
               <div className="overlay-mod-main">
                 <ScrollTitle text={mod.name} className="overlay-mod-name" />
-                <div className="overlay-mod-sub">{mod.enabled ? '已启用' : '已禁用'}</div>
+                <div className="overlay-mod-sub">{mod.enabled ? t('mod.enabled') : t('mod.disabled')}</div>
               </div>
               <button
                 className={`switch${mod.enabled ? ' on' : ''}`}
@@ -490,7 +490,7 @@ export function OverlayApp() {
                 }}
                 role="switch"
                 aria-checked={mod.enabled}
-                aria-label={mod.enabled ? '禁用' : '启用'}
+                aria-label={mod.enabled ? t('common.disable') : t('common.enable')}
               >
                 <span />
               </button>
@@ -597,10 +597,10 @@ export function OverlayApp() {
               <div style={{ textAlign: 'center', padding: '6px 0' }}>
                 <div className="muted small">{t('overlay.benchmarkMeasuredLabel')}</div>
                 <div style={{ fontSize: '26px', fontWeight: 700, fontFamily: 'monospace', margin: '4px 0' }}>
-                  {benchmarkElapsed.toFixed(2)} 秒
+                  {benchmarkElapsed.toFixed(2)} {t('common.secondsUnit')}
                 </div>
                 <div style={{ fontSize: '13px', margin: '8px 0', padding: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
-                  {t('overlay.benchmarkRecDelayLabel')}<strong style={{ color: 'var(--accent, #6366f1)' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} {effectiveLocale === 'zh-CN' ? '秒' : 's'}</strong>
+                  {t('overlay.benchmarkRecDelayLabel')}<strong style={{ color: 'var(--accent, #6366f1)' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} {t('common.secondsUnit')}</strong>
                   <span className="muted small" style={{ display: 'block', marginTop: '2px' }}>
                     {t('overlay.benchmarkRecMargin')}
                   </span>
@@ -642,7 +642,7 @@ export function OverlayApp() {
               }
               setShowBenchmark(false)
             }}
-            title={effectiveLocale === 'zh-CN' ? '一键切换全角色池方案' : 'Quickly switch whole roster scheme'}
+            title={t('overlay.quickSwitchSchemeTooltip')}
           >
             {t('overlay.schemesBtn', { count: rosterPresets.length })}
           </button>
@@ -654,7 +654,7 @@ export function OverlayApp() {
               setBenchmarkElapsed(0)
               setShowPresetDrawer(false)
             }}
-            title={effectiveLocale === 'zh-CN' ? '浮动实机测速：无需切屏，直接观察游戏重载并精确校准缓冲延迟' : 'In-game benchmark: calibrate reload buffer delay without switching windows'}
+            title={t('overlay.benchmarkOverlayTooltip')}
           >
             {t('overlay.benchmarkBtn')}
           </button>
@@ -663,28 +663,28 @@ export function OverlayApp() {
             onClick={() => {
               void (async () => {
                 const result = await window.moddeck.reloadF10()
-                if (!result.ok) setError(result.error || (effectiveLocale === 'zh-CN' ? '重载失败' : 'Reload failed'))
+                if (!result.ok) setError(result.error || t('overlay.reloadFailed'))
                 else setPendingCount(0)
               })()
             }}
-            title={pendingCount > 0 ? (effectiveLocale === 'zh-CN' ? `有 ${pendingCount} 个预设待生效，点击发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 立即刷新实机画面` : `${pendingCount} presets queued. Click to reload with ${boot?.settings.ui.reloadHotkey || 'F10'}`) : (effectiveLocale === 'zh-CN' ? `发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 重载配置` : `Send ${boot?.settings.ui.reloadHotkey || 'F10'} to reload game`)}
+            title={pendingCount > 0 ? t('overlay.pendingCountHint', { count: pendingCount }) : t('overlay.reloadWithF10Tooltip', { hotkey: boot?.settings.ui.reloadHotkey || 'F10' })}
           >
             {pendingCount > 0 ? t('overlay.applyNowBtn', { count: pendingCount }) : t('overlay.reloadBtn', { hotkey: boot?.settings.ui.reloadHotkey || 'F10' })}
           </button>
           <button
             className="btn ghost small-btn"
             onClick={() => window.moddeck.overlayOpenManager()}
-            title={effectiveLocale === 'zh-CN' ? '打开 ModDeck 管理器主界面' : 'Open ModDeck Manager Window'}
+            title={t('overlay.openManagerTooltip')}
           >
             {t('overlay.openManagerBtn')}
           </button>
         </div>
         <div className="overlay-hint-bar">
-          <kbd className="overlay-kbd">{overlayHotkey || (effectiveLocale === 'zh-CN' ? '未绑定' : 'Unbound')}</kbd>
-          <span className="overlay-hint-action">{effectiveLocale === 'zh-CN' ? '呼出' : 'Toggle'}</span>
+          <kbd className="overlay-kbd">{overlayHotkey || t('overlay.unboundHotkey')}</kbd>
+          <span className="overlay-hint-action">{t('overlay.hotkeyToggleAction')}</span>
           <span className="overlay-hint-dot">·</span>
           <kbd className="overlay-kbd">Esc</kbd>
-          <span className="overlay-hint-action">{effectiveLocale === 'zh-CN' ? '隐藏' : 'Hide'}</span>
+          <span className="overlay-hint-action">{t('overlay.hotkeyHideAction')}</span>
         </div>
       </footer>
     </div>

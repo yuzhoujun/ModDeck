@@ -52,7 +52,7 @@ export function ModRow({
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      title={draggable ? '拖动排序' : mod.folderName}
+      title={draggable ? t('character.dragToSort') : mod.folderName}
     >
       {selectable ? (
         <input
@@ -64,7 +64,7 @@ export function ModRow({
             onCheck?.()
           }}
           onClick={(event) => event.stopPropagation()}
-          aria-label={`选择 ${mod.name}`}
+          aria-label={t('character.selectModAria', { name: mod.name })}
         />
       ) : null}
       <div className="mod-thumb">
@@ -77,7 +77,7 @@ export function ModRow({
       <div className="mod-main">
         <div className="mod-name" title={mod.folderName}>
           <ScrollTitle text={mod.name} className="mod-name-text" title={mod.folderName} />
-          {!mod.hasIni ? <span className="tag warn">{effectiveLocale === 'zh-CN' ? '缺少 ini' : 'No ini'}</span> : null}
+          {!mod.hasIni ? <span className="tag warn">{t('character.noIniTag')}</span> : null}
         </div>
         <div className="mod-sub">
           {mod.enabled ? t('common.enabled') : t('common.disabled')} · {formatDate(mod.updatedAt)}
@@ -111,7 +111,7 @@ export function ModRow({
           event.stopPropagation()
           onDelete()
         }}
-        title="删除到回收站"
+        title={t('character.deleteToRecycleBin')}
       >
         <Icon name="trash" size={17} />
       </button>

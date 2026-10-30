@@ -70,7 +70,7 @@ export function OverlayDetailApp() {
     setSent(null)
     try {
       const result = await window.moddeck.sendModHotkey(key)
-      if (!result.ok) setError(result.error || '发送失败')
+      if (!result.ok) setError(result.error || t('overlay.sendFailed'))
       else setSent(key)
     } catch (err) {
       setError(errorMessage(err))
@@ -127,7 +127,7 @@ export function OverlayDetailApp() {
         void fetchDetails()
         void fetchPresets()
       } else {
-        setError(res.error || '应用预设失败')
+        setError(res.error || t('overlay.applyPresetFailed'))
       }
     } catch (err) {
       setError(errorMessage(err))
@@ -153,7 +153,7 @@ export function OverlayDetailApp() {
         setShowSaveBox(false)
         void fetchPresets()
       } else {
-        setError(res.error || '保存预设失败')
+        setError(res.error || t('overlay.savePresetFailed'))
       }
     } catch (err) {
       setError(errorMessage(err))
@@ -169,7 +169,7 @@ export function OverlayDetailApp() {
           <span className="brand-mark small">M</span>
           <div className="overlay-brand-text">
             <ScrollTitle
-              text={details?.name || 'Mod 热键与预设'}
+              text={details?.name || t('overlay.modHotkeysAndPresets')}
               className="overlay-title-marquee"
             />
             <span>{details ? (details.enabled ? t('common.enabled') : t('common.disabled')) : t('common.loading')}</span>
@@ -202,7 +202,7 @@ export function OverlayDetailApp() {
                 <button
                   className="btn ghost small-btn overlay-preset-toggle-btn"
                   onClick={() => setShowSaveBox(!showSaveBox)}
-                  title="将游戏当前变体状态保存为新预设"
+                  title={t('overlay.saveLiveAsNewPresetTooltip')}
                 >
                   <Icon name="plus" size={12} />
                   {showSaveBox ? t('common.cancel') : t('mod.saveAsNew')}
@@ -213,7 +213,7 @@ export function OverlayDetailApp() {
                 <div className="overlay-preset-save-box">
                   <input
                     className="input small-input"
-                    placeholder="输入预设名（如：长发短裙）"
+                    placeholder={t('overlay.presetNameInputPlaceholder')}
                     value={newPresetName}
                     onChange={(e) => setNewPresetName(e.target.value)}
                     onKeyDown={(e) => {
@@ -225,23 +225,21 @@ export function OverlayDetailApp() {
                     className="btn primary small-btn"
                     disabled={savingPreset}
                     onClick={() => void handleSavePreset()}
-                  >
-                    保存
-                  </button>
+                  >{t('common.save')}</button>
                 </div>
               ) : null}
 
               <div className="overlay-presets-chips">
                 {presetsLoading ? (
-                  <span className="muted small">读取中…</span>
+                  <span className="muted small">{t('common.loading')}</span>
                 ) : presets.length === 0 ? (
-                  <span className="muted small">暂无预设</span>
+                  <span className="muted small">{t('overlay.noPresetsAvailable')}</span>
                 ) : (
                   <>
                     {hasUnsavedChanges() ? (
                       <div
                         className="overlay-preset-chip is-dirty"
-                        title="当前实机参数处于未保存的自定义状态，点击上方『存为预设』可保存"
+                        title={t('overlay.dirtyCustomStateTooltip')}
                       >
                         <span className="preset-dot is-dirty" />
                         <span className="preset-chip-name">{t('preset.dirtyLiveOption')}</span>
@@ -255,7 +253,7 @@ export function OverlayDetailApp() {
                         key={preset.id}
                         className={`overlay-preset-chip${pending ? ' is-pending' : active ? ' is-active' : ''}`}
                         onClick={() => requestApplyPreset(preset)}
-                        title={pending ? `「${preset.name}」待刷新生效，按 F10 即可换装` : active ? '当前正处于此预设' : `点击应用「${preset.name}」并刷新`}
+                        title={pending ? t('overlay.presetPendingReloadTooltip', { name: preset.name }) : active ? t('overlay.presetCurrentlyActiveTooltip') : t('overlay.presetClickToApplyTooltip', { name: preset.name })}
                       >
                         <span className="preset-dot" />
                         <span className="preset-chip-name" style={{ minWidth: 0, flex: 1, overflow: "hidden" }}><ScrollTitle text={(preset.id === '__default__' || preset.name === '默认' || preset.name === '默认 (初始)') ? t('preset.defaultPreset') : preset.name} /></span>
@@ -283,7 +281,7 @@ export function OverlayDetailApp() {
                       key={`${hotkey.section}-${index}`}
                       className="hotkey-pill"
                       onClick={() => void send(hotkey.key)}
-                      title={`${hotkey.section} · 点击发送`}
+                      title={t('overlay.clickToSendHotkeyTooltip', { section: hotkey.section })}
                     >
                       <kbd>{hotkey.key}</kbd>
                       <span>{hotkey.section}</span>
@@ -297,29 +295,25 @@ export function OverlayDetailApp() {
 
             {confirmPreset ? (
               <Modal
-                title="切换预设确认"
+                title={t('preset.dirtyConfirmTitle')}
                 onClose={() => setConfirmPreset(null)}
                 width={290}
                 footer={
                   <>
-                    <button className="btn ghost small-btn" onClick={() => setConfirmPreset(null)}>
-                      取消
-                    </button>
+                    <button className="btn ghost small-btn" onClick={() => setConfirmPreset(null)}>{t('common.cancel')}</button>
                     <button
                       className="btn primary small-btn"
                       onClick={() => void handleApplyPreset(confirmPreset)}
-                    >
-                      确认并切换
-                    </button>
+                    >{t('preset.dirtyConfirmProceed')}</button>
                   </>
                 }
               >
                 <div className="danger-confirm-dialog" style={{ fontSize: '13px' }}>
                   <p>
-                    检测到当前造型有<strong>未保存的实机改动</strong>。
+                    {t('preset.dirtyConfirmDesc1')}
                   </p>
                   <p className="muted small">
-                    切换到「{confirmPreset.name}」将覆盖未保存的配置，是否确认继续？
+                    {t('preset.dirtyConfirmDesc2', { name: confirmPreset.name })}
                   </p>
                 </div>
               </Modal>

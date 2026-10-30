@@ -46,9 +46,9 @@ export function CharacterCard({
             {initialOf(name)}
           </span>
         )}
-        {!character.known ? <span className="tag new">{effectiveLocale === 'zh-CN' ? '新' : 'NEW'}</span> : null}
+        {!character.known ? <span className="tag new">{t('character.tagNew')}</span> : null}
         {character.kind === 'utility' ? (
-          <span className="tag utility">{effectiveLocale === 'zh-CN' ? '功能' : 'UTIL'}</span>
+          <span className="tag utility">{t('character.tagUtility')}</span>
         ) : null}
       </div>
       <div className="char-meta">

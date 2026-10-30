@@ -333,7 +333,7 @@ export function SettingsView({
             <div className="setting-row-action" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <select
                 className="select"
-                style={{ minWidth: '150px' }}
+                style={{ flex: 1, minWidth: 0 }}
                 value={draft.ui.language || 'auto'}
                 onChange={(event) => {
                   const val = event.target.value
@@ -350,13 +350,12 @@ export function SettingsView({
               </select>
               <button
                 type="button"
-                className="btn ghost small-btn"
+                className="icon-btn"
                 title={t('settings.general.openLanguagesFolderTip')}
                 onClick={() => void window.moddeck.openPath('languages')}
-                style={{ padding: '6px 10px', height: '32px', whiteSpace: 'nowrap' }}
+                style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', flexShrink: 0 }}
               >
-                <Icon name="folder" size={14} />
-                {t('settings.general.openLanguagesFolder')}
+                <Icon name="folder" size={16} />
               </button>
             </div>
           </section>
@@ -458,7 +457,7 @@ export function SettingsView({
             <div className="setting-group-box">
               <div className="setting-group-header">
                 <span className="setting-group-title">{t('settings.general.recentModCount')}</span>
-                <span className="setting-val-badge">{draft.ui.recentModCount} 个</span>
+                <span className="setting-val-badge">{draft.ui.recentModCount} {t('settings.general.itemsUnit')}</span>
               </div>
               <div className="setting-range-container">
                 <input
@@ -615,13 +614,13 @@ export function SettingsView({
                     <span>{t('settings.general.manualReloadAlertTitle')}</span>
                   </div>
                   <div>
-                    您已关闭部分预设自动重载。挑选预设后，造型变量已预写入集中桥接文件，但<strong>实机画面仍需一次重载才能呈现</strong>。
+                    {t('settings.advanced.modalReloadF10Desc1')}<strong>{t('settings.advanced.modalReloadF10Desc2')}</strong>。
                   </div>
                   <div style={{ marginTop: '6px' }}>
-                    • <strong>推荐重载生效方式</strong>：在游戏内按快捷键（默认 <code>{draft.ui.overlayHotkey || 'Alt+Shift+M'}</code>）呼出浮动快捷窗口，点击底部的 <strong>「重载 F10 / 立即生效」</strong> 按钮（当有待生效预设排队时会显示为高亮脉冲 <strong>「● 立即生效 (N)」</strong>，平时显示为 <strong>「重载 F10」</strong>）。ModDeck 将启动安全缓冲同步，自动清空排队指示灯并保全冷启动数据。
+                    {t('settings.advanced.modalReloadF10Desc3', { hotkey: draft.ui.overlayHotkey || 'Alt+Shift+M' })}
                   </div>
                   <div style={{ marginTop: '6px' }}>
-                    • <strong>物理键盘 F10 说明</strong>：若您在游戏内直接按键盘物理 <code>F10</code>，游戏画面会<strong>立即变身换装生效</strong>（集中桥接配置已被 3DMigoto 读取），但 ModDeck UI 状态由于 Windows 进程隔离无法自动截获键盘按键并转绿。建议您随时呼出快捷窗口点击生效，让指示灯与磁盘完全同步闭环。
+                    {t('settings.advanced.modalReloadF10Desc4')}
                   </div>
                 </div>
               )}
@@ -677,7 +676,7 @@ export function SettingsView({
                     void window.moddeck.reloadF10()
                     onNotify(t('settings.notify.d3dxReloadSent'))
                   }}
-                  title="若游戏运行中修改，可点击向游戏发送重载，立即应用新刷盘周期"
+                  title={t('settings.advanced.applyIntervalTooltip')}
                 >
                   <Icon name="refresh" size={13} />
                   <span>{t('settings.general.applyIntervalNow')}</span>
@@ -715,7 +714,7 @@ export function SettingsView({
                     setBenchmarkElapsed(0)
                     setShowBenchmarkModal(true)
                   }}
-                  title="在游戏运行中实测重载耗时并自动设置最适延迟"
+                  title={t('settings.advanced.benchmarkCalibrateTooltip')}
                 >
                   <Icon name="refresh" size={13} />
                   <span>{t('settings.general.benchmarkCalibrate')}</span>
@@ -1145,7 +1144,7 @@ export function SettingsView({
                     userSelect: 'all'
                   }}
                 >
-                  {info?.userData || '获取中...'}
+                  {info?.userData || t('common.loading')}
                 </code>
               </div>
               <div className="row">
@@ -1174,11 +1173,11 @@ export function SettingsView({
         <Modal
           title={t('settings.modals.f10WarningTitle')}
           onClose={() => setShowF10WarningModal(false)}
-          width={420}
+          width={440}
           footer={
             <>
               <button className="btn ghost" onClick={() => setShowF10WarningModal(false)}>
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 className="btn primary"
@@ -1187,14 +1186,17 @@ export function SettingsView({
                   updateUi({ autoReloadModToggle: true, autoReloadF10: true })
                 }}
               >
-                确认开启
+                {t('settings.modals.confirmEnable')}
               </button>
             </>
           }
         >
           <div className="danger-confirm-dialog">
             <p>
-              {t('settings.advanced.autoReloadModalBody')}
+              {t('settings.modals.f10WarningDesc1', { hotkey: draft.ui.reloadHotkey || 'F10' })}
+            </p>
+            <p className="muted small">
+              {t('settings.modals.f10WarningDesc2')}
             </p>
           </div>
         </Modal>
@@ -1207,7 +1209,7 @@ export function SettingsView({
           footer={
             <>
               <button className="btn ghost" onClick={() => setShowDisablePresetReloadModal(null)}>
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 className="btn primary"
@@ -1228,7 +1230,10 @@ export function SettingsView({
         >
           <div className="danger-confirm-dialog">
             <p>
-              {t('settings.advanced.autoReloadDisableBody')}
+              {t('settings.modals.disablePresetReloadDesc1')}
+            </p>
+            <p className="muted small">
+              {t('settings.modals.disablePresetReloadDesc2', { hotkey: draft.ui.reloadHotkey || 'F10' })}
             </p>
           </div>
         </Modal>
@@ -1282,12 +1287,7 @@ export function SettingsView({
               </div>
             ) : (
               <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
-                <button
-                  className="btn ghost"
-                  onClick={() => setShowBenchmarkModal(false)}
-                >
-                  取消
-                </button>
+                <button className="btn ghost" onClick={() => setShowBenchmarkModal(false)}>{t('common.cancel')}</button>
                 <button
                   className="btn primary"
                   onClick={async () => {
@@ -1344,11 +1344,11 @@ export function SettingsView({
                   {t('settings.modals.benchmarkMeasured')}
                 </div>
                 <div style={{ fontSize: '32px', fontWeight: 700, fontFamily: 'monospace' }}>
-                  {benchmarkElapsed.toFixed(2)} {effectiveLocale === 'zh-CN' ? '秒' : 's'}
+                  {benchmarkElapsed.toFixed(2)} {t('common.secondsUnit')}
                 </div>
                 <div style={{ margin: '14px 0', padding: '10px', background: 'var(--bg-subtle, rgba(255,255,255,0.04))', borderRadius: '6px' }}>
                   <div style={{ fontSize: '14px' }}>
-                    {t('settings.modals.benchmarkRecommended')}<strong style={{ color: 'var(--accent, #6366f1)', fontSize: '16px' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} {effectiveLocale === 'zh-CN' ? '秒' : 's'}</strong>
+                    {t('settings.modals.benchmarkRecommended')}<strong style={{ color: 'var(--accent, #6366f1)', fontSize: '16px' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} {t('common.secondsUnit')}</strong>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted, #888)', marginTop: '4px' }}>
                     {t('settings.modals.benchmarkRecommendedDesc', { time: benchmarkElapsed.toFixed(1) })}

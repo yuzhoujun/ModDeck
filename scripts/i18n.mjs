@@ -73,10 +73,14 @@ function scanHardcodedChinese() {
         const lines = fs.readFileSync(full, 'utf8').split('\n')
         lines.forEach((line, i) => {
           const trimmed = line.trim()
-          if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) return
+          if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*') || trimmed.startsWith('{/*')) return
           if (chineseRegex.test(line)) {
-            // Check if it's completely inside t('...') or not
-            results.push({ file: path.relative(ROOT, full), line: i + 1, text: trimmed })
+            // Filter out lines where all Chinese is wrapped in t('...') or t("...") or fallback comments
+            // Quick check: does it have raw Chinese not inside t(...)
+            const withoutT = line.replace(/t\([^)]+\)/g, '')
+            if (chineseRegex.test(withoutT)) {
+              results.push({ file: path.relative(ROOT, full), line: i + 1, text: trimmed })
+            }
           }
         })
       }
@@ -89,7 +93,30 @@ function scanHardcodedChinese() {
 
 const command = process.argv[2] || 'check'
 
-if (command === 'check') {
+if (command === 'extract') {
+  console.log('🔍 Scanning src/renderer/src for hardcoded Chinese text...\n')
+  const items = scanHardcodedChinese()
+  const grouped = {}
+  for (const item of items) {
+    grouped[item.file] = grouped[item.file] || []
+    grouped[item.file].push(item)
+  }
+
+  console.log('📊 Summary of untranslated Chinese text by file:')
+  console.log('------------------------------------------------------------')
+  let total = 0
+  const sortedFiles = Object.keys(grouped).sort((a, b) => grouped[b].length - grouped[a].length)
+  for (const f of sortedFiles) {
+    console.log(`  📄 ${f.padEnd(45)} : ${grouped[f].length} occurrences`)
+    total += grouped[f].length
+  }
+  console.log('------------------------------------------------------------')
+  console.log(`Total untranslated lines found: ${total} across ${sortedFiles.length} files.\n`)
+
+  const reportPath = path.resolve(__dirname, 'untranslated-report.json')
+  fs.writeFileSync(reportPath, JSON.stringify(grouped, null, 2), 'utf8')
+  console.log(`💾 Detailed report saved to: ${reportPath}`)
+} else if (command === 'check') {
   console.log('🔍 Checking i18n locales against base (zh-CN)...')
   const baseFile = path.join(LOCALES_DIR, `${BASE_LOCALE}.json`)
   if (!fs.existsSync(baseFile)) {
@@ -177,5 +204,5 @@ if (command === 'check') {
   writeJson(targetFile, template)
   console.log(`🎉 Created new locale template: ${targetFile}`)
 } else {
-  console.log('Unknown command. Available: check, sync, new <locale>')
+  console.log('Unknown command. Available: check, sync, extract, new <locale>')
 }

@@ -136,7 +136,7 @@ export function ModDetailsPanel({
     if (!details) return
     const name = newPresetName.trim()
     if (!name) {
-      onNotify?.('请输入预设名称', 'err')
+      onNotify?.(t('preset.enterPresetNameErr'), 'err')
       return
     }
     try {
@@ -147,7 +147,7 @@ export function ModDetailsPanel({
         name
       )
       if (res.ok) {
-        onNotify?.(`已保存预设「${name}」`, 'ok')
+        onNotify?.(t('preset.presetSaved', { name }), 'ok')
         setNewPresetName('')
         setShowSavePreset(false)
         const updated = await window.moddeck.getModPresets(
@@ -157,7 +157,7 @@ export function ModDetailsPanel({
         )
         setPresets(updated)
       } else {
-        onNotify?.(res.error || '保存预设失败', 'err')
+        onNotify?.(res.error || t('preset.presetSaveFailed'), 'err')
       }
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : String(err), 'err')
@@ -183,12 +183,12 @@ export function ModDetailsPanel({
         preset.id
       )
       if (res.ok) {
-        onNotify?.(`已切换至预设「${preset.name}」`, 'ok')
+        onNotify?.(t('preset.presetSwitched', { name: preset.name }), 'ok')
         setConfirmPreset(null)
         onRefreshDetails?.()
         void refreshPresets()
       } else {
-        onNotify?.(res.error || '切换预设失败', 'err')
+        onNotify?.(res.error || t('preset.presetSwitchFailed'), 'err')
       }
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : String(err), 'err')
@@ -205,10 +205,10 @@ export function ModDetailsPanel({
         preset.id
       )
       if (res.ok) {
-        onNotify?.(`已删除预设「${preset.name}」`, 'info')
+        onNotify?.(t('preset.presetDeleted', { name: preset.name }), 'info')
         setPresets((curr) => curr.filter((p) => p.id !== preset.id))
       } else {
-        onNotify?.(res.error || '删除预设失败', 'err')
+        onNotify?.(res.error || t('preset.presetDeleteFailed'), 'err')
       }
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : String(err), 'err')
@@ -250,7 +250,7 @@ export function ModDetailsPanel({
     <aside className="detail-panel">
       <div className="detail-head">
         <strong>{t('mod.detailsTitle')}</strong>
-        <button className="icon-btn" onClick={onClose} title="关闭">
+        <button className="icon-btn" onClick={onClose} title={t('common.close')}>
           <Icon name="close" size={16} />
         </button>
       </div>
@@ -258,7 +258,7 @@ export function ModDetailsPanel({
       {loading ? (
         <div className="detail-empty">
           <div className="spinner" />
-          <span className="muted">读取目录…</span>
+          <span className="muted">{t('common.readingDirectory')}</span>
         </div>
       ) : error ? (
         <div className="detail-empty">
@@ -274,20 +274,20 @@ export function ModDetailsPanel({
             onDragOver={handlePreviewDragOver}
             onDragLeave={handlePreviewDragLeave}
             onDrop={handlePreviewDrop}
-            title={onSetPreview ? '点击或拖入图片更换该 Mod 的预览图' : undefined}
+            title={onSetPreview ? t('preset.setModPreviewDrag') : undefined}
           >
             {details.previewUrl ? (
               <img src={details.previewUrl} alt="" />
             ) : (
               <div className="detail-preview-empty">
                 <Icon name="image" size={28} />
-                <span>点击或拖入图片设置预览图</span>
+                <span>{t('preset.setModPreviewDrop')}</span>
               </div>
             )}
             {onSetPreview ? (
               <div className="detail-preview-hint">
                 <Icon name="upload" size={15} />
-                <span>{previewDrag ? '松开保存为 Mod 预览图' : '点击或拖入图片更换预览图'}</span>
+                <span>{previewDrag ? t('preset.setModPreviewDropActive') : t('preset.setModPreviewDrop')}</span>
               </div>
             ) : null}
           </div>
@@ -295,7 +295,7 @@ export function ModDetailsPanel({
           <div className="detail-title">
             <ScrollTitle text={details.name} className="detail-title-text" />
             <span className={`chip ${details.enabled ? 'ok' : ''}`}>
-              {details.enabled ? '已启用' : '已禁用'}
+              {details.enabled ? t('mod.enabled') : t('mod.disabled')}
             </span>
           </div>
           <div className="detail-path" title={details.folderName}>
@@ -328,7 +328,7 @@ export function ModDetailsPanel({
               <button
                 className="btn ghost small-btn"
                 onClick={() => setShowSavePreset(!showSavePreset)}
-                title="将当前配置保存为该 Mod 的独立预设"
+                title={t('preset.saveAsModPresetTooltip')}
               >
                 <Icon name="plus" size={13} />
                 {showSavePreset ? t('common.cancel') : t('mod.saveAsNew')}
@@ -362,7 +362,7 @@ export function ModDetailsPanel({
                 {hasUnsavedChanges() ? (
                   <div
                     className="detail-preset-chip is-dirty"
-                    title="检测到实机参数已发生自定义修改，未匹配任何已保存预设。点击右上角『存为预设』可将其持久化保存。"
+                    title={t('preset.unsavedDirtyModTooltip')}
                   >
                     <div className="preset-apply-btn" style={{ cursor: 'default' }}>
                       <span className="preset-dot is-dirty" />
@@ -379,17 +379,17 @@ export function ModDetailsPanel({
                       key={preset.id}
                       className={`detail-preset-chip${pending ? ' is-pending' : active ? ' is-active' : ''}${isDefault ? ' is-default' : ''}`}
                       onDoubleClick={() => setInspectingPreset(preset)}
-                      title="双击查看预设参数详情"
+                      title={t('preset.viewPresetDetailTooltip')}
                     >
                       <button
                         className="preset-apply-btn"
                         onClick={() => requestApplyPreset(preset)}
                         title={
                           pending
-                            ? `「${preset.name}」已排队待生效，按 F10 立即刷新实机画面`
+                            ? t('preset.presetQueuedF10', { name: preset.name })
                             : active
-                              ? `当前正处于「${preset.name}」（双击查看详情）`
-                              : `点击应用「${preset.name}」（双击查看详情）`
+                              ? t('preset.presetCurrentActive', { name: preset.name })
+                              : t('preset.presetClickToApply', { name: preset.name })
                         }
                       >
                         <span className="preset-dot" />
@@ -401,7 +401,7 @@ export function ModDetailsPanel({
                           e.stopPropagation()
                           setInspectingPreset(preset)
                         }}
-                        title="查看预设详情"
+                        title={t('preset.viewDetailsBtnTooltip')}
                       >
                         <Icon name="info" size={12} />
                       </button>
@@ -409,7 +409,7 @@ export function ModDetailsPanel({
                         <button
                           className="icon-btn danger preset-del-btn"
                           onClick={() => void handleDeletePreset(preset)}
-                          title="删除该预设"
+                          title={t('preset.deletePresetBtnTooltip')}
                         >
                           <Icon name="close" size={12} />
                         </button>
@@ -496,11 +496,10 @@ export function ModDetailsPanel({
         >
           <div className="danger-confirm-dialog">
             <p>
-              检测到当前变体状态已有<strong>未保存的改动</strong>。
+              {t('preset.dirtyConfirmDesc1')}
             </p>
             <p className="muted small">
-              如果继续切换至「{confirmPreset.name}」，当前未存为预设的 ini
-              改动将被直接覆盖。是否确定继续？
+              {t('preset.dirtyConfirmDesc2', { name: confirmPreset.name })}
             </p>
           </div>
         </Modal>
