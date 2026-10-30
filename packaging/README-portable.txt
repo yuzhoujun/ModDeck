@@ -10,7 +10,8 @@ ModDeck 2.3.0 免安装便携版
    - ModDeck.exe
    - ModDeck.cmd
    - resources 文件夹（里面应有 app.asar）
-   - locales 文件夹
+   - languages 文件夹（多语言词典 JSON，支持外部扩展）
+   - locales 文件夹（Chromium 底层系统支持）
 3. 双击 ModDeck.cmd。
 
 为什么直接双击 ModDeck.exe 可能没反应

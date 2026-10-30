@@ -13,6 +13,7 @@ const BUILTIN_LOCALES: Record<string, TranslationDict> = {
 export interface I18nContextValue {
   locale: string
   effectiveLocale: string
+  availableLocales: string[]
   setLocale: (next: SupportedLocale) => void
   t: (key: string, params?: TranslationParams) => string
 }
@@ -49,6 +50,7 @@ export function I18nProvider({
   children: ReactNode
 }) {
   const [currentLocale, setCurrentLocale] = useState<string>(language || 'auto')
+  const [customDicts, setCustomDicts] = useState<Record<string, TranslationDict>>({})
 
   useEffect(() => {
     if (language) {
@@ -58,6 +60,7 @@ export function I18nProvider({
         .bootstrap()
         .then((b) => {
           if (b?.settings?.ui?.language) setCurrentLocale(b.settings.ui.language)
+          if (b?.customLocales) setCustomDicts(b.customLocales)
         })
         .catch(() => {})
     }
@@ -70,6 +73,7 @@ export function I18nProvider({
           .bootstrap()
           .then((b) => {
             if (b?.settings?.ui?.language) setCurrentLocale(b.settings.ui.language)
+            if (b?.customLocales) setCustomDicts(b.customLocales)
           })
           .catch(() => {})
       })
@@ -82,6 +86,11 @@ export function I18nProvider({
 
   const effectiveLocale = useMemo(() => resolveEffectiveLocale(currentLocale), [currentLocale])
 
+  const availableLocales = useMemo(() => {
+    const customKeys = Object.keys(customDicts).filter((k) => k !== 'zh-CN' && k !== 'en-US' && k !== 'en')
+    return ['zh-CN', 'en-US', ...customKeys]
+  }, [customDicts])
+
   const setLocale = (next: SupportedLocale) => {
     setCurrentLocale(next)
     if (onLanguageChange) {
@@ -92,7 +101,7 @@ export function I18nProvider({
   }
 
   const t = useMemo(() => {
-    const activeDict = BUILTIN_LOCALES[effectiveLocale] || BUILTIN_LOCALES['en-US']
+    const activeDict = customDicts[effectiveLocale] || BUILTIN_LOCALES[effectiveLocale] || BUILTIN_LOCALES['en-US']
     const fallbackDict = BUILTIN_LOCALES['zh-CN']
 
     return (key: string, params?: TranslationParams): string => {
@@ -111,10 +120,10 @@ export function I18nProvider({
       }
       return result
     }
-  }, [effectiveLocale])
+  }, [effectiveLocale, customDicts])
 
   return (
-    <I18nContext.Provider value={{ locale: currentLocale, effectiveLocale, setLocale, t }}>
+    <I18nContext.Provider value={{ locale: currentLocale, effectiveLocale, availableLocales, setLocale, t }}>
       {children}
     </I18nContext.Provider>
   )
@@ -128,6 +137,7 @@ export function useI18n(): I18nContextValue {
     return {
       locale: 'auto',
       effectiveLocale: effective,
+      availableLocales: ['zh-CN', 'en-US'],
       setLocale: () => undefined,
       t: (key: string, params?: TranslationParams) => {
         let raw = getNestedValue(activeDict, key) || key
@@ -163,4 +173,3 @@ export function getLocaleGameShortName(game: GameDef, effectiveLocale: string): 
   if (effectiveLocale === 'zh-CN') return game.shortName
   return game.shortNameEn || game.shortName
 }
-

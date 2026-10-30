@@ -1,6 +1,6 @@
 {
   "name": "moddeck",
-  "version": "2.3.1-patch.2",
+  "version": "2.3.1-patch.3",
   "private": true,
   "description": "Open-source local mod manager for 3DMigoto / XXMI games",
   "author": "ModDeck contributors",
@@ -13,7 +13,9 @@
     "smoke": "node scripts/prepare-smoke.mjs && electron . --smoke-test --no-sandbox",
     "scan:report": "electron . --scan-report --no-sandbox",
     "package:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-portable.ps1",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "i18n:check": "node scripts/i18n.mjs check",
+    "i18n:sync": "node scripts/i18n.mjs sync"
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",

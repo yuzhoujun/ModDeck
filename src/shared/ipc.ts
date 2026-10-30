@@ -111,7 +111,7 @@ export interface ModDeckApi {
   deleteMod(gameId: GameId, characterFolder: string, modFolder: string): Promise<ToggleResult>
   openModFolder(gameId: GameId, characterFolder: string, modFolder: string): Promise<ToggleResult>
   openCharacterFolder(gameId: GameId, characterFolder: string): Promise<ToggleResult>
-  openPath(kind: 'mods' | 'game' | 'loader' | 'data' | 'logs', gameId?: GameId): Promise<ToggleResult>
+  openPath(kind: 'mods' | 'game' | 'loader' | 'data' | 'logs' | 'languages' | 'locales', gameId?: GameId): Promise<ToggleResult>
   pickModsFolder(): Promise<string | null>
   pickGameExe(): Promise<string | null>
   pickLoader(): Promise<string | null>

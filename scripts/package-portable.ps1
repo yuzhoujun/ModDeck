@@ -26,7 +26,10 @@ if ($LASTEXITCODE -ne 0) { throw 'electron-builder --dir failed' }
 
 Copy-Item 'packaging\README-portable.txt' (Join-Path $appDir 'README.txt') -Force
 Copy-Item 'packaging\ModDeck.cmd' (Join-Path $appDir 'ModDeck.cmd') -Force
-Copy-Item 'src\shared\i18n\locales' (Join-Path $appDir 'locales') -Recurse -Force
+$langDir = Join-Path $appDir 'languages'
+New-Item -ItemType Directory -Force $langDir | Out-Null
+Copy-Item 'src\shared\i18n\locales\*' $langDir -Force
+if (Test-Path (Join-Path $appDir 'locales\locales')) { Remove-Item (Join-Path $appDir 'locales\locales') -Recurse -Force }
 
 $sevenZipCandidates = @()
 if ($env:ProgramFiles) { $sevenZipCandidates += Join-Path $env:ProgramFiles '7-Zip\7z.exe' }
