@@ -197,7 +197,7 @@
       "allowHotkeySendDesc": "在快捷窗口内点击 Mod 变体热键胶囊时，自动向处于前台的游戏窗口发送物理按键信号。",
       "recentModCount": "快捷窗口最近使用 Mod 栏展示数量",
       "recentModCountDesc": "在游戏内浮动快捷窗口顶部展示的最近操作 Mod 快捷胶囊数量（设为 0 则在快捷窗口中完全隐藏最近使用栏）。",
-      "languageTitle": "软件语言 (Language)",
+      "languageTitle": "界面语言",
       "languageDesc": "选择界面显示语言。支持简体中文、English 及 locales/ 外部语言包扩展。",
       "languageAuto": "跟随系统 (Auto)",
       "behaviorTitle": "游戏刷新与快捷行为",
@@ -233,8 +233,8 @@
       "reloadBufferDelayCurrent": "当前: {seconds}s",
       "benchmarkCalibrate": "测速校准",
       "reloadBufferDelayDesc": "💡 该参数为 ModDeck 内部的异步等待定时器，纯内存热生效，修改后无需重载或重启游戏。F10 后 ModDeck 等待游戏编译着色器及跨入渲染帧的缓冲时间。可点击「测速校准」自动测量。",
-      "closeBehaviorTitle": "关闭行为",
-      "closeBehaviorDesc": "最小化后 ModDeck 会留在托盘，全局快捷键和快捷窗口继续可用。",
+      "closeBehaviorTitle": "窗口关闭行为",
+      "closeBehaviorDesc": "选择关闭主界面时的默认动作。最小化到托盘可保持快捷键与快捷窗口随时可用。",
       "closeBehavior": "关闭主窗口时",
       "closeBehaviorQuit": "直接退出 ModDeck",
       "closeBehaviorMinimize": "最小化到系统托盘（推荐）"
@@ -247,7 +247,11 @@
       "loaderPathLabel": "启动器（可选）",
       "launchArgsLabel": "启动参数（可选）",
       "pickFolderTooltip": "选择目录",
-      "pickFileTooltip": "选择程序"
+      "pickFileTooltip": "选择程序",
+      "modsPlaceholder": "例如 D:/Games/XXMI/{loader} 或 D:/Games/XXMI/{loader}/Mods",
+      "argsPlaceholder": "例如 -dx11",
+      "pickGameTooltip": "选择游戏程序",
+      "pickLoaderTooltip": "选择启动器"
     },
     "environment": {
       "title": "MI 运行环境检查",
@@ -261,7 +265,13 @@
       "statusMissingLine": "缺少 exclude_recursive = DISABLED*",
       "statusMissingFile": "找不到根目录的 d3dx.ini",
       "statusNoRoot": "还没有配置目录",
-      "statusPending": "待接入"
+      "statusPending": "待接入",
+      "checking": "检测中…",
+      "rootDirLabel": "根目录：",
+      "ruleLabel": "规则：",
+      "notConfigured": "未配置",
+      "pendingDesc": "该 MI 的环境检查尚未接入，配置位置已保留，后续版本补充。",
+      "statusNotChecked": "尚未检测"
     },
     "import": {
       "title": "Mod 导入行为",
@@ -278,7 +288,15 @@
       "syncRosterBtn": "一键更新词库",
       "syncRosterSyncing": "更新中…",
       "rosterStatusBuiltin": "当前使用内置离线词库",
-      "rosterStatusSynced": "上次云端同步：{time}"
+      "rosterStatusSynced": "上次云端同步：{time}",
+      "mirrorPresetsLabel": "源地址预设",
+      "mirrorOfficial": "官方 Raw",
+      "mirrorGitHubRawBlob": "GitHub 原始",
+      "mirrorJsDelivr": "jsDelivr CDN (国内加速)",
+      "mirrorGhProxy": "ghproxy (代理加速)",
+      "mirrorCustom": "自定义",
+      "rosterStatusPrefix": "当前词库状态：",
+      "rosterItemUnit": "项"
     },
     "about": {
       "title": "关于 ModDeck",
@@ -299,6 +317,21 @@
     "advanced": {
       "title": "高级设置",
       "desc": "管理游戏内快捷悬浮窗、3DMigoto 重载热键、自动换装策略与刷盘同步延迟。"
+    },
+    "modals": {
+      "f10WarningTitle": "开启自动重载确认",
+      "f10WarningDesc1": "开启后，每次切换 Mod 或应用预设都会在 600ms 防抖后自动向游戏发送 {hotkey}。",
+      "f10WarningDesc2": "注意：当 Mods 目录下启用的 Mod 较多时，3DMigoto 执行每次重载大约会有数秒钟的画面停顿，属于加载器正常现象。",
+      "confirmEnable": "确认开启",
+      "disablePresetReloadTitle": "关闭预设自动重载确认",
+      "disablePresetReloadDesc1": "关闭后，在主界面或快捷窗口切换预设将不再自动驱动游戏换装。",
+      "disablePresetReloadDesc2": "新预设将暂存为“待生效”状态（显示为蓝色脉冲光标），您可以在离线状态下挑选多个角色的不同预设，最后手动按下 {hotkey}（或点击快捷窗口底部的“立即生效”按钮）一次性全部换装。",
+      "confirmDisable": "确认关闭",
+      "benchmarkTitle": "3DMigoto 重载耗时测速校准",
+      "benchmarkStop": "⏱️ 游戏已重载完毕，停止计时",
+      "benchmarkRetry": "重新测速",
+      "benchmarkApply": "应用推荐值 ({seconds}s) 并保存",
+      "benchmarkStart": "开始测速"
     }
   }
 }

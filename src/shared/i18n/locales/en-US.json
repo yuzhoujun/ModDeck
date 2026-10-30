@@ -178,9 +178,9 @@
     "eyebrow": "PREFERENCES",
     "title": "Settings",
     "desc": "General behavior, game paths, environment checks, and import options. All changes saved locally.",
-    "autoSaveIdle": "Auto-saved locally in real time",
+    "autoSaveIdle": "Auto-saved locally",
     "autoSaveSaving": "Saving…",
-    "autoSaveSaved": "Auto-saved",
+    "autoSaveSaved": "Saved",
     "tabGeneral": "General",
     "tabGames": "Paths",
     "tabEnvironment": "Environment",
@@ -197,7 +197,7 @@
       "allowHotkeySendDesc": "When clicking mod hotkey capsules in overlay, automatically send physical key events to foreground game window.",
       "recentModCount": "Recent Mods Display Count in Quick Overlay",
       "recentModCountDesc": "Number of recently used mod capsules displayed at top of in-game overlay (set to 0 to completely hide recent bar).",
-      "languageTitle": "Language / 软件语言",
+      "languageTitle": "Interface Language",
       "languageDesc": "Choose interface language. Supports Simplified Chinese, English, and external locales/ packages.",
       "languageAuto": "Auto (Follow System)",
       "behaviorTitle": "Game Refresh & Hotkey Behavior",
@@ -233,8 +233,8 @@
       "reloadBufferDelayCurrent": "Current: {seconds}s",
       "benchmarkCalibrate": "Benchmark",
       "reloadBufferDelayDesc": "💡 Internal async waiting timer in ModDeck. Pure memory hot-reload without needing F10 or restart. Waiting duration for game shaders to compile and cross Present frame. Click 'Benchmark' to measure.",
-      "closeBehaviorTitle": "Close Behavior",
-      "closeBehaviorDesc": "When minimized, ModDeck stays in system tray with hotkeys and quick overlay active.",
+      "closeBehaviorTitle": "Close Window Behavior",
+      "closeBehaviorDesc": "Choose action when closing main window. Minimizing keeps hotkeys and Quick Overlay active.",
       "closeBehavior": "When closing main window",
       "closeBehaviorQuit": "Quit ModDeck",
       "closeBehaviorMinimize": "Minimize to system tray (Recommended)"
@@ -247,7 +247,11 @@
       "loaderPathLabel": "Loader Executable (Optional)",
       "launchArgsLabel": "Launch Arguments (Optional)",
       "pickFolderTooltip": "Select Directory",
-      "pickFileTooltip": "Select Executable"
+      "pickFileTooltip": "Select Executable",
+      "modsPlaceholder": "e.g. D:/Games/XXMI/{loader} or D:/Games/XXMI/{loader}/Mods",
+      "argsPlaceholder": "e.g. -dx11",
+      "pickGameTooltip": "Select Game Executable",
+      "pickLoaderTooltip": "Select Loader Executable"
     },
     "environment": {
       "title": "MI Environment Checks",
@@ -261,7 +265,13 @@
       "statusMissingLine": "Missing exclude_recursive = DISABLED*",
       "statusMissingFile": "Cannot find d3dx.ini in root",
       "statusNoRoot": "Directory not configured yet",
-      "statusPending": "Upcoming"
+      "statusPending": "Upcoming",
+      "checking": "Checking…",
+      "rootDirLabel": "Root: ",
+      "ruleLabel": "Rule: ",
+      "notConfigured": "Not configured",
+      "pendingDesc": "Environment check not yet integrated for this MI; configuration slot reserved for future updates.",
+      "statusNotChecked": "Not checked yet"
     },
     "import": {
       "title": "Mod Import Behavior",
@@ -278,7 +288,15 @@
       "syncRosterBtn": "Update Dictionary Now",
       "syncRosterSyncing": "Updating…",
       "rosterStatusBuiltin": "Currently using built-in offline dictionary",
-      "rosterStatusSynced": "Last cloud sync: {time}"
+      "rosterStatusSynced": "Last cloud sync: {time}",
+      "mirrorPresetsLabel": "Source Presets",
+      "mirrorOfficial": "Official Raw",
+      "mirrorGitHubRawBlob": "GitHub Raw (Blob)",
+      "mirrorJsDelivr": "jsDelivr CDN (Fast)",
+      "mirrorGhProxy": "ghproxy (Proxy)",
+      "mirrorCustom": "Custom",
+      "rosterStatusPrefix": "Current Dictionary: ",
+      "rosterItemUnit": "items"
     },
     "about": {
       "title": "About ModDeck",
@@ -299,6 +317,21 @@
     "advanced": {
       "title": "Advanced Settings",
       "desc": "Configure in-game Quick Overlay, 3DMigoto reload hotkeys, auto-switch strategies, and sync timing."
+    },
+    "modals": {
+      "f10WarningTitle": "Confirm Enable Auto-Reload",
+      "f10WarningDesc1": "When enabled, switching mods or applying presets will automatically send {hotkey} to the game after a 600ms debounce.",
+      "f10WarningDesc2": "Note: With many active mods, 3DMigoto reloading may cause a momentary pause of several seconds. This is normal loader behavior.",
+      "confirmEnable": "Confirm Enable",
+      "disablePresetReloadTitle": "Confirm Disable Preset Auto-Reload",
+      "disablePresetReloadDesc1": "When disabled, switching presets in main view or overlay will no longer automatically reload the game.",
+      "disablePresetReloadDesc2": "New presets will be queued as pending (indicated by a blue pulsing dot). You can select presets across characters and then press {hotkey} or click Apply Now in overlay to reload all changes at once.",
+      "confirmDisable": "Confirm Disable",
+      "benchmarkTitle": "3DMigoto Reload Benchmark & Calibration",
+      "benchmarkStop": "⏱️ Game Reload Finished, Stop Timer",
+      "benchmarkRetry": "Rerun Benchmark",
+      "benchmarkApply": "Apply Recommended ({seconds}s) & Save",
+      "benchmarkStart": "Start Benchmark"
     }
   }
 }
