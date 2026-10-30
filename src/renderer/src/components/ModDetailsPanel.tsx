@@ -249,7 +249,7 @@ export function ModDetailsPanel({
   return (
     <aside className="detail-panel">
       <div className="detail-head">
-        <strong>Mod 详情</strong>
+        <strong>{t('mod.detailsTitle')}</strong>
         <button className="icon-btn" onClick={onClose} title="关闭">
           <Icon name="close" size={16} />
         </button>
@@ -393,7 +393,7 @@ export function ModDetailsPanel({
                         }
                       >
                         <span className="preset-dot" />
-                        <span className="preset-name"><ScrollTitle text={preset.name} /></span>
+                        <span className="preset-name"><ScrollTitle text={(preset.id === '__default__' || preset.name === '默认' || preset.name === '默认 (初始)') ? t('preset.defaultPreset') : preset.name} /></span>
                       </button>
                       <button
                         className="icon-btn preset-info-btn"

@@ -750,9 +750,13 @@ export async function getModPresets(
     }
   }
 
-  // 确保存在「默认 (初始)」出厂预设，并始终同步最新解析出的 persist 默认变量
-  let defaultPreset = list.find((p) => p.id === '__default__')
+  // 确保存在「默认」出厂预设，并始终同步最新解析出的 persist 默认变量
   let listModified = false
+  let defaultPreset = list.find((p) => p.id === '__default__')
+  if (defaultPreset && (defaultPreset.name === '默认 (初始)' || defaultPreset.name === '默认(初始)')) {
+    defaultPreset.name = '默认'
+    listModified = true
+  }
   if (!defaultPreset) {
     let defaultInis: string[] = []
     if (modPath && (await pathExists(modPath))) {
@@ -767,7 +771,7 @@ export async function getModPresets(
 
     defaultPreset = {
       id: '__default__',
-      name: '默认 (初始)',
+      name: '默认',
       modName: cleanModName,
       characterFolder,
       activeIniFiles: defaultInis,

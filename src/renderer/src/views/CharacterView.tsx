@@ -11,7 +11,7 @@ import { ImportDropdown } from '../components/ImportDropdown'
 import { ModDetailsPanel } from '../components/ModDetailsPanel'
 import { ModRow } from '../components/ModRow'
 import { displayNameOf, initialOf, modMatches } from '../utils'
-import { useI18n, getLocaleCharacterName } from '../i18n'
+import { useI18n, getLocaleCharacterName, getLocaleGameName } from '../i18n'
 
 export function CharacterView({
   game,
@@ -169,7 +169,7 @@ export function CharacterView({
     <div className="view">
       <button className="back-link" onClick={onBack}>
         <Icon name="back" size={16} />
-        返回角色库
+        {t('character.backToLibrary')}
       </button>
 
       <header className="char-head">
@@ -187,7 +187,7 @@ export function CharacterView({
         </button>
         <div className="char-head-main">
           <div className="eyebrow" style={{ color: game.accent }}>
-            {game.shortName} · {character.folder}
+            {getLocaleGameName(game, effectiveLocale)} · {name}
           </div>
           <h1>{name}</h1>
           <div className="chips">
