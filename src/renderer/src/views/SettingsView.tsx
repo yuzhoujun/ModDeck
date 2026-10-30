@@ -28,7 +28,7 @@ export function SettingsView({
   onSave: (patch: SettingsPatch) => Promise<void>
   onNotify: (text: string, kind?: 'ok' | 'err' | 'info') => void
 }) {
-  const { t, setLocale, effectiveLocale } = useI18n()
+  const { t, setLocale, effectiveLocale, availableLocales } = useI18n()
   const [tab, setTab] = useState<SettingsTab>(initialTab)
   const [draft, setDraft] = useState<Settings>(settings)
   const [hotkeyDraft, setHotkeyDraft] = useState(settings.ui.overlayHotkey)
@@ -122,9 +122,9 @@ export function SettingsView({
       const res = await window.moddeck.syncRemoteRoster(draft.import.rosterRemoteUrl)
       if (res.ok) {
         if (res.status) setRosterStatus(res.status)
-        onNotify(`角色词库已合并更新（共处理 ${res.addedOrUpdated ?? 0} 条云端记录）`)
+        onNotify(t('settings.notify.rosterUpdated', { count: res.addedOrUpdated ?? 0 }))
       } else {
-        onNotify(res.error || '同步角色词库失败', 'err')
+        onNotify(res.error || t('settings.notify.rosterFailed'), 'err')
       }
     } catch (error) {
       onNotify(errorMessage(error), 'err')
@@ -228,13 +228,13 @@ export function SettingsView({
     try {
       const result = await window.moddeck.setOverlayHotkey(value)
       if (!result.ok) {
-        setHotkeyMessage(result.error || '快捷键保存失败')
+        setHotkeyMessage(result.error || t('settings.notify.hotkeyFailed'))
         return
       }
       const nextVal = result.hotkey ?? value
       setHotkeyDraft(nextVal)
       await persistPatch({ ui: { overlayHotkey: nextVal } }, false)
-      setHotkeyMessage(nextVal ? `已自动保存：${nextVal}` : '已禁用快捷窗口快捷键')
+      setHotkeyMessage(nextVal ? t('settings.notify.hotkeySaved', { hotkey: nextVal }) : t('settings.notify.hotkeyDisabled'))
     } catch (error) {
       setHotkeyMessage(errorMessage(error))
     }
@@ -252,13 +252,13 @@ export function SettingsView({
     try {
       const result = await window.moddeck.setReloadHotkey(value)
       if (!result.ok) {
-        setReloadHotkeyMessage(result.error || '重载快捷键保存失败')
+        setReloadHotkeyMessage(result.error || t('settings.notify.reloadHotkeyFailed'))
         return
       }
       const nextVal = result.hotkey ?? (value || 'F10')
       setReloadHotkeyDraft(nextVal)
       setDraft((current) => ({ ...current, ui: { ...current.ui, reloadHotkey: nextVal } }))
-      setReloadHotkeyMessage(`已自动保存：${nextVal}`)
+      setReloadHotkeyMessage(t('settings.notify.reloadHotkeySaved', { hotkey: nextVal }))
       setSaveStatus('saved')
       if (savedBadgeTimerRef.current) clearTimeout(savedBadgeTimerRef.current)
       savedBadgeTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2400)
@@ -330,10 +330,10 @@ export function SettingsView({
                 <p>{t('settings.general.languageDesc')}</p>
               </div>
             </div>
-            <div className="setting-row-action">
+            <div className="setting-row-action" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <select
                 className="select"
-                style={{ width: '100%' }}
+                style={{ minWidth: '150px' }}
                 value={draft.ui.language || 'auto'}
                 onChange={(event) => {
                   const val = event.target.value
@@ -344,7 +344,20 @@ export function SettingsView({
                 <option value="auto">{t('settings.general.languageAuto')}</option>
                 <option value="zh-CN">简体中文 (zh-CN)</option>
                 <option value="en-US">English (en-US)</option>
+                {availableLocales.filter((l) => l !== 'zh-CN' && l !== 'en-US').map((l) => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
               </select>
+              <button
+                type="button"
+                className="btn ghost small-btn"
+                title={t('settings.general.openLanguagesFolderTip')}
+                onClick={() => void window.moddeck.openPath('languages')}
+                style={{ padding: '6px 10px', height: '32px', whiteSpace: 'nowrap' }}
+              >
+                <Icon name="folder" size={14} />
+                {t('settings.general.openLanguagesFolder')}
+              </button>
             </div>
           </section>
 
@@ -485,8 +498,8 @@ export function SettingsView({
 
             <div className="setting-group-box">
               <div className="setting-group-header">
-                <span className="setting-group-title">3DMigoto 游戏重载快捷键</span>
-                <span className="muted small">默认 F10，点击输入框后按键即可修改</span>
+                <span className="setting-group-title">{t('settings.advanced.reloadHotkeyLabel')}</span>
+                <span className="muted small">{t('settings.advanced.reloadHotkeyDesc')}</span>
               </div>
               <div className="hotkey-row">
                 <input
@@ -533,7 +546,7 @@ export function SettingsView({
                   <div>
                     <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{t('settings.general.autoReloadModToggle')}</div>
                     <div className="muted small" style={{ marginTop: '2px' }}>
-                      默认关闭。避免在 Mod 库批量启用/禁用 Mod 时导致游戏画面频繁停顿卡顿。
+                      {t('settings.advanced.switchBatchDesc')}
                     </div>
                   </div>
                 </label>
@@ -643,7 +656,7 @@ export function SettingsView({
                           savedBadgeTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
                         } else {
                           setSaveStatus('idle')
-                          onNotify(res.error || '保存 d3dx.ini 失败', 'err')
+                          onNotify(res.error || t('settings.notify.d3dxSaveFailed'), 'err')
                         }
                       } catch (err) {
                         setSaveStatus('idle')
@@ -662,7 +675,7 @@ export function SettingsView({
                   className="btn ghost small-btn"
                   onClick={() => {
                     void window.moddeck.reloadF10()
-                    onNotify('已向游戏发送 F10 重载，使 3DMigoto 读取新的刷盘周期')
+                    onNotify(t('settings.notify.d3dxReloadSent'))
                   }}
                   title="若游戏运行中修改，可点击向游戏发送重载，立即应用新刷盘周期"
                 >
@@ -671,7 +684,7 @@ export function SettingsView({
                 </button>
               </div>
               <div className="setting-group-desc">
-                💡 控制 3DMigoto 在游戏后台自动将内存中的外观持久化变量刷入 <code>d3dx_user.ini</code> 的周期。数值越小，ModDeck 感知游戏内热键变化越灵敏。修改后会直接写回 <code>d3dx.ini</code>。若游戏正在运行中，需按 F10 重载一次以使 3DMigoto 读取并应用新周期；下次启动游戏亦会自动生效。
+                💡 {t('settings.advanced.d3dxIntervalTip')}
               </div>
             </div>
 
@@ -709,7 +722,7 @@ export function SettingsView({
                 </button>
               </div>
               <div className="setting-group-desc">
-                💡 该参数为 ModDeck 内部的异步等待定时器，纯内存热生效，修改后无需按 F10 或重启游戏，下一次重载立刻按照新设时长计时。F10 重载后 ModDeck 等待游戏编译 Shader 及跨入渲染帧的缓冲时间（之后自动补写持久化配置并清除桥接）。Mod 库较大（10s+）请适度调大；亦可点击「测速校准」自动测量。
+                💡 {t('settings.advanced.f10BufferTip')}
               </div>
             </div>
           </section>
@@ -834,10 +847,8 @@ export function SettingsView({
               <Icon name="box" size={18} />
             </div>
             <div>
-              <h3>MI 运行环境检查</h3>
-              <p className="muted">
-                当前只接入 EFMI 的环境检查。其他 MI 的配置位置已保留，后续版本补充。
-              </p>
+              <h3>{t('settings.environment.title')}</h3>
+              <p className="muted">{t('settings.environment.desc')}</p>
             </div>
           </div>
 
@@ -851,9 +862,9 @@ export function SettingsView({
               }}
             />
             <div>
-              <div style={{ fontWeight: 600, color: '#f1f5f9' }}>启动时检查 DISABLED 规则（默认开启）</div>
+              <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{t('settings.environment.checkStartup')}</div>
               <div className="muted small" style={{ marginTop: '2px' }}>
-                自动校验 d3dx.ini 中是否已包含 exclude_recursive = DISABLED* 规则。
+                {t('settings.environment.checkStartupDesc')}
               </div>
             </div>
           </label>
@@ -893,8 +904,8 @@ export function SettingsView({
                   {supported ? (
                     <>
                       <div className="muted small">
-                        根目录：
-                        {shortPath(env?.root || draft.games[game.id]?.modsPath || '未配置')}
+                        {t('settings.environment.rootDirLabel')}
+                        {shortPath(env?.root || draft.games[game.id]?.modsPath || t('settings.environment.notConfigured'))}
                       </div>
                       <p className="muted small">
                         {t('settings.environment.ruleLabel')}<code>exclude_recursive = DISABLED*</code>
@@ -911,7 +922,7 @@ export function SettingsView({
                     </>
                   ) : (
                     <p className="muted small">
-                      该 MI 的环境检查尚未接入，配置位置已保留，后续版本补充。
+                      {t('settings.environment.pendingDesc')}
                     </p>
                   )}
                 </div>
@@ -929,10 +940,8 @@ export function SettingsView({
                 <Icon name="download" size={18} />
               </div>
               <div>
-                <h3>Mod 导入行为</h3>
-                <p className="muted">
-                  支持批量选择或拖入 .zip / .7z / .rar 压缩包与已解压的 Mod 文件夹。默认复制不删除原包。
-                </p>
+                <h3>{t('settings.import.title')}</h3>
+                <p className="muted">{t('settings.import.desc')}</p>
               </div>
             </div>
             <div className="setting-group-box">
@@ -964,9 +973,9 @@ export function SettingsView({
                   onChange={(event) => updateImport({ overwriteExisting: event.target.checked })}
                 />
                 <div>
-                  <div style={{ fontWeight: 600, color: '#f1f5f9' }}>同名时覆盖</div>
+                  <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{t('settings.import.overwrite')}</div>
                   <div className="muted small" style={{ marginTop: '2px' }}>
-                    旧目录会先自动安全备份到 backups 目录；关闭则自动重命名递增。
+                    {t('settings.import.overwriteDesc')}
                   </div>
                 </div>
               </label>
@@ -979,16 +988,49 @@ export function SettingsView({
                 <Icon name="refresh" size={18} />
               </div>
               <div>
-                <h3>角色匹配词库（内置离线 + 云端增量合并）</h3>
-                <p className="muted">
-                  内置完整离线角色词典（中英文、拼音、别名），开箱即用。点击更新可拉取远程 roster.json 并与内置词典做增量合并，不会丢失任何内置角色。
-                </p>
+                <h3>{t('settings.import.rosterTitle')}</h3>
+                <p className="muted">{t('settings.import.rosterDesc')}</p>
               </div>
             </div>
             <div className="setting-group-box">
               <div className="setting-group-header">
-                <span className="setting-group-title">远程词库 JSON 地址</span>
-                <span className="muted small">GitHub Raw 或自定义镜像地址</span>
+                <span className="setting-group-title">{t('settings.import.rosterUrlLabel')}</span>
+                <span className="muted small">{t('settings.import.rosterUrlDesc')}</span>
+              </div>
+              <div className="setting-row-card" style={{ padding: '8px 12px', marginBottom: '8px', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="setting-row-info">
+                  <div className="setting-row-title" style={{ fontSize: '13px' }}>{t('settings.import.mirrorPresetsLabel')}</div>
+                </div>
+                <div className="setting-row-action">
+                  <select
+                    className="select"
+                    style={{ minWidth: '180px' }}
+                    value={
+                      draft.import.rosterRemoteUrl === 'https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/roster.json'
+                        ? 'raw'
+                        : draft.import.rosterRemoteUrl === 'https://github.com/yuzhoujun/ModDeck/raw/main/roster.json'
+                        ? 'github'
+                        : draft.import.rosterRemoteUrl === 'https://cdn.jsdelivr.net/gh/yuzhoujun/ModDeck@main/roster.json'
+                        ? 'jsdelivr'
+                        : draft.import.rosterRemoteUrl === 'https://ghfast.top/https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/roster.json'
+                        ? 'ghproxy'
+                        : 'custom'
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value
+                      if (val === 'raw') updateImport({ rosterRemoteUrl: 'https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/roster.json' })
+                      else if (val === 'github') updateImport({ rosterRemoteUrl: 'https://github.com/yuzhoujun/ModDeck/raw/main/roster.json' })
+                      else if (val === 'jsdelivr') updateImport({ rosterRemoteUrl: 'https://cdn.jsdelivr.net/gh/yuzhoujun/ModDeck@main/roster.json' })
+                      else if (val === 'ghproxy') updateImport({ rosterRemoteUrl: 'https://ghfast.top/https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/roster.json' })
+                    }}
+                  >
+                    <option value="raw">{t('settings.import.mirrorOfficial')} (GitHub Raw)</option>
+                    <option value="github">{t('settings.import.mirrorGitHubRawBlob')}</option>
+                    <option value="jsdelivr">{t('settings.import.mirrorJsDelivr')}</option>
+                    <option value="ghproxy">{t('settings.import.mirrorGhProxy')}</option>
+                    <option value="custom">{t('settings.import.mirrorCustom')}</option>
+                  </select>
+                </div>
               </div>
               <div className="field-row">
                 <input
@@ -1011,13 +1053,13 @@ export function SettingsView({
               </div>
               {rosterStatus ? (
                 <div className="setting-group-desc">
-                  当前词库状态：
+                  {t('settings.import.rosterStatusPrefix')}
                   {games
-                    .map((g) => `${g.shortName} ${rosterStatus.gameCounts[g.id] ?? 0} 项`)
+                    .map((g) => `${getLocaleGameName(g, effectiveLocale)} ${rosterStatus.gameCounts[g.id] ?? 0} ${t('settings.import.rosterItemUnit')}`)
                     .join(' · ')}
                   {rosterStatus.updatedAt
-                    ? ` · 上次云端同步：${new Date(rosterStatus.updatedAt).toLocaleString()}`
-                    : ' · 当前使用内置离线词库'}
+                    ? t('settings.import.rosterStatusSynced', { time: new Date(rosterStatus.updatedAt).toLocaleString() })
+                    : t('settings.import.rosterStatusBuiltin')}
                 </div>
               ) : null}
             </div>
@@ -1115,6 +1157,10 @@ export function SettingsView({
                   <Icon name="folder" size={16} />
                   {t('settings.about.openLogsFolder')}
                 </button>
+                <button className="btn ghost" onClick={() => window.moddeck.openPath('languages')}>
+                  <Icon name="folder" size={16} />
+                  {t('settings.about.openLanguagesFolder')}
+                </button>
               </div>
               <div className="setting-group-desc">
                 {t('settings.about.storageTip')}
@@ -1148,11 +1194,7 @@ export function SettingsView({
         >
           <div className="danger-confirm-dialog">
             <p>
-              开启后，每次切换 Mod 或应用预设都会在 600ms 防抖后自动向游戏发送{' '}
-              <code>{draft.ui.reloadHotkey || 'F10'}</code>。
-            </p>
-            <p className="muted small">
-              注意：当 Mods 目录下启用的 Mod 较多时，3DMigoto 执行每次重载大约会有数秒钟的画面停顿，属于加载器正常现象。
+              {t('settings.advanced.autoReloadModalBody')}
             </p>
           </div>
         </Modal>
@@ -1186,10 +1228,7 @@ export function SettingsView({
         >
           <div className="danger-confirm-dialog">
             <p>
-              关闭后，在主界面或快捷窗口切换预设将<strong>不再自动驱动游戏换装</strong>。
-            </p>
-            <p className="muted small">
-              新预设将暂存为“待生效”状态（显示为蓝色脉冲光标），您可以在离线状态下挑选多个角色的不同预设，最后<strong>手动按下 {draft.ui.reloadHotkey || 'F10'}</strong>（或点击快捷窗口底部的“立即生效”按钮）一次性全部换装。
+              {t('settings.advanced.autoReloadDisableBody')}
             </p>
           </div>
         </Modal>
@@ -1238,7 +1277,7 @@ export function SettingsView({
                     setShowBenchmarkModal(false)
                   }}
                 >
-                  应用推荐值 ({Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))}s) 并保存
+                  {t('settings.modals.benchmarkApplyBtn', { seconds: Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2)) })}
                 </button>
               </div>
             ) : (
@@ -1275,44 +1314,44 @@ export function SettingsView({
             {benchmarkStatus === 'idle' ? (
               <>
                 <p style={{ margin: 0, lineHeight: 1.6 }}>
-                  不同玩家的电脑配置与已装 Mod 数量/材质大小不同，3DMigoto 执行 F10 重载的实际耗时差异很大（通常在 1.1s 到 18s 不等）。
+                  {t('settings.modals.benchmarkDesc')}
                 </p>
                 <div style={{ background: 'var(--bg-subtle, rgba(255,255,255,0.04))', padding: '10px 12px', borderRadius: '6px', fontSize: '13px' }}>
-                  <strong>测速说明：</strong>
+                  <strong>{t('settings.modals.benchmarkStepTitle')}</strong>
                   <ol style={{ margin: '6px 0 0 18px', padding: 0, lineHeight: 1.5 }}>
-                    <li>请确保<strong>游戏已在运行中</strong>且处于可游玩画面；</li>
-                    <li>点击下方「开始测速」，ModDeck 将向游戏发送 F10 重载按键并即时启动毫秒计时；</li>
-                    <li>观察游戏画面：当卡顿结束、左上角提示消失、画面恢复流畅时，立即点击「停止计时」；</li>
-                    <li>ModDeck 将自动根据您实测的重载耗时 + 1.5 秒安全余量，计算出最适合您的缓冲同步参数。</li>
+                    <li>{t('settings.modals.benchmarkStep1')}</li>
+                    <li>{t('settings.modals.benchmarkStep2')}</li>
+                    <li>{t('settings.modals.benchmarkStep3')}</li>
+                    <li>{t('settings.modals.benchmarkStep4')}</li>
                   </ol>
                 </div>
               </>
             ) : benchmarkStatus === 'running' ? (
               <div style={{ textAlign: 'center', padding: '16px 0' }}>
                 <div style={{ fontSize: '13px', color: 'var(--text-muted, #888)', marginBottom: '8px' }}>
-                  已向游戏发送 F10，正在重载...
+                  {t('settings.modals.benchmarkRunning')}
                 </div>
                 <div style={{ fontSize: '42px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--accent, #6366f1)' }}>
                   {benchmarkElapsed.toFixed(1)}s
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary, #aaa)', marginTop: '8px' }}>
-                  👀 请注意观察游戏画面：一旦画面恢复正常流动，请立即点击下方绿色大按钮！
+                  {t('settings.modals.benchmarkRunningTip')}
                 </div>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '12px 0' }}>
                 <div style={{ fontSize: '14px', color: 'var(--text-secondary, #aaa)', marginBottom: '4px' }}>
-                  实机测量耗时
+                  {t('settings.modals.benchmarkMeasured')}
                 </div>
                 <div style={{ fontSize: '32px', fontWeight: 700, fontFamily: 'monospace' }}>
-                  {benchmarkElapsed.toFixed(2)} 秒
+                  {benchmarkElapsed.toFixed(2)} {effectiveLocale === 'zh-CN' ? '秒' : 's'}
                 </div>
                 <div style={{ margin: '14px 0', padding: '10px', background: 'var(--bg-subtle, rgba(255,255,255,0.04))', borderRadius: '6px' }}>
                   <div style={{ fontSize: '14px' }}>
-                    推荐延迟：<strong style={{ color: 'var(--accent, #6366f1)', fontSize: '16px' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} 秒</strong>
+                    {t('settings.modals.benchmarkRecommended')}<strong style={{ color: 'var(--accent, #6366f1)', fontSize: '16px' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} {effectiveLocale === 'zh-CN' ? '秒' : 's'}</strong>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted, #888)', marginTop: '4px' }}>
-                    （测得耗时 {benchmarkElapsed.toFixed(1)}s + 1.5s 安全余量，确保 Shader 编译完成并跨过 Present 帧）
+                    {t('settings.modals.benchmarkRecommendedDesc', { time: benchmarkElapsed.toFixed(1) })}
                   </div>
                 </div>
               </div>

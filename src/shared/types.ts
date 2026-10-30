@@ -194,6 +194,7 @@ export interface Bootstrap {
   snapshot: GameSnapshot | null
   appVersion: string
   rosterMap?: Record<GameId, string[]>
+  customLocales?: Record<string, Record<string, any>>
 }
 
 export interface ImportRequest {

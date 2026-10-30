@@ -1634,13 +1634,44 @@ async function renameModAt(
   }
 }
 
+function loadCustomLocales(): Record<string, Record<string, any>> {
+  const result: Record<string, Record<string, any>> = {}
+  const candidateDirs = [
+    path.join(path.dirname(process.execPath), 'languages'),
+    path.join(baseDir(), 'languages')
+  ]
+  for (const dir of candidateDirs) {
+    if (!fsSync.existsSync(dir)) continue
+    try {
+      const files = fsSync.readdirSync(dir)
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue
+        const code = path.basename(file, '.json')
+        const fullPath = path.join(dir, file)
+        try {
+          const parsed = JSON.parse(fsSync.readFileSync(fullPath, 'utf8'))
+          if (parsed && typeof parsed === 'object') {
+            result[code] = parsed
+          }
+        } catch {
+          // ignore invalid json
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return result
+}
+
 function registerIpc(): void {
   register(IPC.bootstrap, async () => ({
     settings,
     games: GAMES,
     snapshot: await makeSnapshot(settings.activeGameId),
     appVersion: app.getVersion(),
-    rosterMap: getRosterMap()
+    rosterMap: getRosterMap(),
+    customLocales: loadCustomLocales()
   }))
 
   register(IPC.appInfo, async (): Promise<AppInfo> => ({
@@ -1832,6 +1863,21 @@ function registerIpc(): void {
   register(IPC.openPath, async (kind: string, gameId?: GameId) => {
     if (kind === 'data') return openInShell(baseDir())
     if (kind === 'logs') return openInShell(path.join(baseDir(), 'logs'))
+    if (kind === 'languages' || kind === 'locales') {
+      const candidates = [
+        path.join(path.dirname(process.execPath), 'languages'),
+        path.join(app.getAppPath(), 'src', 'shared', 'i18n', 'locales'),
+        path.join(baseDir(), 'languages')
+      ]
+      let target = candidates.find((p) => fsSync.existsSync(p))
+      if (!target) {
+        target = path.join(baseDir(), 'languages')
+        try {
+          fsSync.mkdirSync(target, { recursive: true })
+        } catch {}
+      }
+      return openInShell(target)
+    }
     if (!gameId) return { ok: false, error: '缺少游戏参数' }
     const gameSettings = settings.games[gameId]
     if (!gameSettings) return { ok: false, error: '未知游戏' }
