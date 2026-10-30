@@ -14,6 +14,7 @@ import type {
 import { isDirectory, pathExists, readdirSafe } from '../core/fsx'
 import { isInside, isSafeSegment } from '../core/safe-path'
 import { getCharacterMeta } from './metadata'
+import { findCanonicalEnName } from '../core/roster'
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif'])
 const PREVIEW_PATTERN = /^(preview|cover|thumbnail|thumb|screen|screenshot|showcase)/i
@@ -299,6 +300,10 @@ export async function scanCharacters(
     }
 
     const displayName = meta.displayName || entry.name
+    const canonicalEnName =
+      meta.canonicalEnName ||
+      findCanonicalEnName(gameId, entry.name) ||
+      findCanonicalEnName(gameId, displayName)
     let cover = options.coverUrlFor(meta)
     if (!cover) {
       const coverFile = await findCharacterCoverFile(characterPath)
@@ -309,12 +314,13 @@ export async function scanCharacters(
       folder: entry.name,
       displayName,
       aliases: Array.isArray(meta.aliases) ? meta.aliases : [],
+      canonicalEnName,
       modCount,
       enabledCount,
       hiddenCount: modCount - enabledCount,
       hasCover: Boolean(cover),
       coverUrl: cover,
-      known: Boolean(meta.displayName || meta.canonicalEnName || meta.aliases?.length),
+      known: Boolean(meta.displayName || meta.canonicalEnName || meta.aliases?.length || canonicalEnName),
       order: typeof meta.order === 'number' ? meta.order : Number.MAX_SAFE_INTEGER,
       kind: meta.kind === 'utility' ? 'utility' : 'character'
     })

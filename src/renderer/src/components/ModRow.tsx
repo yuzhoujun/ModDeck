@@ -1,11 +1,13 @@
 import type { DragEvent } from 'react'
 import type { ModInfo } from '../../../shared/types'
 import { formatDate } from '../utils'
+import { useI18n } from '../i18n'
 import { Icon } from './Icon'
 import { ScrollTitle } from './ScrollTitle'
 
 export function ModRow({
   mod,
+
   onToggle,
   onOpen,
   onDelete,
@@ -21,6 +23,7 @@ export function ModRow({
   onDrop,
   onDragEnd
 }: {
+
   mod: ModInfo
   onToggle: () => void
   onOpen: () => void
@@ -37,6 +40,7 @@ export function ModRow({
   onDrop?: (event: DragEvent<HTMLDivElement>) => void
   onDragEnd?: () => void
 }) {
+  const { t, effectiveLocale } = useI18n()
   return (
     <div
       className={`mod-row${mod.enabled ? '' : ' is-disabled'}${selected ? ' is-selected' : ''}${
@@ -73,10 +77,10 @@ export function ModRow({
       <div className="mod-main">
         <div className="mod-name" title={mod.folderName}>
           <ScrollTitle text={mod.name} className="mod-name-text" title={mod.folderName} />
-          {!mod.hasIni ? <span className="tag warn">缺少 ini</span> : null}
+          {!mod.hasIni ? <span className="tag warn">{effectiveLocale === 'zh-CN' ? '缺少 ini' : 'No ini'}</span> : null}
         </div>
         <div className="mod-sub">
-          {mod.enabled ? '已启用' : '已禁用'} · {formatDate(mod.updatedAt)}
+          {mod.enabled ? t('common.enabled') : t('common.disabled')} · {formatDate(mod.updatedAt)}
         </div>
       </div>
       <button
@@ -87,7 +91,7 @@ export function ModRow({
         }}
         role="switch"
         aria-checked={mod.enabled}
-        aria-label={mod.enabled ? '禁用' : '启用'}
+        aria-label={mod.enabled ? t('common.disabled') : t('common.enabled')}
       >
         <span />
       </button>
@@ -97,7 +101,7 @@ export function ModRow({
           event.stopPropagation()
           onOpen()
         }}
-        title="打开目录"
+        title={t('common.openFolder')}
       >
         <Icon name="folder" size={17} />
       </button>

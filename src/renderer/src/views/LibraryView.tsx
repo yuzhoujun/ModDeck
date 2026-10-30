@@ -4,6 +4,7 @@ import { isUtilityCategory } from '../../../shared/types'
 import { CharacterCard } from '../components/CharacterCard'
 import { Icon } from '../components/Icon'
 import { ImportDropdown } from '../components/ImportDropdown'
+import { useI18n, getLocaleCharacterName } from '../i18n'
 
 function shortPath(value: string): string {
   const parts = value.split(/[\\/]/).filter(Boolean)
@@ -49,6 +50,7 @@ export function LibraryView({
   onAdd: () => void
   onOpenRosterPresets?: () => void
 }) {
+  const { t, effectiveLocale } = useI18n()
   const [dragFolder, setDragFolder] = useState<string | null>(null)
 
   const { charCount, utilCount } = useMemo(() => {
@@ -69,12 +71,19 @@ export function LibraryView({
       if (filter === 'characters' && isUtilityCategory(character)) return false
       if (filter === 'utility' && !isUtilityCategory(character)) return false
       if (!value) return true
-      const haystack = [character.displayName, character.folder, ...character.aliases]
+      const localizedName = getLocaleCharacterName(character, effectiveLocale)
+      const haystack = [
+        localizedName,
+        character.displayName,
+        character.folder,
+        character.canonicalEnName || '',
+        ...character.aliases
+      ]
         .join(' ')
         .toLowerCase()
       return haystack.includes(value)
     })
-  }, [filter, query, snapshot.characters])
+  }, [filter, query, snapshot.characters, effectiveLocale])
 
   function handleDrop(targetFolder: string) {
     if (!dragFolder || dragFolder === targetFolder) return
@@ -98,10 +107,15 @@ export function LibraryView({
           <div className="eyebrow" style={{ color: game.accent }}>
             {game.shortName} · {game.loader}
           </div>
-          <h1>Mod 库</h1>
+          <h1>{t('library.title')}</h1>
           <p className="muted">
-            {snapshot.characters.length} 个分类项 ({charCount} 角色 / {utilCount} 功能与UI) ·{' '}
-            {snapshot.totalMods} 个 Mod · {snapshot.enabledMods} 个启用
+            {t('library.stats', {
+              categories: snapshot.characters.length,
+              chars: charCount,
+              utils: utilCount,
+              total: snapshot.totalMods,
+              enabled: snapshot.enabledMods
+            })}
           </p>
         </div>
         <div className="actions">
@@ -109,31 +123,31 @@ export function LibraryView({
             className="btn ghost"
             onClick={onLaunchGame}
             disabled={!canLaunchGame}
-            title={canLaunchGame ? '启动游戏' : '请先在设置里配置游戏程序'}
+            title={canLaunchGame ? t('library.launchGame') : t('library.launchGameHint') || '请先在设置里配置游戏程序'}
           >
             <Icon name="external" size={16} />
-            启动游戏
+            {t('library.launchGame')}
           </button>
           <button
             className="btn ghost"
             onClick={onLaunchLoader}
             disabled={!canLaunchLoader}
-            title={canLaunchLoader ? '启动 XXMI / 加载器' : '请先在设置里配置启动器'}
+            title={canLaunchLoader ? t('library.launchLoader', { loader: game.loader }) : t('library.launchLoaderHint') || '请先在设置里配置启动器'}
           >
             <Icon name="external" size={16} />
-            启动 {game.loader}
+            {t('library.launchLoader', { loader: game.loader })}
           </button>
-          <button className="btn ghost" onClick={onRefresh}>
+          <button className="btn ghost" onClick={onRefresh} title={t('library.refreshTooltip')}>
             <Icon name="refresh" size={16} />
-            刷新
+            {t('common.refresh')}
           </button>
-          <button className="btn ghost" onClick={onOpenRosterPresets} title="配置或切换全角色池方案">
+          <button className="btn ghost" onClick={onOpenRosterPresets} title={t('library.rosterPresetsTooltip')}>
             <Icon name="box" size={16} />
-            预设方案
+            {t('library.rosterPresets')}
           </button>
-          <button className="btn ghost" onClick={onAdd}>
+          <button className="btn ghost" onClick={onAdd} title={t('library.newFolderTooltip')}>
             <Icon name="userPlus" size={16} />
-            新增目录
+            {t('library.newFolder')}
           </button>
           <ImportDropdown onImport={onImport} onImportFolder={onImportFolder} />
         </div>
@@ -144,16 +158,16 @@ export function LibraryView({
           <div className="empty-icon">
             <Icon name="box" size={30} />
           </div>
-          <h2>{snapshot.settings.modsPath ? 'Mods 目录不存在' : '还没有配置 Mods 目录'}</h2>
+          <h2>{snapshot.settings.modsPath ? t('library.modsDirNotExist') || 'Mods 目录不存在' : t('library.modsDirNotConfigured') || '还没有配置 Mods 目录'}</h2>
           <p className="muted">
             {snapshot.settings.modsPath
               ? shortPath(snapshot.settings.modsPath)
-              : `选择 ${game.name} 的 Mods 文件夹后，ModDeck 会自动扫描角色和 Mod。`}
+              : t('library.modsDirDesc', { game: game.name }) || `选择 ${game.name} 的 Mods 文件夹后，ModDeck 会自动扫描角色和 Mod。`}
           </p>
           <div className="actions center">
             <button className="btn primary" onClick={() => onOpenSettings('games')}>
               <Icon name="folder" size={16} />
-              打开设置
+              {t('sidebar.settings')}
             </button>
           </div>
         </div>
@@ -164,7 +178,7 @@ export function LibraryView({
               <Icon name="search" size={16} />
               <input
                 className="input"
-                placeholder="搜索角色、别名、目录名"
+                placeholder={t('library.searchPlaceholder')}
                 value={query}
                 onChange={(event) => onQuery(event.target.value)}
               />
@@ -174,22 +188,22 @@ export function LibraryView({
               value={filter}
               onChange={(event) => onFilter(event.target.value as UiSettings['characterFilter'])}
             >
-              <option value="all">全部分类 ({snapshot.characters.length})</option>
-              <option value="characters">仅角色 ({charCount})</option>
-              <option value="utility">仅功能 / UI / 其他 ({utilCount})</option>
-              <option value="withMods">仅有 Mod</option>
-              <option value="empty">仅无 Mod</option>
+              <option value="all">{t('library.filterAll', { count: snapshot.characters.length })}</option>
+              <option value="characters">{t('library.filterCharacters', { count: charCount })}</option>
+              <option value="utility">{t('library.filterUtility', { count: utilCount })}</option>
+              <option value="withMods">{t('library.filterWithMods')}</option>
+              <option value="empty">{t('library.filterEmpty')}</option>
             </select>
             <select
               className="select"
               value={sort}
               onChange={(event) => onSort(event.target.value as UiSettings['sortCharacters'])}
             >
-              <option value="custom">自定义顺序</option>
-              <option value="name">按名称</option>
-              <option value="count">按 Mod 数量</option>
+              <option value="custom">{t('library.sortByCustom')}</option>
+              <option value="name">{t('library.sortByName')}</option>
+              <option value="count">{t('library.sortByCount')}</option>
             </select>
-            {sort === 'custom' ? <span className="hint">拖动卡片排序</span> : null}
+            {sort === 'custom' ? <span className="hint">{t('library.dragFolderHint')}</span> : null}
             <button
               className="path-chip"
               title={snapshot.settings.modsPath}
@@ -204,19 +218,19 @@ export function LibraryView({
             <div className="empty-panel">
               <h2>
                 {query
-                  ? '没有匹配的项目'
+                  ? t('library.emptySearchTitle')
                   : filter === 'characters'
-                    ? '没有角色类分类项'
+                    ? t('library.emptyCharactersTitle')
                     : filter === 'utility'
-                      ? '没有功能/UI/其他类分类项'
+                      ? t('library.emptyUtilityTitle')
                       : filter === 'withMods'
-                        ? '没有带 Mod 的分类项'
+                        ? t('library.emptyWithModsTitle')
                         : filter === 'empty'
-                          ? '所有分类项都已有 Mod'
-                          : 'Mods 目录是空的'}
+                          ? t('library.emptyNoModsTitle')
+                          : t('library.emptyFolderTitle')}
               </h2>
               <p className="muted">
-                {query ? '换个关键词试试。' : '可以切换筛选条件，或导入新的 Mod。'}
+                {query ? t('library.emptySearchDesc') : t('library.emptyFilterDesc')}
               </p>
             </div>
           ) : (

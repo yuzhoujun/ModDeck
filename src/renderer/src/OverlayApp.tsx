@@ -12,10 +12,12 @@ import { isUtilityCategory } from '../../shared/types'
 import { Icon } from './components/Icon'
 import { ScrollTitle } from './components/ScrollTitle'
 import { errorMessage } from './utils'
+import { useI18n, getLocaleCharacterName } from './i18n'
 
 type CharacterFilter = 'all' | 'withMods' | 'empty' | 'characters' | 'utility'
 
 export function OverlayApp() {
+  const { t, effectiveLocale } = useI18n()
   const [boot, setBoot] = useState<Bootstrap | null>(null)
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null)
   const [selected, setSelected] = useState('')
@@ -373,7 +375,7 @@ export function OverlayApp() {
           {filteredCharacters.length === 0 ? <option value="">没有匹配角色</option> : null}
           {filteredCharacters.map((character) => (
             <option key={character.folder} value={character.folder}>
-              {character.displayName} ({character.modCount})
+              {getLocaleCharacterName(character, effectiveLocale)} ({character.modCount})
             </option>
           ))}
         </select>
@@ -383,17 +385,17 @@ export function OverlayApp() {
           onChange={(event) => void changeFilter(event.target.value as CharacterFilter)}
           title="分类筛选"
         >
-          <option value="all">全部</option>
-          <option value="characters">仅角色</option>
-          <option value="utility">仅功能/UI</option>
-          <option value="withMods">有 Mod</option>
-          <option value="empty">无 Mod</option>
+          <option value="all">{t('overlay.filterAll')}</option>
+          <option value="characters">{t('overlay.filterCharacters')}</option>
+          <option value="utility">{t('overlay.filterUtility')}</option>
+          <option value="withMods">{t('overlay.filterWithMods')}</option>
+          <option value="empty">{t('overlay.filterEmpty')}</option>
         </select>
         <div className="search compact">
           <Icon name="search" size={15} />
           <input
             className="input"
-            placeholder="搜索 Mod"
+            placeholder={t('overlay.searchPlaceholder')}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -406,20 +408,20 @@ export function OverlayApp() {
             className={selectMode === 'single' ? 'active' : ''}
             onClick={() => void changeSelectMode('single')}
           >
-            单选
+            {t('preset.single')}
           </button>
           <button
             className={selectMode === 'multi' ? 'active' : ''}
             onClick={() => void changeSelectMode('multi')}
           >
-            多选
+            {t('preset.multi')}
           </button>
         </div>
       </div>
 
       {recentForGame.length > 0 ? (
         <div className="overlay-recent">
-          <span className="muted small">最近</span>
+          <span className="muted small">{t('overlay.recent')}</span>
           <div className="overlay-recent-list">
             {recentForGame.map((item) => (
               <button
@@ -439,7 +441,7 @@ export function OverlayApp() {
         {loading ? (
           <div className="overlay-empty">
             <div className="spinner" />
-            <span>加载中…</span>
+            <span>{t('common.loading')}</span>
           </div>
         ) : visibleMods.length === 0 ? (
           <div className="overlay-empty">
@@ -630,7 +632,7 @@ export function OverlayApp() {
             }}
             title="一键切换全角色池方案"
           >
-            方案 ({rosterPresets.length})
+            {t('overlay.schemesBtn', { count: rosterPresets.length })}
           </button>
           <button
             className={`btn ghost small-btn${showBenchmark ? ' active' : ''}`}
@@ -642,7 +644,7 @@ export function OverlayApp() {
             }}
             title="浮动实机测速：无需切屏，直接观察游戏重载并精确校准缓冲延迟"
           >
-            ⏱️ 测速
+            {t('overlay.benchmarkBtn')}
           </button>
           <button
             className={`btn ghost small-btn${pendingCount > 0 ? ' btn-pending-pulse' : ''}`}
@@ -655,13 +657,13 @@ export function OverlayApp() {
             }}
             title={pendingCount > 0 ? `有 ${pendingCount} 个预设待生效，点击发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 立即刷新实机画面` : `发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 重载 EFMI 配置`}
           >
-            {pendingCount > 0 ? `● 立即生效 (${pendingCount})` : `重载 ${boot?.settings.ui.reloadHotkey || 'F10'}`}
+            {pendingCount > 0 ? t('overlay.applyNowBtn', { count: pendingCount }) : t('overlay.reloadBtn', { hotkey: boot?.settings.ui.reloadHotkey || 'F10' })}
           </button>
           <button
             className="btn ghost small-btn"
             onClick={() => window.moddeck.overlayOpenManager()}
           >
-            打开管理器
+            {t('overlay.openManagerBtn')}
           </button>
         </div>
       </footer>

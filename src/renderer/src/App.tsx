@@ -20,6 +20,7 @@ import { CharacterView } from './views/CharacterView'
 import { LibraryView } from './views/LibraryView'
 import { SettingsView } from './views/SettingsView'
 import { errorMessage } from './utils'
+import { useI18n } from './i18n'
 
 type View = 'library' | 'character' | 'settings'
 type ToastKind = 'ok' | 'err' | 'info'
@@ -30,6 +31,7 @@ interface Toast {
 }
 
 export default function App() {
+  const { t } = useI18n()
   const [boot, setBoot] = useState<Bootstrap | null>(null)
   const [snapshot, setSnapshot] = useState<GameSnapshot | null>(null)
   const [booting, setBooting] = useState(true)
@@ -665,11 +667,11 @@ export default function App() {
           <div className="brand-mark">M</div>
           <div>
             <strong>ModDeck</strong>
-            <span>local mod manager</span>
+            <span>{t('sidebar.localModManager')}</span>
           </div>
         </div>
 
-        <div className="side-label">游戏</div>
+        <div className="side-label">{t('sidebar.games')}</div>
         <nav className="game-nav">
           {boot.games.map((game) => {
             const active = snapshot.game.id === game.id
@@ -701,7 +703,7 @@ export default function App() {
             onClick={() => { setSettingsTab('general'); setView('settings'); }}
           >
             <Icon name="settings" size={17} />
-            设置
+            {t('sidebar.settings')}
           </button>
           <div className="version">v{boot.appVersion} · MIT</div>
         </div>
@@ -878,7 +880,7 @@ export default function App() {
       {busy ? (
         <div className="busy-overlay">
           <div className="spinner" />
-          <span>正在导入，请稍候…</span>
+          <span>{t('common.loading')}</span>
         </div>
       ) : null}
     </div>

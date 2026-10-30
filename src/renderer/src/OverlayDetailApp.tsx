@@ -4,8 +4,10 @@ import { Icon } from './components/Icon'
 import { Modal } from './components/Modal'
 import { ScrollTitle } from './components/ScrollTitle'
 import { errorMessage } from './utils'
+import { useI18n } from './i18n'
 
 export function OverlayDetailApp() {
+  const { t } = useI18n()
   const params = new URLSearchParams(window.location.search)
   const gameId = params.get('gameId') as GameId | null
   const characterFolder = params.get('character') || ''
@@ -170,14 +172,14 @@ export function OverlayDetailApp() {
               text={details?.name || 'Mod 热键与预设'}
               className="overlay-title-marquee"
             />
-            <span>{details ? (details.enabled ? '已启用' : '已禁用') : '读取中…'}</span>
+            <span>{details ? (details.enabled ? t('common.enabled') : t('common.disabled')) : t('common.loading')}</span>
           </div>
         </div>
         <div className="overlay-head-actions">
           <button
             className="icon-btn"
             onClick={() => window.moddeck.hideOverlayDetail()}
-            title="关闭"
+            title={t('common.close')}
           >
             <Icon name="close" size={16} />
           </button>
@@ -196,14 +198,14 @@ export function OverlayDetailApp() {
             {/* 2.2.2.1: 变体预设操作区 */}
             <div className="overlay-section">
               <div className="overlay-section-head">
-                <span className="overlay-section-title">变体 / 预设快照</span>
+                <span className="overlay-section-title">{t('mod.presets')}</span>
                 <button
                   className="btn ghost small-btn overlay-preset-toggle-btn"
                   onClick={() => setShowSaveBox(!showSaveBox)}
                   title="将游戏当前变体状态保存为新预设"
                 >
                   <Icon name="plus" size={12} />
-                  {showSaveBox ? '取消' : '存为预设'}
+                  {showSaveBox ? t('common.cancel') : t('mod.saveAsNew')}
                 </button>
               </div>
 

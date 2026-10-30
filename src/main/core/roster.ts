@@ -604,3 +604,24 @@ export function matchCharacterForMod(
     reason: '未匹配（默认其他）'
   }
 }
+
+/**
+ * 根据角色中文名、目录名或别名查询其标准英文名称（供国际化 / en-US 显示）。
+ */
+export function findCanonicalEnName(gameId: GameId, nameOrFolder: string): string | undefined {
+  if (!nameOrFolder) return undefined
+  const norm = normalizeMatchText(nameOrFolder)
+  if (!norm) return undefined
+  const roster = getMergedRoster(gameId)
+  for (const entry of roster) {
+    if (
+      normalizeMatchText(entry.zh) === norm ||
+      normalizeMatchText(entry.en) === norm ||
+      normalizeMatchText(entry.pinyin) === norm ||
+      (entry.aliases && entry.aliases.some((a) => normalizeMatchText(a) === norm))
+    ) {
+      return entry.en || undefined
+    }
+  }
+  return undefined
+}

@@ -1,6 +1,7 @@
 import type { DragEvent } from 'react'
 import type { CharacterInfo } from '../../../shared/types'
-import { displayNameOf, initialOf } from '../utils'
+import { initialOf } from '../utils'
+import { useI18n, getLocaleCharacterName } from '../i18n'
 
 export function CharacterCard({
   character,
@@ -23,12 +24,14 @@ export function CharacterCard({
   onDrop?: (event: DragEvent<HTMLButtonElement>) => void
   onDragEnd?: () => void
 }) {
-  const name = displayNameOf(character)
+  const { t, effectiveLocale } = useI18n()
+  const name = getLocaleCharacterName(character, effectiveLocale)
+
   return (
     <button
       className={`char-card${dragging ? ' is-dragging' : ''}`}
       onClick={onOpen}
-      title={draggable ? `${character.folder}（拖动排序）` : character.folder}
+      title={draggable ? `${character.folder} (${t('library.dragFolderHint')})` : character.folder}
       draggable={draggable}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
@@ -43,16 +46,18 @@ export function CharacterCard({
             {initialOf(name)}
           </span>
         )}
-        {!character.known ? <span className="tag new">新</span> : null}
-        {character.kind === 'utility' ? <span className="tag utility">功能</span> : null}
+        {!character.known ? <span className="tag new">{effectiveLocale === 'zh-CN' ? '新' : 'NEW'}</span> : null}
+        {character.kind === 'utility' ? (
+          <span className="tag utility">{effectiveLocale === 'zh-CN' ? '功能' : 'UTIL'}</span>
+        ) : null}
       </div>
       <div className="char-meta">
         <div className="char-name" title={name}>
           {name}
         </div>
         <div className="char-sub">
-          {character.modCount} 个 Mod
-          {character.enabledCount > 0 ? ` · ${character.enabledCount} 启用` : ''}
+          {t('common.modsCount', { count: character.modCount })}
+          {character.enabledCount > 0 ? ` · ${t('common.enabledCount', { count: character.enabledCount })}` : ''}
         </div>
       </div>
     </button>

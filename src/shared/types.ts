@@ -25,7 +25,7 @@ export interface GameSettings {
 }
 
 export interface UiSettings {
-  language: 'zh-CN' | 'en'
+  language: 'auto' | 'zh-CN' | 'en-US' | 'en' | (string & {})
   sortCharacters: 'custom' | 'name' | 'count'
   sortMods: 'name' | 'recent' | 'enabled' | 'custom'
   showHidden: boolean
@@ -108,6 +108,7 @@ export interface CharacterInfo {
   folder: string
   displayName: string
   aliases: string[]
+  canonicalEnName?: string
   modCount: number
   enabledCount: number
   hiddenCount: number

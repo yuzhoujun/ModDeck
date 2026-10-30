@@ -12,6 +12,7 @@ import { getAssignmentModItems, isUtilityCategory } from '../../../shared/types'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { ScrollTitle } from './ScrollTitle'
+import { useI18n, getLocaleCharacterName } from '../i18n'
 
 export function RosterPresetModal({
   game,
@@ -24,6 +25,7 @@ export function RosterPresetModal({
   onClose: () => void
   onNotify?: (text: string, kind?: 'ok' | 'err' | 'info') => void
 }) {
+  const { t, effectiveLocale } = useI18n()
   const [presets, setPresets] = useState<RosterPreset[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -552,7 +554,7 @@ export function RosterPresetModal({
             预设只记录各角色/Mod 激活与变体变量配置，毫秒级快速切换，绝不复制实体文件。
           </div>
           <button className="btn" onClick={onClose}>
-            关闭
+            {t('common.close')}
           </button>
         </div>
       }
@@ -675,21 +677,21 @@ export function RosterPresetModal({
                 className={`roster-pool-tab${activePoolTab === 'character' ? ' is-active' : ''}`}
                 onClick={() => setActivePoolTab('character')}
               >
-                🎭 角色预设 ({charPool.length})
+                {t('preset.tabCharacters', { count: charPool.length })}
               </button>
               <button
                 type="button"
                 className={`roster-pool-tab${activePoolTab === 'utility' ? ' is-active' : ''}`}
                 onClick={() => setActivePoolTab('utility')}
               >
-                🧩 功能/UI/其他 ({utilPool.length})
+                {t('preset.tabUtility', { count: utilPool.length })}
               </button>
               <button
                 type="button"
                 className={`roster-pool-tab${activePoolTab === 'all' ? ' is-active' : ''}`}
                 onClick={() => setActivePoolTab('all')}
               >
-                📋 全部 ({validCharacters.length})
+                {t('preset.tabAll', { count: validCharacters.length })}
               </button>
             </div>
 
@@ -745,8 +747,8 @@ export function RosterPresetModal({
                 <div key={char.folder} className="roster-char-card">
                   <div className="roster-char-head">
                     <div className="roster-char-title-wrap">
-                      <span className="roster-char-name" title={char.displayName}>
-                        {char.displayName}
+                      <span className="roster-char-name" title={getLocaleCharacterName(char, effectiveLocale)}>
+                        {getLocaleCharacterName(char, effectiveLocale)}
                       </span>
                       <span className="muted small">({charMods.length})</span>
                     </div>
@@ -758,7 +760,7 @@ export function RosterPresetModal({
                         onClick={() => toggleCharMode(char.folder, 'single')}
                         title="单选模式（互斥保护，同时只生效一个 Mod）"
                       >
-                        单选
+                        {t('preset.single')}
                       </button>
                       <button
                         type="button"
@@ -766,7 +768,7 @@ export function RosterPresetModal({
                         onClick={() => toggleCharMode(char.folder, 'multi')}
                         title="多选模式（共存允许，可同时勾选多个 Mod）"
                       >
-                        多选
+                        {t('preset.multi')}
                       </button>
                     </div>
                   </div>
@@ -779,14 +781,14 @@ export function RosterPresetModal({
                           className="roster-mini-btn"
                           onClick={() => handleSelectAllMods(char.folder, charMods)}
                         >
-                          全选
+                          {t('preset.selectAll')}
                         </button>
                         <button
                           type="button"
                           className="roster-mini-btn"
                           onClick={() => handleClearAllMods(char.folder)}
                         >
-                          全清
+                          {t('preset.clearAll')}
                         </button>
                       </div>
                       <span className="muted small">
@@ -804,7 +806,7 @@ export function RosterPresetModal({
                           checked={assignedItems.length === 0}
                           onChange={() => handleSelectNative(char.folder)}
                         />
-                        <span className="muted">不启用任何 Mod（保持原生）</span>
+                        <span className="muted">{t('preset.noMod')}</span>
                       </label>
                     )}
 

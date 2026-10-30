@@ -11,6 +11,7 @@ import { Icon } from '../components/Icon'
 import { Modal } from '../components/Modal'
 import type { IconName } from '../components/Icon'
 import { errorMessage } from '../utils'
+import { useI18n } from '../i18n'
 
 type SettingsTab = 'general' | 'games' | 'environment' | 'import' | 'about'
 
@@ -27,6 +28,7 @@ export function SettingsView({
   onSave: (patch: SettingsPatch) => Promise<void>
   onNotify: (text: string, kind?: 'ok' | 'err' | 'info') => void
 }) {
+  const { t, setLocale, effectiveLocale } = useI18n()
   const [tab, setTab] = useState<SettingsTab>(initialTab)
   const [draft, setDraft] = useState<Settings>(settings)
   const [hotkeyDraft, setHotkeyDraft] = useState(settings.ui.overlayHotkey)
@@ -266,20 +268,20 @@ export function SettingsView({
   }
 
   const tabs: Array<{ id: SettingsTab; label: string; icon: IconName }> = [
-    { id: 'general', label: '通用', icon: 'settings' },
-    { id: 'games', label: '配置', icon: 'folder' },
-    { id: 'environment', label: '环境', icon: 'box' },
-    { id: 'import', label: '导入', icon: 'download' },
-    { id: 'about', label: '关于', icon: 'info' }
+    { id: 'general', label: t('settings.tabGeneral'), icon: 'settings' },
+    { id: 'games', label: t('settings.tabGames'), icon: 'folder' },
+    { id: 'environment', label: t('settings.tabEnvironment'), icon: 'box' },
+    { id: 'import', label: t('settings.tabImport'), icon: 'download' },
+    { id: 'about', label: t('settings.tabAbout'), icon: 'info' }
   ]
 
   return (
     <div className="view">
       <header className="view-head">
         <div>
-          <div className="eyebrow">首选项</div>
-          <h1>设置</h1>
-          <p className="muted">通用行为、游戏路径、环境检测与导入设置。所有改动实时自动保存在本机。</p>
+          <div className="eyebrow">{t('settings.eyebrow')}</div>
+          <h1>{t('settings.title')}</h1>
+          <p className="muted">{t('settings.desc')}</p>
         </div>
         <div className="actions">
           <div className={`settings-saved-pill ${saveStatus}`}>
@@ -310,6 +312,44 @@ export function SettingsView({
 
       {tab === 'general' ? (
         <>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div className="settings-card-icon" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.25)' }}>
+                <Icon name="settings" size={18} />
+              </div>
+              <div>
+                <h3>{t('settings.general.languageTitle')}</h3>
+                <p className="muted">
+                  {t('settings.general.languageDesc')}
+                </p>
+              </div>
+            </div>
+
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <span className="setting-group-title">{t('settings.general.languageTitle')}</span>
+                <span className="muted small">
+                  {draft.ui.language === 'auto' || !draft.ui.language
+                    ? `${t('settings.general.languageAuto')} (${effectiveLocale})`
+                    : draft.ui.language}
+                </span>
+              </div>
+              <select
+                className="select"
+                value={draft.ui.language || 'auto'}
+                onChange={(event) => {
+                  const val = event.target.value;
+                  setLocale(val);
+                  updateUi({ language: val });
+                }}
+              >
+                <option value="auto">{t('settings.general.languageAuto')}</option>
+                <option value="zh-CN">简体中文 (zh-CN)</option>
+                <option value="en-US">English (en-US)</option>
+              </select>
+            </div>
+          </section>
+
           <section className="settings-card">
             <div className="settings-card-head">
               <div className="settings-card-icon">
