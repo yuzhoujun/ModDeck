@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from './Icon'
+import { useI18n } from '../i18n'
 
 interface ImportDropdownProps {
   label?: string
@@ -9,13 +10,15 @@ interface ImportDropdownProps {
 }
 
 export function ImportDropdown({
-  label = '导入 Mod',
+  label,
   onImport,
   onImportFolder,
   className = ''
 }: ImportDropdownProps) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const displayLabel = label || t('library.importMod')
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -39,17 +42,17 @@ export function ImportDropdown({
           setOpen(false)
           onImport()
         }}
-        title="导入 Mod 压缩包（.zip / .7z / .rar）"
+        title={t('library.importArchive')}
       >
         <Icon name="upload" size={15} />
-        <span>{label}</span>
+        <span>{displayLabel}</span>
       </button>
 
       <button
         type="button"
         className={`btn primary import-caret-btn${open ? ' is-active' : ''}`}
         onClick={() => setOpen(!open)}
-        title="选择导入方式（压缩包 / 文件夹）"
+        title={t('library.importMod')}
       >
         <span className="import-caret">▾</span>
       </button>
@@ -65,7 +68,7 @@ export function ImportDropdown({
             }}
           >
             <Icon name="upload" size={14} />
-            <span>导入压缩包 (.zip / .7z / .rar)</span>
+            <span>{t('library.importArchive')}</span>
           </button>
           <button
             type="button"
@@ -76,7 +79,7 @@ export function ImportDropdown({
             }}
           >
             <Icon name="folder" size={14} />
-            <span>导入 Mod 文件夹</span>
+            <span>{t('library.importFolder')}</span>
           </button>
         </div>
       )}

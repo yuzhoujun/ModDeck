@@ -10,7 +10,9 @@ export type CharacterKind = 'character' | 'utility'
 export interface GameDef {
   id: GameId
   name: string
+  nameEn?: string
   shortName: string
+  shortNameEn?: string
   loader: string
   exeHint: string
   accent: string

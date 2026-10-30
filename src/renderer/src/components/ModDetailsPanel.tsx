@@ -5,6 +5,7 @@ import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { PresetDetailModal } from './PresetDetailModal'
 import { ScrollTitle } from './ScrollTitle'
+import { useI18n } from '../i18n'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -40,6 +41,7 @@ export function ModDetailsPanel({
   onNotify?: (text: string, kind?: 'ok' | 'err' | 'info') => void
   onRefreshDetails?: () => void
 }) {
+  const { t, effectiveLocale } = useI18n()
   const [previewDrag, setPreviewDrag] = useState(false)
   const [presets, setPresets] = useState<ModVariantPreset[]>([])
   const [presetsLoading, setPresetsLoading] = useState(false)
@@ -302,19 +304,19 @@ export function ModDetailsPanel({
 
           <div className="detail-stats">
             <div>
-              <span>文件</span>
+              <span>{t('mod.files')}</span>
               <strong>{details.fileCount}</strong>
             </div>
             <div>
-              <span>大小</span>
+              <span>{t('mod.size')}</span>
               <strong>{formatBytes(details.sizeBytes)}</strong>
             </div>
             <div>
-              <span>更新</span>
+              <span>{t('mod.updated')}</span>
               <strong>{formatDate(details.updatedAt)}</strong>
             </div>
             <div>
-              <span>INI</span>
+              <span>{t('mod.ini')}</span>
               <strong>{details.iniFiles.length}</strong>
             </div>
           </div>
@@ -322,14 +324,14 @@ export function ModDetailsPanel({
           {/* 2.2.1 Level 1: 单 Mod 专属预设与变体管理 */}
           <div className="detail-section">
             <div className="detail-section-head">
-              <span className="detail-section-title">Mod 预设 / 变体</span>
+              <span className="detail-section-title">{t('mod.presets')}</span>
               <button
                 className="btn ghost small-btn"
                 onClick={() => setShowSavePreset(!showSavePreset)}
                 title="将当前配置保存为该 Mod 的独立预设"
               >
                 <Icon name="plus" size={13} />
-                {showSavePreset ? '取消' : '存为预设'}
+                {showSavePreset ? t('common.cancel') : t('mod.saveAsNew')}
               </button>
             </div>
 
@@ -337,7 +339,7 @@ export function ModDetailsPanel({
               <div className="preset-save-box">
                 <input
                   className="input preset-input"
-                  placeholder="输入预设名称（如：黑丝+眼镜）"
+                  placeholder={t('mod.presetNamePlaceholder')}
                   value={newPresetName}
                   onChange={(e) => setNewPresetName(e.target.value)}
                   onKeyDown={(e) => {
@@ -346,15 +348,15 @@ export function ModDetailsPanel({
                   autoFocus
                 />
                 <button className="btn primary small-btn" onClick={() => void handleSavePreset()}>
-                  保存
+                  {t('common.save')}
                 </button>
               </div>
             ) : null}
 
             {presetsLoading ? (
-              <div className="muted small">加载预设中…</div>
+              <div className="muted small">{t('common.loading')}</div>
             ) : presets.length === 0 ? (
-              <div className="muted small">暂无独立预设，点击右上角可将当前状态存为预设</div>
+              <div className="muted small">{t('mod.noPresets')}</div>
             ) : (
               <div className="detail-presets-list">
                 {hasUnsavedChanges() ? (
@@ -364,7 +366,7 @@ export function ModDetailsPanel({
                   >
                     <div className="preset-apply-btn" style={{ cursor: 'default' }}>
                       <span className="preset-dot is-dirty" />
-                      <span className="preset-name">当前实机状态 (未保存改动)</span>
+                      <span className="preset-name">{t('mod.unsavedInGame')}</span>
                     </div>
                   </div>
                 ) : null}
@@ -420,9 +422,9 @@ export function ModDetailsPanel({
           </div>
 
           <div className="detail-section">
-            <div className="detail-section-title">热键</div>
+            <div className="detail-section-title">{t('mod.hotkeys')}</div>
             {details.hotkeys.length === 0 ? (
-              <div className="muted small">没有在 ini 里找到 key</div>
+              <div className="muted small">{t('mod.noHotkeys')}</div>
             ) : (
               <div className="detail-hotkeys">
                 {details.hotkeys.slice(0, 30).map((hotkey, index) => (
@@ -436,9 +438,9 @@ export function ModDetailsPanel({
           </div>
 
           <div className="detail-section">
-            <div className="detail-section-title">INI 文件</div>
+            <div className="detail-section-title">{t('mod.iniFiles')}</div>
             {details.iniFiles.length === 0 ? (
-              <div className="muted small">没有 ini</div>
+              <div className="muted small">{t('mod.noIni')}</div>
             ) : (
               <div className="detail-ini">
                 {details.iniFiles.slice(0, 40).map((file) => (
@@ -451,20 +453,20 @@ export function ModDetailsPanel({
           <div className="detail-actions">
             <button className="btn primary" onClick={onToggle}>
               <Icon name="check" size={15} />
-              {details.enabled ? '禁用' : '启用'}
+              {details.enabled ? t('common.disabled') : t('common.enabled')}
             </button>
             <button className="btn ghost" onClick={onOpen}>
               <Icon name="folder" size={15} />
-              打开目录
+              {t('common.openFolder')}
             </button>
             <button className="btn ghost danger-text" onClick={onDelete}>
               <Icon name="trash" size={15} />
-              删除
+              {t('common.delete')}
             </button>
           </div>
         </div>
       ) : (
-        <div className="detail-empty muted">选择一个 Mod 查看详情</div>
+        <div className="detail-empty muted">{t('mod.selectToView')}</div>
       )}
 
       {inspectingPreset ? (
@@ -475,19 +477,19 @@ export function ModDetailsPanel({
       ) : null}
       {confirmPreset ? (
         <Modal
-          title="切换预设确认"
+          title={t('mod.overwriteConfirmTitle')}
           onClose={() => setConfirmPreset(null)}
           width={400}
           footer={
             <>
               <button className="btn ghost" onClick={() => setConfirmPreset(null)}>
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 className="btn primary"
                 onClick={() => void handleApplyPreset(confirmPreset)}
               >
-                确定覆盖并切换
+                {t('common.confirm')}
               </button>
             </>
           }

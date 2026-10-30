@@ -11,9 +11,9 @@ import { Icon } from '../components/Icon'
 import { Modal } from '../components/Modal'
 import type { IconName } from '../components/Icon'
 import { errorMessage } from '../utils'
-import { useI18n } from '../i18n'
+import { useI18n, getLocaleGameName } from '../i18n'
 
-type SettingsTab = 'general' | 'games' | 'environment' | 'import' | 'about'
+type SettingsTab = 'general' | 'advanced' | 'games' | 'environment' | 'import' | 'about'
 
 export function SettingsView({
   games,
@@ -269,6 +269,7 @@ export function SettingsView({
 
   const tabs: Array<{ id: SettingsTab; label: string; icon: IconName }> = [
     { id: 'general', label: t('settings.tabGeneral'), icon: 'settings' },
+    { id: 'advanced', label: t('settings.tabAdvanced'), icon: 'sliders' },
     { id: 'games', label: t('settings.tabGames'), icon: 'folder' },
     { id: 'environment', label: t('settings.tabEnvironment'), icon: 'box' },
     { id: 'import', label: t('settings.tabImport'), icon: 'download' },
@@ -350,43 +351,86 @@ export function SettingsView({
             </div>
           </section>
 
+
           <section className="settings-card">
             <div className="settings-card-head">
-              <div className="settings-card-icon">
-                <Icon name="settings" size={18} />
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(168, 85, 247, 0.12)',
+                  color: '#c084fc',
+                  borderColor: 'rgba(168, 85, 247, 0.25)'
+                }}
+              >
+                <Icon name="close" size={18} />
               </div>
               <div>
-                <h3>快捷窗口 (Quick Overlay)</h3>
-                <p className="muted">
-                  在游戏内使用浮动快捷窗口随时开关 Mod 与切换预设。点击输入框后直接按下组合键即可保存。
-                </p>
+                <h3>{t('settings.general.closeBehaviorTitle')}</h3>
+                <p className="muted">{t('settings.general.closeBehaviorDesc')}</p>
               </div>
             </div>
 
             <div className="setting-group-box">
               <div className="setting-group-header">
-                <span className="setting-group-title">呼出快捷键</span>
+                <span className="setting-group-title">{t('settings.general.closeBehavior')}</span>
                 <span className="muted small">
-                  当前：{settings.ui.overlayHotkey || '未设置'} · 按 Esc 隐藏快捷窗口
+                  {draft.ui.closeBehavior === 'minimize' ? (effectiveLocale === 'zh-CN' ? '托盘菜单可打开管理器或退出' : 'Tray menu allows opening manager or quitting') : (effectiveLocale === 'zh-CN' ? '关闭主窗口会直接结束进程' : 'Closing main window terminates the process directly')}
+                </span>
+              </div>
+              <select
+                className="select"
+                value={draft.ui.closeBehavior}
+                onChange={(event) =>
+                  updateUi({
+                    closeBehavior: event.target.value === 'minimize' ? 'minimize' : 'quit'
+                  })
+                }
+              >
+                <option value="quit">{t('settings.general.closeBehaviorQuit')}</option>
+                <option value="minimize">{t('settings.general.closeBehaviorMinimize')}</option>
+              </select>
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {tab === 'advanced' ? (
+        <>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div className="settings-card-icon">
+                <Icon name="sliders" size={18} />
+              </div>
+              <div>
+                <h3>{t('settings.general.overlayTitle')}</h3>
+                <p className="muted">{t('settings.general.overlayDesc')}</p>
+              </div>
+            </div>
+
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <span className="setting-group-title">{t('settings.general.overlayHotkey')}</span>
+                <span className="muted small">
+                  {t('settings.general.overlayHotkeyDesc', { hotkey: settings.ui.overlayHotkey || (effectiveLocale === 'zh-CN' ? '未设置' : 'Not set') })}
                 </span>
               </div>
               <div className="hotkey-row">
                 <input
                   className="input hotkey-input"
                   value={hotkeyDraft}
-                  placeholder="点击后按下组合键，例如 Alt+Shift+M"
+                  placeholder={t('settings.general.overlayHotkeyPlaceholder')}
                   readOnly
                   onKeyDown={captureHotkey}
                   onFocus={(event) => event.target.select()}
                 />
                 <button className="btn ghost" onClick={() => void applyHotkey('Alt+Shift+M')}>
-                  恢复默认
+                  {t('common.reset')}
                 </button>
                 <button className="btn ghost" onClick={() => void applyHotkey('')}>
-                  禁用
+                  {t('common.disabled')}
                 </button>
                 <button className="btn ghost" onClick={() => window.moddeck.toggleOverlay()}>
-                  测试呼出
+                  {t('settings.general.testOverlay')}
                 </button>
               </div>
               {hotkeyMessage ? <div className="hint" style={{ marginTop: '8px' }}>{hotkeyMessage}</div> : null}
@@ -400,9 +444,9 @@ export function SettingsView({
                   onChange={(event) => updateUi({ allowHotkeySend: event.target.checked })}
                 />
                 <div>
-                  <div style={{ fontWeight: 600, color: '#f1f5f9' }}>允许点击热键发送到游戏</div>
+                  <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{t('settings.general.allowHotkeySend')}</div>
                   <div className="muted small" style={{ marginTop: '2px' }}>
-                    在快捷窗口内点击 Mod 变体热键胶囊时，自动向处于前台的游戏窗口发送物理按键信号。
+                    {t('settings.general.allowHotkeySendDesc')}
                   </div>
                 </div>
               </label>
@@ -410,7 +454,7 @@ export function SettingsView({
 
             <div className="setting-group-box">
               <div className="setting-group-header">
-                <span className="setting-group-title">快捷窗口最近使用 Mod 栏展示数量</span>
+                <span className="setting-group-title">{t('settings.general.recentModCount')}</span>
                 <span className="setting-val-badge">{draft.ui.recentModCount} 个</span>
               </div>
               <div className="setting-range-container">
@@ -425,10 +469,11 @@ export function SettingsView({
                 />
               </div>
               <div className="setting-group-desc">
-                在游戏内浮动快捷窗口顶部展示的最近操作 Mod 快捷胶囊数量（设为 0 则在快捷窗口中完全隐藏最近使用栏）。
+                {t('settings.general.recentModCountDesc')}
               </div>
             </div>
           </section>
+
 
           <section className="settings-card">
             <div className="settings-card-head">
@@ -443,7 +488,7 @@ export function SettingsView({
                 <Icon name="refresh" size={18} />
               </div>
               <div>
-                <h3>游戏刷新与快捷行为</h3>
+                <h3>{t('settings.general.behaviorTitle')}</h3>
                 <p className="muted">控制 3DMigoto 游戏重载热键、预设自动换装策略及刷盘同步延迟。</p>
               </div>
             </div>
@@ -457,13 +502,13 @@ export function SettingsView({
                 <input
                   className="input hotkey-input"
                   value={reloadHotkeyDraft}
-                  placeholder="默认 F10"
+                  placeholder={t('settings.general.reloadHotkeyPlaceholder')}
                   readOnly
                   onKeyDown={captureReloadHotkey}
                   onFocus={(event) => event.target.select()}
                 />
                 <button className="btn ghost" onClick={() => void applyReloadHotkey('F10')}>
-                  恢复默认 (F10)
+                  {t('common.reset')} (F10)
                 </button>
                 <button
                   className="btn ghost"
@@ -471,7 +516,7 @@ export function SettingsView({
                     void window.moddeck.reloadF10()
                   }}
                 >
-                  测试发送
+                  {t('settings.general.testReload')}
                 </button>
               </div>
               {reloadHotkeyMessage ? <div className="hint" style={{ marginTop: '8px' }}>{reloadHotkeyMessage}</div> : null}
@@ -479,7 +524,7 @@ export function SettingsView({
 
             <div className="setting-group-box">
               <div className="setting-group-header" style={{ marginBottom: '10px' }}>
-                <span className="setting-group-title">自动重载与换装生效策略</span>
+                <span className="setting-group-title">{t('settings.general.autoReloadStrategy')}</span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -496,7 +541,7 @@ export function SettingsView({
                     }}
                   />
                   <div>
-                    <div style={{ fontWeight: 600, color: '#f1f5f9' }}>切换普通 Mod 启停后自动重载</div>
+                    <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{t('settings.general.autoReloadModToggle')}</div>
                     <div className="muted small" style={{ marginTop: '2px' }}>
                       默认关闭。避免在 Mod 库批量启用/禁用 Mod 时导致游戏画面频繁停顿卡顿。
                     </div>
@@ -517,10 +562,10 @@ export function SettingsView({
                   />
                   <div>
                     <div style={{ fontWeight: 600, color: '#f1f5f9' }}>
-                      切换单 Mod 变体预设后自动重载 <span className="tag ok" style={{ marginLeft: '6px' }}>推荐常开</span>
+                      {t('settings.general.autoReloadModPreset')} <span className="tag ok" style={{ marginLeft: '6px' }}>{t('settings.general.autoReloadModPresetBadge')}</span>
                     </div>
                     <div className="muted small" style={{ marginTop: '2px' }}>
-                      在主界面或快捷窗口点击单个 Mod 预设时，自动向游戏发送重载，即刻换装生效。
+                      {t('settings.general.autoReloadModPresetDesc')}
                     </div>
                   </div>
                 </label>
@@ -539,10 +584,10 @@ export function SettingsView({
                   />
                   <div>
                     <div style={{ fontWeight: 600, color: '#f1f5f9' }}>
-                      切换全角色池方案后自动重载 <span className="tag ok" style={{ marginLeft: '6px' }}>推荐常开</span>
+                      {t('settings.general.autoReloadRosterPreset')} <span className="tag ok" style={{ marginLeft: '6px' }}>{t('settings.general.autoReloadRosterPresetBadge')}</span>
                     </div>
                     <div className="muted small" style={{ marginTop: '2px' }}>
-                      在快捷窗口或主界面切换全局角色池方案时，自动向游戏发送重载，一键全队阵容换装。
+                      {t('settings.general.autoReloadRosterPresetDesc')}
                     </div>
                   </div>
                 </label>
@@ -564,7 +609,7 @@ export function SettingsView({
                 >
                   <div style={{ fontWeight: 700, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
                     <Icon name="info" size={15} />
-                    <span>⚠️ 手动重载模式生效特别提醒</span>
+                    <span>{t('settings.general.manualReloadAlertTitle')}</span>
                   </div>
                   <div>
                     您已关闭部分预设自动重载。挑选预设后，造型变量已预写入集中桥接文件，但<strong>实机画面仍需一次重载才能呈现</strong>。
@@ -582,11 +627,11 @@ export function SettingsView({
             <div className="setting-group-box">
               <div className="setting-group-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="setting-group-title">3DMigoto 运行时变量自动刷盘间隔</span>
-                  <span className="tag warning">需 F10 重载生效</span>
+                  <span className="setting-group-title">{t('settings.general.autoSaveInterval')}</span>
+                  <span className="tag warning">{t('settings.general.autoSaveIntervalBadge')}</span>
                 </div>
                 <span className="muted small">
-                  实机 ini: {d3dxAutoSaveInterval === -1 ? '已禁用定时' : `${d3dxAutoSaveInterval}s`}
+                  {t('settings.general.autoSaveIntervalCurrent', { seconds: d3dxAutoSaveInterval === -1 ? (effectiveLocale === 'zh-CN' ? '已禁用定时' : 'Disabled') : `${d3dxAutoSaveInterval}s` })}
                 </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
@@ -617,10 +662,10 @@ export function SettingsView({
                     }
                   }}
                 >
-                  <option value={10}>10 秒（极速同步，推荐实机热键调造型时使用）</option>
-                  <option value={30}>30 秒（均衡）</option>
-                  <option value={60}>60 秒（3DMigoto 官方出厂默认）</option>
-                  <option value={-1}>-1（禁用定时刷盘，仅在游戏退出或按 F10 时保存）</option>
+                  <option value={10}>{t('settings.general.autoSaveIntervalOpt10')}</option>
+                  <option value={30}>{t('settings.general.autoSaveIntervalOpt30')}</option>
+                  <option value={60}>{t('settings.general.autoSaveIntervalOpt60')}</option>
+                  <option value={-1}>{t('settings.general.autoSaveIntervalOptDisabled')}</option>
                 </select>
                 <button
                   type="button"
@@ -632,7 +677,7 @@ export function SettingsView({
                   title="若游戏运行中修改，可点击向游戏发送重载，立即应用新刷盘周期"
                 >
                   <Icon name="refresh" size={13} />
-                  <span>立即 F10 生效</span>
+                  <span>{t('settings.general.applyIntervalNow')}</span>
                 </button>
               </div>
               <div className="setting-group-desc">
@@ -643,10 +688,10 @@ export function SettingsView({
             <div className="setting-group-box">
               <div className="setting-group-header">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="setting-group-title">3DMigoto 重载缓冲同步延迟</span>
-                  <span className="tag ok">纯热生效 · 无需重载</span>
+                  <span className="setting-group-title">{t('settings.general.reloadBufferDelay')}</span>
+                  <span className="tag ok">{t('settings.general.reloadBufferDelayBadge')}</span>
                 </div>
-                <span className="muted small">当前: {draft.ui.postReloadSyncDelay ?? 6}s</span>
+                <span className="muted small">{t('settings.general.reloadBufferDelayCurrent', { seconds: draft.ui.postReloadSyncDelay ?? 6 })}</span>
               </div>
               <div className="setting-range-container">
                 <input
@@ -670,7 +715,7 @@ export function SettingsView({
                   title="在游戏运行中实测重载耗时并自动设置最适延迟"
                 >
                   <Icon name="refresh" size={13} />
-                  <span>测速校准</span>
+                  <span>{t('settings.general.benchmarkCalibrate')}</span>
                 </button>
               </div>
               <div className="setting-group-desc">
@@ -679,49 +724,9 @@ export function SettingsView({
             </div>
           </section>
 
-          <section className="settings-card">
-            <div className="settings-card-head">
-              <div
-                className="settings-card-icon"
-                style={{
-                  background: 'rgba(168, 85, 247, 0.12)',
-                  color: '#c084fc',
-                  borderColor: 'rgba(168, 85, 247, 0.25)'
-                }}
-              >
-                <Icon name="close" size={18} />
-              </div>
-              <div>
-                <h3>关闭行为</h3>
-                <p className="muted">最小化后 ModDeck 会留在托盘，全局快捷键和快捷窗口继续可用。</p>
-              </div>
-            </div>
-
-            <div className="setting-group-box">
-              <div className="setting-group-header">
-                <span className="setting-group-title">关闭主窗口时</span>
-                <span className="muted small">
-                  {draft.ui.closeBehavior === 'minimize'
-                    ? '托盘菜单可打开管理器或退出'
-                    : '关闭主窗口会直接结束进程'}
-                </span>
-              </div>
-              <select
-                className="select"
-                value={draft.ui.closeBehavior}
-                onChange={(event) =>
-                  updateUi({
-                    closeBehavior: event.target.value === 'minimize' ? 'minimize' : 'quit'
-                  })
-                }
-              >
-                <option value="quit">直接退出 ModDeck</option>
-                <option value="minimize">最小化到系统托盘（推荐）</option>
-              </select>
-            </div>
-          </section>
         </>
       ) : null}
+
 
       {tab === 'games' ? (
         <section className="settings-card">
@@ -730,10 +735,8 @@ export function SettingsView({
               <Icon name="folder" size={18} />
             </div>
             <div>
-              <h3>游戏与目录路径</h3>
-              <p className="muted">
-                只需要指向 Mods 目录；游戏程序和启动器用于顶部的“启动游戏 / 启动 XXMI”按钮。
-              </p>
+              <h3>{t('settings.games.title')}</h3>
+              <p className="muted">{t('settings.games.desc')}</p>
             </div>
           </div>
           <div className="game-settings">
@@ -743,12 +746,12 @@ export function SettingsView({
                 <div className="game-setting" key={game.id}>
                   <div className="game-setting-head">
                     <span className="dot" style={{ background: game.accent }} />
-                    <strong>{game.name}</strong>
+                    <strong>{getLocaleGameName(game, effectiveLocale)}</strong>
                     <span className="muted">{game.loader}</span>
                   </div>
 
                   <label className="field">
-                    <span>{game.loader} 根目录或 Mods 目录</span>
+                    <span>{t('settings.games.modsPathLabel', { loader: game.loader })}</span>
                     <div className="field-row">
                       <input
                         className="input"
@@ -760,7 +763,7 @@ export function SettingsView({
                       />
                       <button
                         className="icon-btn"
-                        title="选择目录"
+                        title={t('settings.games.pickFolderTooltip')}
                         onClick={() =>
                           pickInto(game.id, 'modsPath', () => window.moddeck.pickModsFolder())
                         }
@@ -771,7 +774,7 @@ export function SettingsView({
                   </label>
 
                   <label className="field">
-                    <span>游戏程序（可选）</span>
+                    <span>{t('settings.games.gamePathLabel')}</span>
                     <div className="field-row">
                       <input
                         className="input"
@@ -794,7 +797,7 @@ export function SettingsView({
                   </label>
 
                   <label className="field">
-                    <span>启动器（可选）</span>
+                    <span>{t('settings.games.loaderPathLabel')}</span>
                     <div className="field-row">
                       <input
                         className="input"
@@ -817,7 +820,7 @@ export function SettingsView({
                   </label>
 
                   <label className="field">
-                    <span>启动参数（可选）</span>
+                    <span>{t('settings.games.launchArgsLabel')}</span>
                     <input
                       className="input"
                       value={value?.launchArgs ?? ''}
@@ -1047,26 +1050,26 @@ export function SettingsView({
                 <Icon name="info" size={18} />
               </div>
               <div>
-                <h3>关于 ModDeck</h3>
-                <p className="muted">ModDeck · MIT License · 本地优先 (Local-First 架构)</p>
+                <h3>{t('settings.about.title')}</h3>
+                <p className="muted">{t('settings.about.desc')}</p>
               </div>
             </div>
             {info ? (
               <div className="kv" style={{ marginBottom: 0 }}>
                 <div>
-                  <span>软件版本</span>
+                  <span>{t('settings.about.version')}</span>
                   <code>{info.version}</code>
                 </div>
                 <div>
-                  <span>Electron 运行时</span>
+                  <span>{t('settings.about.electron')}</span>
                   <code>{info.electron}</code>
                 </div>
                 <div>
-                  <span>Node.js 内核</span>
+                  <span>{t('settings.about.node')}</span>
                   <code>{info.node}</code>
                 </div>
                 <div>
-                  <span>开源协议</span>
+                  <span>{t('settings.about.license')}</span>
                   <code>MIT License</code>
                 </div>
               </div>
@@ -1086,15 +1089,15 @@ export function SettingsView({
                 <Icon name="folder" size={18} />
               </div>
               <div>
-                <h3>本地数据与存储</h3>
-                <p className="muted">设置、角色元数据、封面、快照和日志都保存在本机，纯本地无云端泄露隐患。</p>
+                <h3>{t('settings.about.storageTitle')}</h3>
+                <p className="muted">{t('settings.about.storageDesc')}</p>
               </div>
             </div>
 
             <div className="setting-group-box">
               <div className="setting-group-header">
-                <span className="setting-group-title">数据存储根目录 (userData)</span>
-                <span className="muted small">本地持久化存储</span>
+                <span className="setting-group-title">{t('settings.about.userDataLabel')}</span>
+                <span className="muted small">{t('settings.about.userDataBadge')}</span>
               </div>
               <div style={{ margin: '8px 0 12px 0' }}>
                 <code
@@ -1116,15 +1119,15 @@ export function SettingsView({
               <div className="row">
                 <button className="btn ghost" onClick={() => window.moddeck.openPath('data')}>
                   <Icon name="folder" size={16} />
-                  打开数据目录 (userData)
+                  {t('settings.about.openDataFolder')}
                 </button>
                 <button className="btn ghost" onClick={() => window.moddeck.openPath('logs')}>
                   <Icon name="folder" size={16} />
-                  打开运行日志 (logs)
+                  {t('settings.about.openLogsFolder')}
                 </button>
               </div>
               <div className="setting-group-desc">
-                💡 包含 ModDeck 配置、角色匹配数据、预设方案快照及运行日志。在重装系统或迁移设备时，直接打包复制该文件夹即可完整保留所有设置与预设。
+                {t('settings.about.storageTip')}
               </div>
             </div>
           </section>

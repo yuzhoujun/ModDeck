@@ -56,7 +56,8 @@
     "emptyNoModsTitle": "All categories have mods",
     "emptyFolderTitle": "Mods folder is empty",
     "emptySearchDesc": "Try a different keyword.",
-    "emptyFilterDesc": "You can change filter criteria or import new mods."
+    "emptyFilterDesc": "You can change filter criteria or import new mods.",
+    "importToCharacter": "Import to this category"
   },
   "character": {
     "back": "Back to Library",
@@ -94,7 +95,16 @@
     "moveToTrash": "Move to Trash",
     "moveToTrashConfirm": "Are you sure you want to move mod '{name}' to Recycle Bin?",
     "overwriteConfirmTitle": "Overwrite Preset Confirmation",
-    "overwriteConfirmDesc": "Current in-game state has been adjusted. Do you want to save and overwrite preset '{name}' with current in-game parameters?"
+    "overwriteConfirmDesc": "Current in-game state has been adjusted. Do you want to save and overwrite preset '{name}' with current in-game parameters?",
+    "files": "Files",
+    "size": "Size",
+    "updated": "Updated",
+    "ini": "INI",
+    "noPresets": "No presets yet. Click top-right to save current state.",
+    "noHotkeys": "No keys found in ini",
+    "iniFiles": "INI Files",
+    "noIni": "No ini files",
+    "selectToView": "Select a mod to view details"
   },
   "preset": {
     "modalTitle": "Roster Scheme Management",
@@ -141,7 +151,11 @@
     "reloadBtn": "Reload {hotkey}",
     "applyNowBtn": "● Apply Now ({count})",
     "openManagerBtn": "Open Manager",
-    "pendingCountHint": "{count} presets pending. Click to refresh in-game screen immediately"
+    "pendingCountHint": "{count} presets pending. Click to refresh in-game screen immediately",
+    "emptyModForChar": "No matching mods for this character",
+    "emptyCharList": "No characters to display",
+    "footerHint": "Hotkey {hotkey} · Esc to hide",
+    "noMatchingChar": "No matching character"
   },
   "benchmark": {
     "modalTitle": "3DMigoto Reload Benchmark Calibration",
@@ -280,6 +294,11 @@
       "openDataFolder": "Open Data Directory (userData)",
       "openLogsFolder": "Open Run Logs (logs)",
       "storageTip": "💡 Contains ModDeck settings, character match data, preset snapshots, and runtime logs. Backup this folder directly when migrating or reinstalling Windows."
+    },
+    "tabAdvanced": "Advanced",
+    "advanced": {
+      "title": "Advanced Settings",
+      "desc": "Configure in-game Quick Overlay, 3DMigoto reload hotkeys, auto-switch strategies, and sync timing."
     }
   }
 }
