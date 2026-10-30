@@ -38,6 +38,7 @@ export function OverlayApp() {
   const [benchmarkElapsed, setBenchmarkElapsed] = useState(0)
   const benchmarkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const benchmarkStartRef = useRef<number>(0)
+  const [overlayHotkey, setOverlayHotkey] = useState<string>('Alt+Shift+M')
 
   useEffect(() => {
     return () => {
@@ -73,6 +74,7 @@ export function OverlayApp() {
         setSelectMode(data.settings.ui.modSelectMode)
         setFilter(data.settings.ui.characterFilter)
         setPinned(data.settings.ui.overlayPinned)
+        if (data.settings.ui.overlayHotkey) setOverlayHotkey(data.settings.ui.overlayHotkey)
         setRecent(data.settings.recentMods)
         const characters = data.snapshot?.characters ?? []
         const initialFilter = data.settings.ui.characterFilter
@@ -98,9 +100,22 @@ export function OverlayApp() {
   }, [])
 
   useEffect(() => {
+    const onFocus = () => {
+      window.moddeck.getOverlayHotkey().then((k) => {
+        if (k) setOverlayHotkey(k)
+      }).catch(() => undefined)
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
+  useEffect(() => {
     if (loading) return
     let active = true
     const unsubscribe = window.moddeck.onStateChanged(() => {
+      window.moddeck.getOverlayHotkey().then((k) => {
+        if (k && active) setOverlayHotkey(k)
+      }).catch(() => undefined)
       void (async () => {
         try {
           const data = await window.moddeck.bootstrap()
@@ -487,7 +502,7 @@ export function OverlayApp() {
       {showPresetDrawer ? (
         <div className="overlay-preset-drawer">
           <div className="overlay-preset-head">
-            <strong>选择全角色预设方案</strong>
+            <strong>{t('overlay.schemesDrawerTitle')}</strong>
             <button className="icon-btn" onClick={() => setShowPresetDrawer(false)}>
               <Icon name="close" size={14} />
             </button>
@@ -495,7 +510,7 @@ export function OverlayApp() {
           <div className="overlay-preset-list">
             {rosterPresets.length === 0 ? (
               <div className="muted small" style={{ padding: '8px 12px' }}>
-                暂无预设方案，请在管理器主界面新建。
+                {t('overlay.noSchemesHint')}
               </div>
             ) : (
               rosterPresets.map((p) => {
@@ -509,7 +524,7 @@ export function OverlayApp() {
                     <span className="preset-dot" />
                     <span className="overlay-preset-name">{p.name}</span>
                     <span className="muted small">
-                      {Object.keys(p.assignments).length} 角色 · {Object.values(p.assignments).reduce((acc, a) => acc + (a?.mods?.length ? a.mods.length : (a?.modName ? 1 : 0)), 0)} Mod
+                      {t('overlay.schemeStats', { chars: Object.keys(p.assignments).length, mods: Object.values(p.assignments).reduce((acc, a) => acc + (a?.mods?.length ? a.mods.length : (a?.modName ? 1 : 0)), 0) })}
                     </span>
                   </button>
                 )
@@ -522,7 +537,7 @@ export function OverlayApp() {
       {showBenchmark ? (
         <div className="overlay-preset-drawer" style={{ maxHeight: '280px' }}>
           <div className="overlay-preset-head">
-            <strong>⏱️ 浮动实机重载测速校准</strong>
+            <strong>⏱️ {t('overlay.benchmarkDrawerTitle')}</strong>
             <button className="icon-btn" onClick={() => setShowBenchmark(false)}>
               <Icon name="close" size={14} />
             </button>
@@ -531,10 +546,10 @@ export function OverlayApp() {
             {benchmarkStatus === 'idle' ? (
               <>
                 <div className="muted small" style={{ lineHeight: 1.5 }}>
-                  浮于游戏窗口之上直接测量，<strong>杜绝 Alt+Tab 切屏反应误差</strong>！
+                  {t('overlay.benchmarkDrawerDesc')}
                 </div>
                 <div style={{ fontSize: '12px', background: 'rgba(255,255,255,0.04)', padding: '8px 10px', borderRadius: '4px' }}>
-                  点击下方「开始测速」，ModDeck 将向游戏发送 F10。请直接观察下方游戏画面，当重载卡顿结束、画面恢复流畅时，立即点击「停止计时」！
+                  {t('overlay.benchmarkDrawerTip')}
                 </div>
                 <button
                   className="btn primary small-btn"
@@ -553,13 +568,13 @@ export function OverlayApp() {
                     }
                   }}
                 >
-                  开始测速 (触发 F10)
+                  {t('overlay.benchmarkStartBtn')}
                 </button>
               </>
             ) : benchmarkStatus === 'running' ? (
               <div style={{ textAlign: 'center', padding: '10px 0' }}>
                 <div className="muted small" style={{ marginBottom: '6px' }}>
-                  已向游戏发送 F10，正在重载计时...
+                  {t('overlay.benchmarkRunningMsg')}
                 </div>
                 <div style={{ fontSize: '36px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--accent, #6366f1)' }}>
                   {benchmarkElapsed.toFixed(1)}s
@@ -575,19 +590,19 @@ export function OverlayApp() {
                     setBenchmarkStatus('finished')
                   }}
                 >
-                  ⏱️ 画面已恢复流畅，停止计时
+                  {t('overlay.benchmarkStopBtn')}
                 </button>
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '6px 0' }}>
-                <div className="muted small">实测游戏重载耗时</div>
+                <div className="muted small">{t('overlay.benchmarkMeasuredLabel')}</div>
                 <div style={{ fontSize: '26px', fontWeight: 700, fontFamily: 'monospace', margin: '4px 0' }}>
                   {benchmarkElapsed.toFixed(2)} 秒
                 </div>
                 <div style={{ fontSize: '13px', margin: '8px 0', padding: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
-                  推荐缓冲延迟：<strong style={{ color: 'var(--accent, #6366f1)' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} 秒</strong>
+                  {t('overlay.benchmarkRecDelayLabel')}<strong style={{ color: 'var(--accent, #6366f1)' }}>{Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))} {effectiveLocale === 'zh-CN' ? '秒' : 's'}</strong>
                   <span className="muted small" style={{ display: 'block', marginTop: '2px' }}>
-                    （实测耗时 + 1.5s 安全余量）
+                    {t('overlay.benchmarkRecMargin')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '10px' }}>
@@ -598,7 +613,7 @@ export function OverlayApp() {
                       setBenchmarkElapsed(0)
                     }}
                   >
-                    重新测速
+                    {t('overlay.benchmarkRestartBtn')}
                   </button>
                   <button
                     className="btn primary small-btn"
@@ -608,7 +623,7 @@ export function OverlayApp() {
                       setShowBenchmark(false)
                     }}
                   >
-                    应用推荐值 ({Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2))}s)
+                    {t('overlay.benchmarkApplyBtn', { seconds: Math.min(25, Math.max(2, Math.round((benchmarkElapsed + 1.5) * 2) / 2)) })}
                   </button>
                 </div>
               </div>
@@ -617,9 +632,6 @@ export function OverlayApp() {
         </div>
       ) : null}
       <footer className="overlay-foot">
-        <span className="muted">
-          {t('overlay.footerHint', { hotkey: boot?.settings.ui.overlayHotkey || (effectiveLocale === 'zh-CN' ? '未设置' : 'None') })}
-        </span>
         <div className="overlay-foot-actions">
           <button
             className={`btn ghost small-btn${showPresetDrawer ? ' active' : ''}`}
@@ -630,7 +642,7 @@ export function OverlayApp() {
               }
               setShowBenchmark(false)
             }}
-            title="一键切换全角色池方案"
+            title={effectiveLocale === 'zh-CN' ? '一键切换全角色池方案' : 'Quickly switch whole roster scheme'}
           >
             {t('overlay.schemesBtn', { count: rosterPresets.length })}
           </button>
@@ -642,7 +654,7 @@ export function OverlayApp() {
               setBenchmarkElapsed(0)
               setShowPresetDrawer(false)
             }}
-            title="浮动实机测速：无需切屏，直接观察游戏重载并精确校准缓冲延迟"
+            title={effectiveLocale === 'zh-CN' ? '浮动实机测速：无需切屏，直接观察游戏重载并精确校准缓冲延迟' : 'In-game benchmark: calibrate reload buffer delay without switching windows'}
           >
             {t('overlay.benchmarkBtn')}
           </button>
@@ -651,20 +663,28 @@ export function OverlayApp() {
             onClick={() => {
               void (async () => {
                 const result = await window.moddeck.reloadF10()
-                if (!result.ok) setError(result.error || '重载失败')
+                if (!result.ok) setError(result.error || (effectiveLocale === 'zh-CN' ? '重载失败' : 'Reload failed'))
                 else setPendingCount(0)
               })()
             }}
-            title={pendingCount > 0 ? `有 ${pendingCount} 个预设待生效，点击发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 立即刷新实机画面` : `发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 重载 EFMI 配置`}
+            title={pendingCount > 0 ? (effectiveLocale === 'zh-CN' ? `有 ${pendingCount} 个预设待生效，点击发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 立即刷新实机画面` : `${pendingCount} presets queued. Click to reload with ${boot?.settings.ui.reloadHotkey || 'F10'}`) : (effectiveLocale === 'zh-CN' ? `发送 ${boot?.settings.ui.reloadHotkey || 'F10'} 重载配置` : `Send ${boot?.settings.ui.reloadHotkey || 'F10'} to reload game`)}
           >
             {pendingCount > 0 ? t('overlay.applyNowBtn', { count: pendingCount }) : t('overlay.reloadBtn', { hotkey: boot?.settings.ui.reloadHotkey || 'F10' })}
           </button>
           <button
             className="btn ghost small-btn"
             onClick={() => window.moddeck.overlayOpenManager()}
+            title={effectiveLocale === 'zh-CN' ? '打开 ModDeck 管理器主界面' : 'Open ModDeck Manager Window'}
           >
             {t('overlay.openManagerBtn')}
           </button>
+        </div>
+        <div className="overlay-hint-bar">
+          <kbd className="overlay-kbd">{overlayHotkey || (effectiveLocale === 'zh-CN' ? '未绑定' : 'Unbound')}</kbd>
+          <span className="overlay-hint-action">{effectiveLocale === 'zh-CN' ? '呼出' : 'Toggle'}</span>
+          <span className="overlay-hint-dot">·</span>
+          <kbd className="overlay-kbd">Esc</kbd>
+          <span className="overlay-hint-action">{effectiveLocale === 'zh-CN' ? '隐藏' : 'Hide'}</span>
         </div>
       </footer>
     </div>

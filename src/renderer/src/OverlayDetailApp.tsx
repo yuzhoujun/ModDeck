@@ -244,7 +244,7 @@ export function OverlayDetailApp() {
                         title="当前实机参数处于未保存的自定义状态，点击上方『存为预设』可保存"
                       >
                         <span className="preset-dot is-dirty" />
-                        <span className="preset-chip-name">未保存实机改动</span>
+                        <span className="preset-chip-name">{t('preset.dirtyLiveOption')}</span>
                       </div>
                     ) : null}
                     {presets.map((preset) => {
@@ -258,7 +258,7 @@ export function OverlayDetailApp() {
                         title={pending ? `「${preset.name}」待刷新生效，按 F10 即可换装` : active ? '当前正处于此预设' : `点击应用「${preset.name}」并刷新`}
                       >
                         <span className="preset-dot" />
-                        <span className="preset-chip-name" style={{ minWidth: 0, flex: 1, overflow: "hidden" }}><ScrollTitle text={preset.name} /></span>
+                        <span className="preset-chip-name" style={{ minWidth: 0, flex: 1, overflow: "hidden" }}><ScrollTitle text={(preset.id === '__default__' || preset.name === '默认' || preset.name === '默认 (初始)') ? t('preset.defaultPreset') : preset.name} /></span>
                       </button>
                     )
                   })}
@@ -270,11 +270,11 @@ export function OverlayDetailApp() {
             {/* 游戏内按键区 */}
             <div className="overlay-section" style={{ marginTop: '14px' }}>
               <div className="overlay-section-head">
-                <span className="overlay-section-title">游戏内热键 (点击发送)</span>
+                <span className="overlay-section-title">{t('overlay.ingameHotkeysTitle')}</span>
               </div>
               {details.hotkeys.length === 0 ? (
                 <div className="muted small" style={{ marginTop: '4px' }}>
-                  该 Mod 的 ini 里没有配置快捷键
+                  {t('overlay.noIngameHotkeys')}
                 </div>
               ) : (
                 <div className="hotkey-grid">

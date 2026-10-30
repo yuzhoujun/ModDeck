@@ -12,7 +12,7 @@ import { getAssignmentModItems, isUtilityCategory } from '../../../shared/types'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { ScrollTitle } from './ScrollTitle'
-import { useI18n, getLocaleCharacterName } from '../i18n'
+import { useI18n, getLocaleCharacterName, getLocaleGameName } from '../i18n'
 
 export function RosterPresetModal({
   game,
@@ -545,13 +545,13 @@ export function RosterPresetModal({
 
   return (
     <Modal
-      title={`角色池预设方案管理 · ${game.shortName}`}
+      title={`${t('preset.rosterModalTitle')} · ${getLocaleGameName(game, effectiveLocale)}`}
       onClose={onClose}
       width={840}
       footer={
         <div className="modal-foot-between">
           <div className="muted small">
-            预设只记录各角色/Mod 激活与变体变量配置，毫秒级快速切换，绝不复制实体文件。
+            {t('preset.rosterModalDesc')}
           </div>
           <button className="btn" onClick={onClose}>
             {t('common.close')}
@@ -563,7 +563,7 @@ export function RosterPresetModal({
         {/* 顶部方案栏 */}
         <div className="roster-presets-bar">
           <div className="roster-presets-bar-head">
-            <strong>已存方案 ({presets.length})</strong>
+            <strong>{t('preset.savedSchemes', { count: presets.length })}</strong>
             <button
               className="btn small-btn primary"
               disabled={!showCreateForm && Boolean(matchingExistingPreset)}
@@ -575,7 +575,7 @@ export function RosterPresetModal({
               }
             >
               <Icon name="plus" size={14} />
-              {showCreateForm ? '取消' : '存为新方案'}
+              {showCreateForm ? t('common.cancel') : t('preset.saveAsNewScheme')}
             </button>
           </div>
 
@@ -583,7 +583,7 @@ export function RosterPresetModal({
             <div className="roster-save-box">
               <input
                 className="input"
-                placeholder="输入方案名称（如：深渊作战组、清凉夏日等）"
+                placeholder={t('preset.schemeNamePlaceholder')}
                 value={presetName}
                 onChange={(e) => setPresetName(e.target.value)}
                 onKeyDown={(e) => {
@@ -660,10 +660,10 @@ export function RosterPresetModal({
         {/* 角色与 Mod 方案配置区域 */}
         <div className="roster-config-section">
           <div className="roster-config-head">
-            <strong>角色 Mod 与变体预设方案配置</strong>
+            <strong>{t('preset.configSectionTitle')}</strong>
             <input
               className="input roster-search-input"
-              placeholder="快速过滤角色/分类…"
+              placeholder={t('preset.filterPlaceholder')}
               value={charFilter}
               onChange={(e) => setCharFilter(e.target.value)}
             />
@@ -703,7 +703,7 @@ export function RosterPresetModal({
                 title="将当前分池中全部项目设置为不启用任何 Mod（保持游戏原生）[快捷键 Alt+U]"
               >
                 <Icon name="close" size={12} />
-                <span>一键全部不启用</span>
+                <span>{t('preset.disableAllInPool')}</span>
                 <kbd className="kbd-shortcut">Alt+U</kbd>
               </button>
               <button
@@ -713,7 +713,7 @@ export function RosterPresetModal({
                 title="将当前分池中全部项目恢复为游戏实机当前正在使用的 Mod 与预设 [快捷键 Alt+R]"
               >
                 <Icon name="refresh" size={12} />
-                <span>一键选中当前使用中</span>
+                <span>{t('preset.selectCurrentInPool')}</span>
                 <kbd className="kbd-shortcut">Alt+R</kbd>
               </button>
             </div>
@@ -860,7 +860,7 @@ export function RosterPresetModal({
                             <div className="roster-mod-presets-row">
                               <span className="roster-mod-presets-label">
                                 <Icon name="box" size={12} />
-                                预设:
+                                {t('preset.presetPrefix')}
                               </span>
                               {isLoadingPresets && presets.length === 0 ? (
                                 <span className="muted small">加载中…</span>
@@ -877,18 +877,18 @@ export function RosterPresetModal({
                                     title="选择该方案生效时此 Mod 所应用的变体预设"
                                   >
                                     {assignedItem?.presetId === '__dirty__' && (
-                                      <option value="__dirty__">⚠️ 当前实机 (未保存改动)</option>
+                                      <option value="__dirty__">⚠️ {t('preset.dirtyLiveOption')}</option>
                                     )}
                                     {presets.map((p) => (
                                       <option key={p.id} value={p.id}>
-                                        {p.id === '__default__' ? `默认 (${p.name})` : p.name}
-                                        {p.isActive ? ' · 当前实机' : ''}
+                                        {(p.id === '__default__' || p.name === '默认' || p.name === '默认 (初始)') ? t('preset.defaultPreset') : p.name}
+                                        {p.isActive ? ` · ${t('preset.currentLive')}` : ''}
                                       </option>
                                     ))}
                                   </select>
                                   {assignedItem?.presetId === '__dirty__' && (
-                                    <span className="roster-dirty-pill" title="当前实机造型有微调，尚未保存为独立单 Mod 预设">
-                                      未保存
+                                    <span className="roster-dirty-pill" title={t('preset.dirtyTitle')}>
+                                      {t('preset.dirtyPill')}
                                     </span>
                                   )}
                                   <button
