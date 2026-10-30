@@ -11,7 +11,7 @@ import { Icon } from '../components/Icon'
 import { Modal } from '../components/Modal'
 import type { IconName } from '../components/Icon'
 import { errorMessage } from '../utils'
-import { useI18n, getLocaleGameName } from '../i18n'
+import { useI18n, getLocaleGameName, getLocaleGameShortName } from '../i18n'
 
 type SettingsTab = 'general' | 'advanced' | 'games' | 'environment' | 'import' | 'about'
 
@@ -164,11 +164,11 @@ export function SettingsView({
   }
 
   function envStatusText(status: EnvironmentCheck['status'] | undefined): string {
-    if (status === 'ok') return '规则存在，DISABLED_ 会生效'
-    if (status === 'missing-line') return '缺少 exclude_recursive = DISABLED*'
-    if (status === 'missing-file') return '找不到 EFMI 根目录的 d3dx.ini'
-    if (status === 'no-root') return '还没有配置 EFMI 目录'
-    return '尚未检测'
+    if (status === 'ok') return t('settings.environment.statusOk')
+    if (status === 'missing-line') return t('settings.environment.statusMissingLine')
+    if (status === 'missing-file') return t('settings.environment.statusMissingFile')
+    if (status === 'no-root') return t('settings.environment.statusNoRoot')
+    return t('settings.environment.statusNotChecked')
   }
 
   function updateGame(
@@ -289,10 +289,10 @@ export function SettingsView({
             <span className="status-dot-pulse" />
             <span>
               {saveStatus === 'saving'
-                ? '正在保存…'
+                ? t('settings.autoSaveSaving')
                 : saveStatus === 'saved'
-                  ? '已自动保存'
-                  : '修改实时自动保存'}
+                  ? t('settings.autoSaveSaved')
+                  : t('settings.autoSaveIdle')}
             </span>
           </div>
         </div>
@@ -313,35 +313,32 @@ export function SettingsView({
 
       {tab === 'general' ? (
         <>
-          <section className="settings-card">
-            <div className="settings-card-head">
-              <div className="settings-card-icon" style={{ background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.25)' }}>
+          <section className="setting-row-card">
+            <div className="setting-row-info">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  color: '#60a5fa',
+                  borderColor: 'rgba(59, 130, 246, 0.25)'
+                }}
+              >
                 <Icon name="settings" size={18} />
               </div>
-              <div>
+              <div className="setting-row-text">
                 <h3>{t('settings.general.languageTitle')}</h3>
-                <p className="muted">
-                  {t('settings.general.languageDesc')}
-                </p>
+                <p>{t('settings.general.languageDesc')}</p>
               </div>
             </div>
-
-            <div className="setting-group-box">
-              <div className="setting-group-header">
-                <span className="setting-group-title">{t('settings.general.languageTitle')}</span>
-                <span className="muted small">
-                  {draft.ui.language === 'auto' || !draft.ui.language
-                    ? `${t('settings.general.languageAuto')} (${effectiveLocale})`
-                    : draft.ui.language}
-                </span>
-              </div>
+            <div className="setting-row-action">
               <select
                 className="select"
+                style={{ width: '100%' }}
                 value={draft.ui.language || 'auto'}
                 onChange={(event) => {
-                  const val = event.target.value;
-                  setLocale(val);
-                  updateUi({ language: val });
+                  const val = event.target.value
+                  setLocale(val)
+                  updateUi({ language: val })
                 }}
               >
                 <option value="auto">{t('settings.general.languageAuto')}</option>
@@ -351,9 +348,8 @@ export function SettingsView({
             </div>
           </section>
 
-
-          <section className="settings-card">
-            <div className="settings-card-head">
+          <section className="setting-row-card">
+            <div className="setting-row-info">
               <div
                 className="settings-card-icon"
                 style={{
@@ -364,21 +360,15 @@ export function SettingsView({
               >
                 <Icon name="close" size={18} />
               </div>
-              <div>
+              <div className="setting-row-text">
                 <h3>{t('settings.general.closeBehaviorTitle')}</h3>
-                <p className="muted">{t('settings.general.closeBehaviorDesc')}</p>
+                <p>{t('settings.general.closeBehaviorDesc')}</p>
               </div>
             </div>
-
-            <div className="setting-group-box">
-              <div className="setting-group-header">
-                <span className="setting-group-title">{t('settings.general.closeBehavior')}</span>
-                <span className="muted small">
-                  {draft.ui.closeBehavior === 'minimize' ? (effectiveLocale === 'zh-CN' ? '托盘菜单可打开管理器或退出' : 'Tray menu allows opening manager or quitting') : (effectiveLocale === 'zh-CN' ? '关闭主窗口会直接结束进程' : 'Closing main window terminates the process directly')}
-                </span>
-              </div>
+            <div className="setting-row-action">
               <select
                 className="select"
+                style={{ width: '100%' }}
                 value={draft.ui.closeBehavior}
                 onChange={(event) =>
                   updateUi({
@@ -489,7 +479,7 @@ export function SettingsView({
               </div>
               <div>
                 <h3>{t('settings.general.behaviorTitle')}</h3>
-                <p className="muted">控制 3DMigoto 游戏重载热键、预设自动换装策略及刷盘同步延迟。</p>
+                <p className="muted">{t('settings.general.behaviorDesc')}</p>
               </div>
             </div>
 
@@ -756,7 +746,7 @@ export function SettingsView({
                       <input
                         className="input"
                         value={value?.modsPath ?? ''}
-                        placeholder={`例如 D:/Games/XXMI/${game.loader} 或 D:/Games/XXMI/${game.loader}/Mods`}
+                        placeholder={t('settings.games.modsPlaceholder', { loader: game.loader })}
                         onChange={(event) =>
                           updateGame(game.id, { modsPath: event.target.value }, true)
                         }
@@ -786,7 +776,7 @@ export function SettingsView({
                       />
                       <button
                         className="icon-btn"
-                        title="选择游戏程序"
+                        title={t('settings.games.pickGameTooltip')}
                         onClick={() =>
                           pickInto(game.id, 'gamePath', () => window.moddeck.pickGameExe())
                         }
@@ -809,7 +799,7 @@ export function SettingsView({
                       />
                       <button
                         className="icon-btn"
-                        title="选择启动器"
+                        title={t('settings.games.pickLoaderTooltip')}
                         onClick={() =>
                           pickInto(game.id, 'loaderPath', () => window.moddeck.pickLoader())
                         }
@@ -824,7 +814,7 @@ export function SettingsView({
                     <input
                       className="input"
                       value={value?.launchArgs ?? ''}
-                      placeholder="例如 -dx11"
+                      placeholder={t('settings.games.argsPlaceholder')}
                       onChange={(event) =>
                         updateGame(game.id, { launchArgs: event.target.value }, true)
                       }
@@ -874,14 +864,14 @@ export function SettingsView({
               disabled={envChecking}
             >
               <Icon name="refresh" size={14} />
-              {envChecking ? '检测中…' : '重新检测全部'}
+              {envChecking ? t('settings.environment.checking') : t('settings.environment.recheck')}
             </button>
             {draft.ui.envCheckNeverPrompt ? (
               <button
                 className="btn ghost small-btn"
                 onClick={() => updateUi({ envCheckNeverPrompt: false })}
               >
-                恢复启动提示
+                {t('settings.environment.restorePrompt')}
               </button>
             ) : null}
           </div>
@@ -894,10 +884,10 @@ export function SettingsView({
                 <div className={`env-game-card${supported ? '' : ' pending'}`} key={game.id}>
                   <div className="env-game-head">
                     <span className="dot" style={{ background: game.accent }} />
-                    <strong>{game.name}</strong>
+                    <strong>{getLocaleGameName(game, effectiveLocale)}</strong>
                     <span className="muted">{game.loader}</span>
                     <span className={`chip${supported && env?.status === 'ok' ? ' ok' : ''}`}>
-                      {supported ? envStatusText(env?.status) : '待接入'}
+                      {supported ? envStatusText(env?.status) : t('settings.environment.statusPending')}
                     </span>
                   </div>
                   {supported ? (
@@ -907,7 +897,7 @@ export function SettingsView({
                         {shortPath(env?.root || draft.games[game.id]?.modsPath || '未配置')}
                       </div>
                       <p className="muted small">
-                        规则：<code>exclude_recursive = DISABLED*</code>
+                        {t('settings.environment.ruleLabel')}<code>exclude_recursive = DISABLED*</code>
                       </p>
                       <div className="row">
                         <button
@@ -915,7 +905,7 @@ export function SettingsView({
                           onClick={() => void window.moddeck.openEnvironmentFolder(game.id)}
                         >
                           <Icon name="folder" size={14} />
-                          打开 EFMI 目录
+                          {t('settings.environment.openFolder', { loader: game.loader })}
                         </button>
                       </div>
                     </>
@@ -947,7 +937,7 @@ export function SettingsView({
             </div>
             <div className="setting-group-box">
               <div className="setting-group-header">
-                <span className="setting-group-title">导入方式</span>
+                <span className="setting-group-title">{t('settings.import.modeLabel')}</span>
               </div>
               <div className="segmented">
                 <button
@@ -955,14 +945,14 @@ export function SettingsView({
                   className={(draft.import.mode ?? (draft.import.deleteArchiveAfter ? 'move' : 'copy')) === 'copy' ? 'active' : ''}
                   onClick={() => updateImport({ mode: 'copy', deleteArchiveAfter: false })}
                 >
-                  复制（保留原文件/文件夹）
+                  {t('settings.import.modeCopy')}
                 </button>
                 <button
                   type="button"
                   className={(draft.import.mode ?? (draft.import.deleteArchiveAfter ? 'move' : 'copy')) === 'move' ? 'active' : ''}
                   onClick={() => updateImport({ mode: 'move', deleteArchiveAfter: true })}
                 >
-                  移动（导入成功后删除原压缩包/文件夹）
+                  {t('settings.import.modeMove')}
                 </button>
               </div>
             </div>
@@ -1016,7 +1006,7 @@ export function SettingsView({
                   disabled={rosterSyncing}
                 >
                   <Icon name="refresh" size={14} />
-                  {rosterSyncing ? '更新中…' : '一键更新词库'}
+                  {rosterSyncing ? t('settings.import.syncRosterSyncing') : t('settings.import.syncRosterBtn')}
                 </button>
               </div>
               {rosterStatus ? (
@@ -1136,7 +1126,7 @@ export function SettingsView({
 
       {showF10WarningModal ? (
         <Modal
-          title="开启自动重载确认"
+          title={t('settings.modals.f10WarningTitle')}
           onClose={() => setShowF10WarningModal(false)}
           width={420}
           footer={
@@ -1169,7 +1159,7 @@ export function SettingsView({
       ) : null}
       {showDisablePresetReloadModal ? (
         <Modal
-          title="关闭预设自动重载确认"
+          title={t('settings.modals.disablePresetReloadTitle')}
           onClose={() => setShowDisablePresetReloadModal(null)}
           width={440}
           footer={
@@ -1189,7 +1179,7 @@ export function SettingsView({
                   }
                 }}
               >
-                确认关闭
+                {t('settings.modals.confirmDisable')}
               </button>
             </>
           }
@@ -1207,7 +1197,7 @@ export function SettingsView({
 
       {showBenchmarkModal ? (
         <Modal
-          title="3DMigoto 重载耗时测速校准"
+          title={t('settings.modals.benchmarkTitle')}
           onClose={() => {
             if (benchmarkTimerRef.current) clearInterval(benchmarkTimerRef.current)
             benchmarkTimerRef.current = null
@@ -1227,7 +1217,7 @@ export function SettingsView({
                   setBenchmarkStatus('finished')
                 }}
               >
-                ⏱️ 游戏已重载完毕，停止计时
+                {t('settings.modals.benchmarkStop')}
               </button>
             ) : benchmarkStatus === 'finished' ? (
               <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
@@ -1238,7 +1228,7 @@ export function SettingsView({
                     setBenchmarkElapsed(0)
                   }}
                 >
-                  重新测速
+                  {t('settings.modals.benchmarkRetry')}
                 </button>
                 <button
                   className="btn primary"
@@ -1275,7 +1265,7 @@ export function SettingsView({
                     }
                   }}
                 >
-                  开始测速
+                  {t('settings.modals.benchmarkStart')}
                 </button>
               </div>
             )
