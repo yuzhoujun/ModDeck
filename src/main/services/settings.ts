@@ -20,7 +20,7 @@ export function defaultSettings(): Settings {
     activeGameId: GAMES[0].id,
     games,
     ui: {
-      language: 'zh-CN',
+      language: 'auto',
       sortCharacters: 'custom',
       sortMods: 'name',
       showHidden: false,
@@ -134,7 +134,7 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
     activeGameId,
     games,
     ui: {
-      language: source.ui?.language === 'en' ? 'en' : 'zh-CN',
+      language: source.ui?.language || 'auto',
       sortCharacters:
         source.ui?.sortCharacters === 'name' || source.ui?.sortCharacters === 'count'
           ? source.ui.sortCharacters
@@ -234,7 +234,7 @@ export function mergeSettings(current: Settings, patch: SettingsPatch): Settings
     next.ui = {
       ...next.ui,
       ...patch.ui,
-      language: patch.ui.language === 'en' ? 'en' : next.ui.language,
+      language: patch.ui.language !== undefined ? patch.ui.language : next.ui.language,
       showHidden:
         typeof patch.ui.showHidden === 'boolean' ? patch.ui.showHidden : next.ui.showHidden
     }

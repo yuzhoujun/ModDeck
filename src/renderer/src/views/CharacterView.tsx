@@ -11,6 +11,7 @@ import { ImportDropdown } from '../components/ImportDropdown'
 import { ModDetailsPanel } from '../components/ModDetailsPanel'
 import { ModRow } from '../components/ModRow'
 import { displayNameOf, initialOf, modMatches } from '../utils'
+import { useI18n, getLocaleCharacterName } from '../i18n'
 
 export function CharacterView({
   game,
@@ -68,7 +69,8 @@ export function CharacterView({
   const [dragName, setDragName] = useState<string | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
 
-  const name = displayNameOf(character)
+  const { t, effectiveLocale } = useI18n()
+  const name = getLocaleCharacterName(character, effectiveLocale)
   const visible = mods.filter((mod) => modMatches(mod, query))
   const selectedMod = selectedName ? mods.find((mod) => mod.name === selectedName) ?? null : null
 
@@ -189,24 +191,24 @@ export function CharacterView({
           </div>
           <h1>{name}</h1>
           <div className="chips">
-            <span className="chip">{character.modCount} 个 Mod</span>
-            <span className="chip ok">{character.enabledCount} 启用</span>
+            <span className="chip">{t('common.modsCount', { count: character.modCount })}</span>
+            <span className="chip ok">{t('common.enabledCount', { count: character.enabledCount })}</span>
             {character.hiddenCount > 0 ? (
-              <span className="chip">{character.hiddenCount} 禁用</span>
+              <span className="chip">{character.hiddenCount} {t('common.disabled')}</span>
             ) : null}
-            {!character.known ? <span className="chip new">新角色</span> : null}
+            {!character.known ? <span className="chip new">{effectiveLocale === 'zh-CN' ? '新角色' : 'NEW'}</span> : null}
           </div>
         </div>
         <div className="actions">
           <button className="btn ghost" onClick={onEdit}>
             <Icon name="edit" size={15} />
-            编辑
+            {t('common.edit')}
           </button>
           <button className="btn ghost" onClick={onOpenCharacterFolder}>
             <Icon name="folder" size={15} />
-            打开目录
+            {t('character.openFolder')}
           </button>
-          <ImportDropdown label="导入到该角色" onImport={onImport} onImportFolder={onImportFolder} />
+          <ImportDropdown label={effectiveLocale === 'zh-CN' ? '导入到该角色' : 'Import to category'} onImport={onImport} onImportFolder={onImportFolder} />
         </div>
       </header>
 
@@ -215,7 +217,7 @@ export function CharacterView({
           <Icon name="search" size={16} />
           <input
             className="input"
-            placeholder="搜索 Mod"
+            placeholder={t('character.searchPlaceholder')}
             value={query}
             onChange={(event) => onQuery(event.target.value)}
           />
@@ -225,10 +227,10 @@ export function CharacterView({
           value={sort}
           onChange={(event) => onSort(event.target.value as UiSettings['sortMods'])}
         >
-          <option value="name">按名称</option>
-          <option value="recent">按更新时间</option>
-          <option value="enabled">启用的优先</option>
-          <option value="custom">自定义顺序</option>
+          <option value="name">{t('library.sortByName')}</option>
+          <option value="recent">{effectiveLocale === 'zh-CN' ? '按更新时间' : 'By Date'}</option>
+          <option value="enabled">{effectiveLocale === 'zh-CN' ? '启用的优先' : 'Enabled First'}</option>
+          <option value="custom">{t('library.sortByCustom')}</option>
         </select>
         <div className="segmented compact">
           <button
@@ -239,14 +241,14 @@ export function CharacterView({
             }}
             title="启用一个 Mod 时自动关闭其他 Mod"
           >
-            单选
+            {t('preset.single')}
           </button>
           <button
             className={selectMode === 'multi' ? 'active' : ''}
             onClick={() => onSelectMode('multi')}
             title="可以同时启用多个 Mod"
           >
-            多选
+            {t('preset.multi')}
           </button>
         </div>
         {selectMode === 'multi' && checked.size > 0 ? (
@@ -262,7 +264,7 @@ export function CharacterView({
                 setChecked(new Set())
               }}
             >
-              启用选中
+              {effectiveLocale === 'zh-CN' ? '启用选中' : 'Enable Selected'}
             </button>
             <button
               className="btn ghost"
@@ -274,14 +276,14 @@ export function CharacterView({
                 setChecked(new Set())
               }}
             >
-              禁用选中
+              {effectiveLocale === 'zh-CN' ? '禁用选中' : 'Disable Selected'}
             </button>
           </>
         ) : null}
         {sort === 'custom' ? <span className="hint">拖动 Mod 排序</span> : null}
         <button className="btn ghost" onClick={onRefresh}>
           <Icon name="refresh" size={15} />
-          刷新
+          {t('common.refresh')}
         </button>
 
       </div>
@@ -291,17 +293,15 @@ export function CharacterView({
           {loading ? (
             <div className="empty-panel">
               <div className="spinner" />
-              <p className="muted">正在扫描 Mod…</p>
+              <p className="muted">{t('common.loading')}</p>
             </div>
           ) : visible.length === 0 ? (
             <div className="empty-panel">
               <div className="empty-icon">
                 <Icon name="box" size={28} />
               </div>
-              <h2>{query ? '没有匹配的 Mod' : '这个角色还没有 Mod'}</h2>
-              <p className="muted">
-                {query ? '换个关键词试试。' : '点右上角“导入到该角色”，或把压缩包拖进来。'}
-              </p>
+              <h2>{query ? (effectiveLocale === 'zh-CN' ? '没有匹配的 Mod' : 'No matching mods') : t('character.emptyModsTitle')}</h2>
+              <p className="muted">{query ? t('library.emptySearchDesc') : t('character.emptyModsDesc')}</p>
             </div>
           ) : (
             <div className="mod-list">
