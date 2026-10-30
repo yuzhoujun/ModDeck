@@ -680,35 +680,6 @@ export function SettingsView({
               </select>
             </div>
           </section>
-
-          <section className="settings-card">
-            <div className="settings-card-head">
-              <div
-                className="settings-card-icon"
-                style={{
-                  background: 'rgba(234, 179, 8, 0.12)',
-                  color: '#fbbf24',
-                  borderColor: 'rgba(234, 179, 8, 0.25)'
-                }}
-              >
-                <Icon name="folder" size={18} />
-              </div>
-              <div>
-                <h3>本地数据</h3>
-                <p className="muted">设置、角色元数据、封面、快照和日志都保存在本机，纯本地无云端泄露隐患。</p>
-              </div>
-            </div>
-            <div className="row">
-              <button className="btn ghost" onClick={() => window.moddeck.openPath('data')}>
-                <Icon name="folder" size={16} />
-                打开数据目录 (userData)
-              </button>
-              <button className="btn ghost" onClick={() => window.moddeck.openPath('logs')}>
-                <Icon name="folder" size={16} />
-                打开运行日志 (logs)
-              </button>
-            </div>
-          </section>
         </>
       ) : null}
 
@@ -1022,47 +993,102 @@ export function SettingsView({
       ) : null}
 
       {tab === 'about' ? (
-        <section className="settings-card">
-          <div className="settings-card-head">
-            <div className="settings-card-icon" style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)' }}>
-              <Icon name="info" size={18} />
-            </div>
-            <div>
-              <h3>关于 ModDeck</h3>
-              <p className="muted">ModDeck · MIT License · 本地优先 (Local-First 架构)</p>
-            </div>
-          </div>
-          {info ? (
-            <div className="kv">
-              <div>
-                <span>版本</span>
-                <code>{info.version}</code>
+        <>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  color: '#38bdf8',
+                  borderColor: 'rgba(56, 189, 248, 0.25)'
+                }}
+              >
+                <Icon name="info" size={18} />
               </div>
               <div>
-                <span>Electron</span>
-                <code>{info.electron}</code>
-              </div>
-              <div>
-                <span>Node</span>
-                <code>{info.node}</code>
-              </div>
-              <div>
-                <span>数据目录</span>
-                <code>{info.userData}</code>
+                <h3>关于 ModDeck</h3>
+                <p className="muted">ModDeck · MIT License · 本地优先 (Local-First 架构)</p>
               </div>
             </div>
-          ) : null}
-          <div className="row">
-            <button className="btn ghost" onClick={() => window.moddeck.openPath('data')}>
-              <Icon name="folder" size={16} />
-              打开数据目录
-            </button>
-            <button className="btn ghost" onClick={() => window.moddeck.openPath('logs')}>
-              <Icon name="folder" size={16} />
-              打开日志
-            </button>
-          </div>
-        </section>
+            {info ? (
+              <div className="kv" style={{ marginBottom: 0 }}>
+                <div>
+                  <span>软件版本</span>
+                  <code>{info.version}</code>
+                </div>
+                <div>
+                  <span>Electron 运行时</span>
+                  <code>{info.electron}</code>
+                </div>
+                <div>
+                  <span>Node.js 内核</span>
+                  <code>{info.node}</code>
+                </div>
+                <div>
+                  <span>开源协议</span>
+                  <code>MIT License</code>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(234, 179, 8, 0.12)',
+                  color: '#fbbf24',
+                  borderColor: 'rgba(234, 179, 8, 0.25)'
+                }}
+              >
+                <Icon name="folder" size={18} />
+              </div>
+              <div>
+                <h3>本地数据与存储</h3>
+                <p className="muted">设置、角色元数据、封面、快照和日志都保存在本机，纯本地无云端泄露隐患。</p>
+              </div>
+            </div>
+
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <span className="setting-group-title">数据存储根目录 (userData)</span>
+                <span className="muted small">本地持久化存储</span>
+              </div>
+              <div style={{ margin: '8px 0 12px 0' }}>
+                <code
+                  style={{
+                    display: 'block',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(0, 0, 0, 0.28)',
+                    border: '1px solid var(--line-soft)',
+                    color: '#cbd5e1',
+                    fontSize: '12px',
+                    wordBreak: 'break-all',
+                    userSelect: 'all'
+                  }}
+                >
+                  {info?.userData || '获取中...'}
+                </code>
+              </div>
+              <div className="row">
+                <button className="btn ghost" onClick={() => window.moddeck.openPath('data')}>
+                  <Icon name="folder" size={16} />
+                  打开数据目录 (userData)
+                </button>
+                <button className="btn ghost" onClick={() => window.moddeck.openPath('logs')}>
+                  <Icon name="folder" size={16} />
+                  打开运行日志 (logs)
+                </button>
+              </div>
+              <div className="setting-group-desc">
+                💡 包含 ModDeck 配置、角色匹配数据、预设方案快照及运行日志。在重装系统或迁移设备时，直接打包复制该文件夹即可完整保留所有设置与预设。
+              </div>
+            </div>
+          </section>
+        </>
       ) : null}
 
       {showF10WarningModal ? (
