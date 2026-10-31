@@ -18,6 +18,7 @@ export function defaultSettings(): Settings {
   return {
     schemaVersion: 1,
     activeGameId: GAMES[0].id,
+    xxmiRoot: '',
     games,
     ui: {
       language: 'auto',
@@ -54,6 +55,34 @@ export function defaultSettings(): Settings {
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value : ''
+}
+
+export function inferXxmiRootFromPath(candidatePath: string): string {
+  let current = candidatePath.trim().replace(/[\\/]+$/, '')
+  if (!current) return ''
+  try {
+    if (fsSync.existsSync(current) && fsSync.statSync(current).isFile()) {
+      current = path.dirname(current)
+    }
+  } catch {
+    // ignore
+  }
+  for (let i = 0; i < 5 && current; i++) {
+    try {
+      if (
+        fsSync.existsSync(path.join(current, 'XXMI Launcher Config.json')) ||
+        fsSync.existsSync(path.join(current, 'Resources', 'Bin', 'XXMI Launcher.exe'))
+      ) {
+        return current
+      }
+    } catch {
+      // ignore
+    }
+    const parent = path.dirname(current)
+    if (!parent || parent === current) break
+    current = parent
+  }
+  return ''
 }
 
 /** 允许用户选择 EFMI 根目录；内部统一落到它的 Mods 子目录。 */
@@ -129,9 +158,25 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
       ? Math.max(0, Math.min(15, Math.floor(source.ui.recentModCount)))
       : 8
 
+  let xxmiRoot = asString(source.xxmiRoot).trim().replace(/[\\/]+$/, '')
+  if (xxmiRoot) {
+    xxmiRoot = inferXxmiRootFromPath(xxmiRoot) || xxmiRoot
+  } else {
+    for (const g of Object.values(games)) {
+      const inferred =
+        (g.loaderPath ? inferXxmiRootFromPath(g.loaderPath) : '') ||
+        (g.modsPath ? inferXxmiRootFromPath(g.modsPath) : '')
+      if (inferred) {
+        xxmiRoot = inferred
+        break
+      }
+    }
+  }
+
   return {
     schemaVersion: 1,
     activeGameId,
+    xxmiRoot,
     games,
     ui: {
       language: source.ui?.language || 'auto',
@@ -219,6 +264,7 @@ export function mergeSettings(current: Settings, patch: SettingsPatch): Settings
   }
 
   if (isGameId(patch.activeGameId)) next.activeGameId = patch.activeGameId
+  if (typeof patch.xxmiRoot === 'string') next.xxmiRoot = patch.xxmiRoot.trim()
 
   if (patch.games) {
     for (const [gameId, value] of Object.entries(patch.games)) {

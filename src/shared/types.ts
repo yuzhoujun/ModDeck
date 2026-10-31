@@ -80,6 +80,7 @@ export interface ImportSettings {
 export interface Settings {
   schemaVersion: 1
   activeGameId: GameId
+  xxmiRoot?: string
   games: Record<string, GameSettings>
   ui: UiSettings
   import: ImportSettings
@@ -142,6 +143,7 @@ export interface CreateCharacterInput {
   displayName?: string
   aliases?: string[]
   kind?: CharacterKind
+  coverDataUrl?: string
 }
 
 export interface OverlayDetailRequest {
@@ -184,6 +186,7 @@ export interface RosterSyncResult {
   ok: boolean
   updatedAt?: string
   addedOrUpdated?: number
+  createdFoldersCount?: number
   error?: string
   status?: RosterSyncStatus
 }
@@ -255,9 +258,18 @@ export interface ImportResult {
 
 export interface SettingsPatch {
   activeGameId?: GameId
+  xxmiRoot?: string
   games?: Record<string, Partial<GameSettings>>
   ui?: Partial<UiSettings>
   import?: Partial<ImportSettings>
+}
+
+export interface AutoDetectPathsResult {
+  ok: boolean
+  xxmiRoot?: string
+  detectedGames: GameId[]
+  settings?: Settings
+  error?: string
 }
 
 export interface AppInfo {

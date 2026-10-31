@@ -330,7 +330,7 @@ export const BUILTIN_ROSTER: Record<GameId, RosterEntry[]> = {
   ]
 }
 
-function normalizeMatchText(text: string): string {
+export function normalizeMatchText(text: string): string {
   return String(text || '')
     .toLowerCase()
     .replace(/^disabled_/i, '')
@@ -392,11 +392,11 @@ export function getMergedRoster(gameId: GameId): RosterEntry[] {
   return Array.from(byKey.values())
 }
 
-export function getRosterMap(): Record<GameId, string[]> {
+export function getRosterMap(preferEn = false): Record<GameId, string[]> {
   const map = {} as Record<GameId, string[]>
   for (const game of GAMES) {
     const merged = getMergedRoster(game.id)
-    const names = ['其他', ...merged.map((item) => item.zh).filter((zh) => zh !== '其他')]
+    const names = [preferEn ? 'Others' : '其他', ...merged.filter((item) => item.zh !== '其他').map((item) => (preferEn ? item.en || item.zh : item.zh))]
     map[game.id] = Array.from(new Set(names))
   }
   return map
@@ -525,7 +525,8 @@ function containsToken(haystackRaw: string, tokenRaw: string): boolean {
 export function matchCharacterForMod(
   gameId: GameId,
   existingCharacters: CharacterInfo[],
-  textsToMatch: string[]
+  textsToMatch: string[],
+  preferEn = false
 ): { folder: string; reason: string } {
   const combinedRaw = textsToMatch.filter(Boolean).join(' / ')
   if (!combinedRaw.trim()) {
@@ -578,7 +579,7 @@ export function matchCharacterForMod(
       existingByNorm.get(normalizeMatchText(entry.zh)) ||
       existingByNorm.get(normalizeMatchText(entry.en)) ||
       existingByNorm.get(normalizeMatchText(entry.pinyin))
-    const targetFolder = matchedExisting ? matchedExisting.folder : entry.zh
+    const targetFolder = matchedExisting ? matchedExisting.folder : (preferEn ? entry.en || entry.zh : entry.zh)
     const bonus = matchedExisting ? 15 : 0
 
     consider(targetFolder, entry.zh, entry.zh, bonus + 10)
@@ -600,7 +601,7 @@ export function matchCharacterForMod(
     existingByNorm.get(normalizeMatchText('其他')) ||
     existingByNorm.get(normalizeMatchText('others'))
   return {
-    folder: existingOther ? existingOther.folder : '其他',
+    folder: existingOther ? existingOther.folder : (preferEn ? 'Others' : '其他'),
     reason: '未匹配（默认其他）'
   }
 }
@@ -621,6 +622,28 @@ export function findCanonicalEnName(gameId: GameId, nameOrFolder: string): strin
       (entry.aliases && entry.aliases.some((a) => normalizeMatchText(a) === norm))
     ) {
       return entry.en || undefined
+    }
+  }
+  return undefined
+}
+
+
+/**
+ * 根据角色英文名、目录名或别名查询其标准中文名称（供英文目录在 zh-CN 界面显示）。
+ */
+export function findCanonicalZhName(gameId: GameId, nameOrFolder: string): string | undefined {
+  if (!nameOrFolder) return undefined
+  const norm = normalizeMatchText(nameOrFolder)
+  if (!norm) return undefined
+  const roster = getMergedRoster(gameId)
+  for (const entry of roster) {
+    if (
+      normalizeMatchText(entry.zh) === norm ||
+      normalizeMatchText(entry.en) === norm ||
+      normalizeMatchText(entry.pinyin) === norm ||
+      (entry.aliases && entry.aliases.some((a) => normalizeMatchText(a) === norm))
+    ) {
+      return entry.zh || undefined
     }
   }
   return undefined

@@ -58,6 +58,34 @@ function syncStructure(base, target, fillMissing = (key, baseVal) => baseVal) {
   return sortObject(result)
 }
 
+// Scan files for t('...') calls that are missing in baseKeys
+function scanMissingUsedKeys(baseKeysSet) {
+  const srcDir = path.resolve(ROOT, 'src')
+  const missing = []
+
+  function scan(dir) {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, ent.name)
+      if (ent.isDirectory()) {
+        scan(full)
+      } else if (ent.isFile() && /\.(tsx|ts)$/.test(ent.name)) {
+        const text = fs.readFileSync(full, 'utf8')
+        const regex = /\bt\(\s*['"]([a-zA-Z0-9_]+\.[a-zA-Z0-9_.]+)['"]/g
+        let match
+        while ((match = regex.exec(text)) !== null) {
+          const key = match[1]
+          if (!baseKeysSet.has(key)) {
+            missing.push({ key, file: path.relative(ROOT, full) })
+          }
+        }
+      }
+    }
+  }
+
+  scan(srcDir)
+  return missing
+}
+
 // Scan files for hardcoded Chinese outside t(...) and comments
 function scanHardcodedChinese() {
   const srcDir = path.resolve(ROOT, 'src/renderer/src')
@@ -152,6 +180,17 @@ if (command === 'extract') {
     if (missing.length === 0 && extra.length === 0) {
       console.log(`  ✅ 100% matched with base!`)
     }
+  }
+
+  console.log('\n🔍 Checking code t(...) calls against base locale...')
+  const baseKeysSet = new Set(baseKeys)
+  const missingUsed = scanMissingUsedKeys(baseKeysSet)
+  if (missingUsed.length === 0) {
+    console.log('  ✅ All t(...) keys used in code exist in base locale!')
+  } else {
+    console.warn(`  ⚠️ Found ${missingUsed.length} t(...) calls missing from base locale:`)
+    missingUsed.forEach((m) => console.warn(`    - ${m.key} (in ${m.file})`))
+    hasError = true
   }
 
   console.log('\n🔍 Scanning for untranslated Chinese text in src/renderer/src...')

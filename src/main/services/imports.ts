@@ -296,7 +296,8 @@ export async function parseImportSources(
           matchReason = '当前角色页'
         } else {
           const texts = [entryCharacter, modName, archiveBase]
-          const matched = matchCharacterForMod(game.id, existingCharacters, texts)
+          const preferEn = Boolean(context.settings.ui?.language && context.settings.ui.language !== 'zh-CN' && context.settings.ui.language !== 'auto')
+          const matched = matchCharacterForMod(game.id, existingCharacters, texts, preferEn)
           suggestedCharacter = matched.folder
           matchReason = matched.reason
         }

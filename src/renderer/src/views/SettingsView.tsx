@@ -50,6 +50,7 @@ export function SettingsView({
   }, [draft.activeGameId, settings.activeGameId])
 
   const [rosterSyncing, setRosterSyncing] = useState(false)
+  const [autoDetecting, setAutoDetecting] = useState(false)
   const [showF10WarningModal, setShowF10WarningModal] = useState(false)
   const [showDisablePresetReloadModal, setShowDisablePresetReloadModal] = useState<"modPreset" | "rosterPreset" | null>(null)
 
@@ -122,7 +123,11 @@ export function SettingsView({
       const res = await window.moddeck.syncRemoteRoster(draft.import.rosterRemoteUrl)
       if (res.ok) {
         if (res.status) setRosterStatus(res.status)
-        onNotify(t('settings.notify.rosterUpdated', { count: res.addedOrUpdated ?? 0 }))
+        if ((res.createdFoldersCount ?? 0) > 0) {
+          onNotify(t('settings.notify.rosterUpdatedWithFolders', { count: res.addedOrUpdated ?? 0, created: res.createdFoldersCount ?? 0 }))
+        } else {
+          onNotify(t('settings.notify.rosterUpdated', { count: res.addedOrUpdated ?? 0 }))
+        }
       } else {
         onNotify(res.error || t('settings.notify.rosterFailed'), 'err')
       }
@@ -130,6 +135,58 @@ export function SettingsView({
       onNotify(errorMessage(error), 'err')
     } finally {
       setRosterSyncing(false)
+    }
+  }
+
+  function updateXxmiRoot(value: string, debounced = false) {
+    setDraft((current) => ({ ...current, xxmiRoot: value }))
+    void persistPatch({ xxmiRoot: value }, debounced)
+  }
+
+  async function handlePickXxmiRoot() {
+    try {
+      const res = await window.moddeck.pickXxmiRoot()
+      if (res.settings) {
+        setDraft(res.settings)
+      }
+      if (res.ok) {
+        onNotify(
+          res.detectedGames.length > 0
+            ? t('settings.notify.xxmiSyncedWithGames', { count: res.detectedGames.length })
+            : t('settings.notify.xxmiRootSaved')
+        )
+      }
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    }
+  }
+
+  async function handleAutoDetectPaths() {
+    setAutoDetecting(true)
+    try {
+      const res = await window.moddeck.autoDetectPaths()
+      if (res.settings) {
+        setDraft(res.settings)
+      }
+      if (res.ok) {
+        const names = res.detectedGames
+          .map((gid) => {
+            const g = games.find((item) => item.id === gid)
+            return g ? getLocaleGameShortName(g, effectiveLocale) : gid
+          })
+          .join(' / ')
+        onNotify(
+          names
+            ? t('settings.notify.autoDetectSuccessGames', { games: names })
+            : t('settings.notify.autoDetectSuccessXxmi')
+        )
+      } else {
+        onNotify(res.error || t('settings.notify.autoDetectNone'), 'info')
+      }
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setAutoDetecting(false)
     }
   }
 
@@ -741,6 +798,39 @@ export function SettingsView({
               <p className="muted">{t('settings.games.desc')}</p>
             </div>
           </div>
+          <div className="setting-group-box" style={{ marginBottom: '16px' }}>
+            <div className="setting-group-header">
+              <span className="setting-group-title">{t('settings.games.xxmiRootLabel')}</span>
+              <span className="setting-group-hint">{t('settings.games.xxmiRootHint')}</span>
+            </div>
+            <div className="field-row" style={{ gap: '8px' }}>
+              <input
+                className="input"
+                value={draft.xxmiRoot ?? ''}
+                placeholder={t('settings.games.xxmiRootPlaceholder')}
+                onChange={(event) => updateXxmiRoot(event.target.value, true)}
+              />
+              <button
+                type="button"
+                className="icon-btn"
+                title={t('settings.games.pickFolderTooltip')}
+                onClick={() => void handlePickXxmiRoot()}
+              >
+                <Icon name="folder" size={17} />
+              </button>
+              <button
+                type="button"
+                className="btn ghost small-btn"
+                style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                disabled={autoDetecting}
+                onClick={() => void handleAutoDetectPaths()}
+              >
+                <Icon name="refresh" size={14} />
+                {autoDetecting ? t('settings.games.autoDetecting') : t('settings.games.autoDetectBtn')}
+              </button>
+            </div>
+          </div>
+
           <div className="game-settings">
             {games.map((game) => {
               const value = draft.games[game.id]
@@ -781,7 +871,7 @@ export function SettingsView({
                       <input
                         className="input"
                         value={value?.gamePath ?? ''}
-                        placeholder={game.exeHint}
+                        placeholder={t('settings.games.gamePathPlaceholder', { exe: game.exeHint })}
                         onChange={(event) =>
                           updateGame(game.id, { gamePath: event.target.value }, true)
                         }
@@ -791,29 +881,6 @@ export function SettingsView({
                         title={t('settings.games.pickGameTooltip')}
                         onClick={() =>
                           pickInto(game.id, 'gamePath', () => window.moddeck.pickGameExe())
-                        }
-                      >
-                        <Icon name="folder" size={17} />
-                      </button>
-                    </div>
-                  </label>
-
-                  <label className="field">
-                    <span>{t('settings.games.loaderPathLabel')}</span>
-                    <div className="field-row">
-                      <input
-                        className="input"
-                        value={value?.loaderPath ?? ''}
-                        placeholder="XXMI Launcher.exe"
-                        onChange={(event) =>
-                          updateGame(game.id, { loaderPath: event.target.value }, true)
-                        }
-                      />
-                      <button
-                        className="icon-btn"
-                        title={t('settings.games.pickLoaderTooltip')}
-                        onClick={() =>
-                          pickInto(game.id, 'loaderPath', () => window.moddeck.pickLoader())
                         }
                       >
                         <Icon name="folder" size={17} />

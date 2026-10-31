@@ -1,5 +1,6 @@
 import type {
   AppInfo,
+  AutoDetectPathsResult,
   ModVariantPreset,
   RosterPreset,
   SaveRosterPresetInput,
@@ -38,6 +39,8 @@ export const IPC = {
   openCharacterFolder: 'shell:open-character-folder',
   openPath: 'shell:open-path',
   pickModsFolder: 'dialog:mods-folder',
+  pickXxmiRoot: 'dialog:xxmi-root',
+  autoDetectPaths: 'settings:auto-detect-paths',
   pickGameExe: 'dialog:game-exe',
   pickLoader: 'dialog:loader',
   pickImportFiles: 'dialog:import-files',
@@ -113,6 +116,8 @@ export interface ModDeckApi {
   openCharacterFolder(gameId: GameId, characterFolder: string): Promise<ToggleResult>
   openPath(kind: 'mods' | 'game' | 'loader' | 'data' | 'logs' | 'languages' | 'locales', gameId?: GameId): Promise<ToggleResult>
   pickModsFolder(): Promise<string | null>
+  pickXxmiRoot(): Promise<AutoDetectPathsResult>
+  autoDetectPaths(): Promise<AutoDetectPathsResult>
   pickGameExe(): Promise<string | null>
   pickLoader(): Promise<string | null>
   pickImportFiles(): Promise<string[]>

@@ -20,6 +20,8 @@ const api: ModDeckApi = {
     ipcRenderer.invoke(IPC.openCharacterFolder, gameId, characterFolder),
   openPath: (kind, gameId) => ipcRenderer.invoke(IPC.openPath, kind, gameId),
   pickModsFolder: () => ipcRenderer.invoke(IPC.pickModsFolder),
+  pickXxmiRoot: () => ipcRenderer.invoke(IPC.pickXxmiRoot),
+  autoDetectPaths: () => ipcRenderer.invoke(IPC.autoDetectPaths),
   pickGameExe: () => ipcRenderer.invoke(IPC.pickGameExe),
   pickLoader: () => ipcRenderer.invoke(IPC.pickLoader),
   pickImportFiles: () => ipcRenderer.invoke(IPC.pickImportFiles),

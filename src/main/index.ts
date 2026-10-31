@@ -19,6 +19,7 @@ import {
 } from 'electron'
 import type {
   AppInfo,
+  AutoDetectPathsResult,
   CharacterMeta,
   CreateCharacterInput,
   EnvironmentCheck,
@@ -37,6 +38,7 @@ import { GAMES, requireGame } from './core/games'
 import { ensureDir, pathExists } from './core/fsx'
 import { isInside, isSafeSegment } from './core/safe-path'
 import {
+  inferXxmiRootFromPath,
   loadSettings,
   mergeSettings,
   normalizeModsPath,
@@ -88,7 +90,9 @@ import {
   runImport
 } from './services/imports'
 import {
+  getMergedRoster,
   getRosterMap,
+  normalizeMatchText,
   getRosterStatus,
   loadRosterCache,
   syncRemoteRoster
@@ -444,7 +448,13 @@ async function ensureRosterInitialized(gameId: GameId, modsPath: string): Promis
 
 async function makeSnapshot(gameId: GameId) {
   const game = requireGame(gameId)
-  const gameSettings = settings.games[gameId] ?? { modsPath: '' }
+
+  const rawGameSettings = settings.games[gameId] ?? { modsPath: '' }
+  const effectiveRoot = getEffectiveXxmiRoot(gameId)
+  const gameSettings = {
+    ...rawGameSettings,
+    loaderPath: rawGameSettings.loaderPath || (effectiveRoot ? path.join(effectiveRoot, 'Resources', 'Bin', 'XXMI Launcher.exe') : '')
+  }
   await ensureRosterInitialized(gameId, gameSettings.modsPath)
   return buildSnapshot(game, gameSettings, metadata, {
     coverUrlFor: (meta) => {
@@ -546,7 +556,7 @@ function splitArgs(value: string): string[] {
   return args
 }
 
-async function launchConfigured(
+async function _legacyLaunchConfigured(
   gameId: GameId,
   kind: 'game' | 'loader'
 ): Promise<{ ok: boolean; error?: string; path?: string }> {
@@ -581,6 +591,544 @@ async function launchConfigured(
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
+}
+
+function isNonZhEffectiveLocale(): boolean {
+  const lang = settings?.ui?.language || 'auto'
+  if (lang === 'auto') {
+    const sys = (app.getLocale() || 'zh-CN').toLowerCase()
+    return !sys.startsWith('zh')
+  }
+  return lang !== 'zh-CN'
+}
+
+async function spawnOrShellExecute(
+  exePath: string,
+  args: string[],
+  cwd: string
+): Promise<{ ok: boolean; error?: string; path?: string }> {
+  const extension = path.extname(exePath).toLowerCase()
+  if (extension === '.cmd' || extension === '.bat') {
+    return new Promise((resolve) => {
+      try {
+        const child = spawn(process.env.ComSpec || 'cmd.exe', ['/c', exePath, ...args], {
+          cwd,
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: false
+        })
+        child.once('error', (err) => resolve({ ok: false, error: err.message }))
+        child.once('spawn', () => {
+          child.unref()
+          resolve({ ok: true, path: exePath })
+        })
+      } catch (err) {
+        resolve({ ok: false, error: err instanceof Error ? err.message : String(err) })
+      }
+    })
+  }
+
+  const directResult = await new Promise<{ ok: boolean; code?: string; error?: string }>((resolve) => {
+    try {
+      const child = spawn(exePath, args, {
+        cwd,
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false
+      })
+      child.once('error', (err: NodeJS.ErrnoException) => {
+        resolve({ ok: false, code: err.code, error: err.message })
+      })
+      child.once('spawn', () => {
+        child.unref()
+        resolve({ ok: true })
+      })
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException
+      resolve({ ok: false, code: e.code, error: e.message || String(err) })
+    }
+  })
+
+  if (directResult.ok) {
+    return { ok: true, path: exePath }
+  }
+
+  // Fallback to ShellExecuteEx via .NET ProcessStartInfo (supports UAC requireAdministrator + args + cwd)
+  const argsStr = args
+    .map((a) => (/\s|"/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a))
+    .join(' ')
+  const psScript = `
+$ErrorActionPreference = 'Stop'
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = ${JSON.stringify(exePath)}
+$psi.WorkingDirectory = ${JSON.stringify(cwd)}
+$psi.Arguments = ${JSON.stringify(argsStr)}
+$psi.UseShellExecute = $true
+[System.Diagnostics.Process]::Start($psi) | Out-Null
+`
+  const encoded = Buffer.from(psScript, 'utf16le').toString('base64')
+  return new Promise((resolve) => {
+    const ps = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-EncodedCommand', encoded],
+      { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }
+    )
+    let stderr = ''
+    ps.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString()
+    })
+    ps.once('error', (err) => {
+      resolve({ ok: false, error: err.message })
+    })
+    ps.once('close', (code) => {
+      if (code === 0) {
+        resolve({ ok: true, path: exePath })
+      } else {
+        resolve({
+          ok: false,
+          error: stderr.trim() || directResult.error || `启动失败 (code ${code})`
+        })
+      }
+    })
+  })
+}
+
+async function findExeInDir(dirPath: string, exeNames: string[]): Promise<string | null> {
+  if (!dirPath) return null
+  try {
+    const st = await fs.stat(dirPath)
+    if (st.isFile()) return dirPath
+    if (!st.isDirectory()) return null
+    for (const name of exeNames) {
+      if (!name) continue
+      const candidate = path.join(dirPath, name)
+      if (await pathExists(candidate)) return candidate
+    }
+  } catch {
+    // ignore
+  }
+  return null
+}
+
+function getEffectiveXxmiRoot(gameId?: GameId): string {
+  if (settings.xxmiRoot && fsSync.existsSync(settings.xxmiRoot)) {
+    return inferXxmiRootFromPath(settings.xxmiRoot) || settings.xxmiRoot
+  }
+  if (gameId && settings.games[gameId]) {
+    const g = settings.games[gameId]
+    const fromGame =
+      (g.loaderPath ? inferXxmiRootFromPath(g.loaderPath) : '') ||
+      (g.modsPath ? inferXxmiRootFromPath(g.modsPath) : '')
+    if (fromGame) return fromGame
+  }
+  for (const g of Object.values(settings.games)) {
+    const inferred =
+      (g?.loaderPath ? inferXxmiRootFromPath(g.loaderPath) : '') ||
+      (g?.modsPath ? inferXxmiRootFromPath(g.modsPath) : '')
+    if (inferred) return inferred
+  }
+  return ''
+}
+
+interface RegistryAppEntry {
+  DisplayName?: string
+  InstallLocation?: string
+  DisplayIcon?: string
+  UninstallString?: string
+}
+
+async function queryRegistryApps(): Promise<RegistryAppEntry[]> {
+  if (process.platform !== 'win32') return []
+  const psScript = `
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$paths = @(
+  'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+  'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',
+  'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'
+)
+$items = Get-ItemProperty $paths -ErrorAction SilentlyContinue | Where-Object {
+  $_.DisplayName -match 'XXMI|Hypergryph|GRYPHLINK|鹰角|终末地|miHoYo|HoYoPlay|米哈游|绝区零|星穹|Wuthering|鸣潮|库洛|Kuro|Neverness|异环|NTE'
+} | Select-Object DisplayName, InstallLocation, DisplayIcon, UninstallString
+if ($null -eq $items) { Write-Output '[]' } else { ConvertTo-Json @($items) -Compress }
+`
+  const encoded = Buffer.from(psScript, 'utf16le').toString('base64')
+  return new Promise((resolve) => {
+    const ps = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-EncodedCommand', encoded],
+      { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }
+    )
+    let stdout = ''
+    ps.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString('utf8')
+    })
+    ps.once('error', () => resolve([]))
+    ps.once('close', () => {
+      try {
+        const parsed = JSON.parse(stdout.trim() || '[]')
+        resolve(Array.isArray(parsed) ? parsed : [parsed])
+      } catch {
+        resolve([])
+      }
+    })
+  })
+}
+
+async function detectXxmiAndGamePaths(manualXxmiRoot?: string): Promise<AutoDetectPathsResult> {
+  const regApps = await queryRegistryApps()
+  let xxmiRoot = ''
+
+  if (manualXxmiRoot && manualXxmiRoot.trim()) {
+    const cleaned = manualXxmiRoot.trim().replace(/[\\/]+$/, '')
+    xxmiRoot = inferXxmiRootFromPath(cleaned) || cleaned
+  }
+
+  if (!xxmiRoot) {
+    for (const entry of regApps) {
+      if (/xxmi/i.test(entry.DisplayName || '')) {
+        const loc = (entry.InstallLocation || '').trim().replace(/[\\/]+$/, '')
+        if (loc && (await pathExists(loc))) {
+          xxmiRoot = inferXxmiRootFromPath(loc) || loc
+          break
+        }
+      }
+    }
+  }
+
+  if (!xxmiRoot) {
+    const envCandidates = [
+      settings.xxmiRoot || '',
+      process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Programs', 'XXMI Launcher') : '',
+      process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'XXMI Launcher') : '',
+      process.env.APPDATA ? path.join(process.env.APPDATA, 'XXMI Launcher') : '',
+      getEffectiveXxmiRoot()
+    ].filter(Boolean)
+    for (const cand of envCandidates) {
+      if (await pathExists(cand)) {
+        const inferred = inferXxmiRootFromPath(cand)
+        if (inferred) {
+          xxmiRoot = inferred
+          break
+        }
+      }
+    }
+  }
+
+  let xxmiConfig: Record<string, any> | null = null
+  if (xxmiRoot) {
+    const cfgPath = path.join(xxmiRoot, 'XXMI Launcher Config.json')
+    if (await pathExists(cfgPath)) {
+      try {
+        xxmiConfig = JSON.parse(await fs.readFile(cfgPath, 'utf8'))
+      } catch {
+        xxmiConfig = null
+      }
+    }
+  }
+
+  const findRegLauncherDir = (pattern: RegExp): string => {
+    for (const entry of regApps) {
+      if (pattern.test(entry.DisplayName || '')) {
+        const loc = (entry.InstallLocation || '').trim().replace(/[\\/]+$/, '')
+        if (loc && fsSync.existsSync(loc)) return loc
+      }
+    }
+    return ''
+  }
+
+  const nextGames: Record<string, Partial<Settings['games'][string]>> = {}
+  const detectedGames: GameId[] = []
+
+  for (const game of GAMES) {
+    const currentGame = settings.games[game.id] ?? { modsPath: '' }
+    const patch: Partial<Settings['games'][string]> = {}
+    const imp = xxmiConfig?.Importers?.[game.loader]?.Importer
+
+    // 1. Detect modsPath from XXMI Launcher Config.json or xxmiRoot
+    let detectedModsPath = ''
+    const importerCandidates: string[] = []
+    if (imp?.importer_folder && typeof imp.importer_folder === 'string') {
+      const rawImp = imp.importer_folder.trim().replace(/[\\/]+$/, '')
+      if (rawImp) {
+        if (path.isAbsolute(rawImp)) {
+          importerCandidates.push(rawImp)
+        } else if (xxmiRoot) {
+          importerCandidates.push(path.join(xxmiRoot, rawImp))
+          importerCandidates.push(path.join(xxmiRoot, 'XXMI', rawImp))
+        }
+      }
+    }
+    if (xxmiRoot) {
+      importerCandidates.push(path.join(xxmiRoot, game.loader))
+      importerCandidates.push(path.join(xxmiRoot, 'XXMI', game.loader))
+    }
+
+    for (const cand of importerCandidates) {
+      const modsCandidate = path.join(cand, 'Mods')
+      const d3dxCandidate = path.join(cand, 'd3dx.ini')
+      if ((await pathExists(modsCandidate)) && (await pathExists(d3dxCandidate))) {
+        detectedModsPath = modsCandidate
+        break
+      }
+    }
+    if (detectedModsPath) {
+      patch.modsPath = detectedModsPath
+    }
+
+    // 2. Detect Official Launcher or Game Executable
+    let detectedGamePath = ''
+    const launcherExeNames = ['Launcher.exe', 'launcher.exe', 'NTELauncher.exe', game.exeHint]
+
+    // Priority A: Importer.launcher_folder from XXMI Launcher Config.json
+    if (!detectedGamePath && imp?.launcher_folder && typeof imp.launcher_folder === 'string') {
+      const found = await findExeInDir(imp.launcher_folder.trim(), launcherExeNames)
+      if (found) detectedGamePath = found
+    }
+
+    // Priority B: Parent/grandparent of Importer.game_folder (e.g. Hypergryph Launcher / miHoYo Launcher)
+    if (!detectedGamePath && imp?.game_folder && typeof imp.game_folder === 'string') {
+      const gf = imp.game_folder.trim()
+      if (await pathExists(gf)) {
+        const parent1 = path.dirname(gf)
+        const parent2 = path.dirname(parent1)
+        const foundParent =
+          (await findExeInDir(parent1, ['Launcher.exe', 'launcher.exe', 'NTELauncher.exe'])) ||
+          (await findExeInDir(parent2, ['Launcher.exe', 'launcher.exe', 'NTELauncher.exe']))
+        if (foundParent) {
+          detectedGamePath = foundParent
+        }
+      }
+    }
+
+    // Priority C: Registry official launcher if this game is active/configured in XXMI
+    const hasActiveModsOrGameFolder =
+      Boolean(detectedModsPath || currentGame.modsPath) ||
+      Boolean(imp?.game_folder && (await pathExists(String(imp.game_folder).trim())))
+    if (!detectedGamePath && hasActiveModsOrGameFolder) {
+      let regDir = ''
+      if (game.id === 'endfield') {
+        regDir = findRegLauncherDir(/鹰角|Hypergryph|GRYPHLINK|终末地|Endfield/i)
+      } else if (game.id === 'honkai-star-rail' || game.id === 'zzz') {
+        regDir = findRegLauncherDir(/米哈游|miHoYo|HoYoPlay/i)
+      } else if (game.id === 'wuthering-waves') {
+        regDir = findRegLauncherDir(/鸣潮|Wuthering|库洛|Kuro/i)
+      } else if (game.id === 'neverness-to-everness') {
+        regDir = findRegLauncherDir(/异环|Neverness|NTE/i)
+      }
+      if (regDir) {
+        const found = await findExeInDir(regDir, launcherExeNames)
+        if (found) detectedGamePath = found
+      }
+    }
+
+    // Priority D: Direct game executable inside Importer.game_folder
+    if (!detectedGamePath && imp?.game_folder && typeof imp.game_folder === 'string') {
+      const gf = imp.game_folder.trim()
+      const exeList = Array.isArray(imp.game_exe_names) ? [...imp.game_exe_names, game.exeHint] : [game.exeHint]
+      const found = await findExeInDir(gf, exeList)
+      if (found) detectedGamePath = found
+    }
+
+    if (detectedGamePath) {
+      patch.gamePath = detectedGamePath
+    }
+
+    if (patch.modsPath || patch.gamePath) {
+      nextGames[game.id] = patch
+      detectedGames.push(game.id)
+    }
+  }
+
+  settings = mergeSettings(settings, {
+    xxmiRoot: xxmiRoot || settings.xxmiRoot || '',
+    games: nextGames
+  })
+  await saveSettings(baseDir(), settings)
+  refreshModsWatcher()
+  broadcastStateChanged({ gameId: settings.activeGameId })
+
+  return {
+    ok: Boolean(xxmiRoot || detectedGames.length > 0),
+    xxmiRoot: settings.xxmiRoot,
+    detectedGames,
+    settings,
+    error: !xxmiRoot && detectedGames.length === 0 ? '未能在系统中自动检测到 XXMI 或游戏启动器路径，请手动选择目录' : undefined
+  }
+}
+
+async function launchConfigured(
+  gameId: GameId,
+  kind: 'game' | 'loader'
+): Promise<{ ok: boolean; error?: string; path?: string }> {
+  const game = requireGame(gameId)
+  const gameSettings = settings.games[gameId]
+  if (!gameSettings) return { ok: false, error: '未知游戏' }
+
+  if (kind === 'loader') {
+    const customLoader = (gameSettings.loaderPath || '').trim()
+    // If user configured a custom standalone loader (not XXMI Launcher.exe)
+    if (
+      customLoader &&
+      (await pathExists(customLoader)) &&
+      !/xxmi\s*launcher\.exe$/i.test(path.basename(customLoader))
+    ) {
+      const st = await fs.stat(customLoader).catch(() => null)
+      if (st?.isFile()) {
+        return spawnOrShellExecute(customLoader, [], path.dirname(customLoader))
+      }
+    }
+
+    // Resolve XXMI Launcher.exe from customLoader, xxmiRoot, or inferred path
+    let xxmiExe = ''
+    if (customLoader && /xxmi\s*launcher\.exe$/i.test(path.basename(customLoader)) && (await pathExists(customLoader))) {
+      xxmiExe = customLoader
+    }
+    if (!xxmiExe) {
+      const root = getEffectiveXxmiRoot(gameId)
+      if (root) {
+        const cand1 = path.join(root, 'Resources', 'Bin', 'XXMI Launcher.exe')
+        const cand2 = path.join(root, 'XXMI Launcher.exe')
+        if (await pathExists(cand1)) xxmiExe = cand1
+        else if (await pathExists(cand2)) xxmiExe = cand2
+      }
+    }
+    if (!xxmiExe) {
+      // Try auto-detecting from registry once
+      const detected = await detectXxmiAndGamePaths()
+      if (detected.xxmiRoot) {
+        const cand1 = path.join(detected.xxmiRoot, 'Resources', 'Bin', 'XXMI Launcher.exe')
+        const cand2 = path.join(detected.xxmiRoot, 'XXMI Launcher.exe')
+        if (await pathExists(cand1)) xxmiExe = cand1
+        else if (await pathExists(cand2)) xxmiExe = cand2
+      }
+    }
+
+    if (!xxmiExe) {
+      return {
+        ok: false,
+        error: isNonZhEffectiveLocale()
+          ? `XXMI Launcher not configured or found. Please set XXMI Root Directory in Settings.`
+          : `未找到 XXMI 启动器，请在「设置 → 配置」顶部填写 XXMI 安装根目录或点击一键检测`
+      }
+    }
+
+    const args = ['--nogui', '--xxmi', game.loader]
+    return spawnOrShellExecute(xxmiExe, args, path.dirname(xxmiExe))
+  }
+
+  // kind === 'game'
+  let target = (gameSettings.gamePath || '').trim()
+  if (!target || !(await pathExists(target))) {
+    const detected = await detectXxmiAndGamePaths()
+    target = (detected.settings?.games?.[gameId]?.gamePath || '').trim()
+  }
+  if (!target) {
+    return {
+      ok: false,
+      error: isNonZhEffectiveLocale()
+        ? 'Official launcher or game executable is not configured'
+        : '未配置官方启动器或游戏程序'
+    }
+  }
+  if (!(await pathExists(target))) {
+    return {
+      ok: false,
+      error: isNonZhEffectiveLocale()
+        ? `Path does not exist: ${target}`
+        : `启动器或游戏程序不存在: ${target}`
+    }
+  }
+
+  // If user configured a directory (e.g. Hypergryph Launcher folder), find Launcher.exe inside
+  const resolvedFile = await findExeInDir(target, [
+    'Launcher.exe',
+    'launcher.exe',
+    'NTELauncher.exe',
+    game.exeHint
+  ])
+  if (!resolvedFile) {
+    return {
+      ok: false,
+      error: isNonZhEffectiveLocale()
+        ? `No executable found in directory: ${target}`
+        : `在该目录下未找到可执行的启动器程序: ${target}`
+    }
+  }
+  target = resolvedFile
+
+  // If user previously pointed directly to Endfield.exe inside Hypergryph Launcher/games/..., redirect to official Launcher.exe if present
+  if (gameId === 'endfield' && path.basename(target).toLowerCase() === 'endfield.exe') {
+    const officialLauncher = path.resolve(path.dirname(target), '..', '..', 'Launcher.exe')
+    if (await pathExists(officialLauncher)) {
+      target = officialLauncher
+    }
+  }
+
+  const args = splitArgs(gameSettings.launchArgs || '')
+  return spawnOrShellExecute(target, args, path.dirname(target))
+}
+
+async function syncMissingRosterFoldersToDisk(): Promise<number> {
+  const preferEn = isNonZhEffectiveLocale()
+  let createdCount = 0
+  let metadataChanged = false
+  for (const game of GAMES) {
+    const modsPath = settings.games[game.id]?.modsPath
+    if (!modsPath || !(await pathExists(modsPath))) continue
+    try {
+      const base = await resolveCharacterBase(modsPath)
+      const existingFolders = await listCharacterFolderNames(modsPath)
+      const existingNormSet = new Set<string>()
+      for (const f of existingFolders) {
+        existingNormSet.add(normalizeMatchText(f))
+        const meta = getCharacterMeta(metadata, game.id, f)
+        if (meta.displayName) existingNormSet.add(normalizeMatchText(meta.displayName))
+        if (meta.canonicalEnName) existingNormSet.add(normalizeMatchText(meta.canonicalEnName))
+        for (const a of meta.aliases ?? []) {
+          if (a) existingNormSet.add(normalizeMatchText(a))
+        }
+      }
+
+      const roster = getMergedRoster(game.id)
+      for (const entry of roster) {
+        if (entry.zh === '其他') continue
+        const candidateTokens = [entry.zh, entry.en, entry.pinyin, ...(entry.aliases ?? [])]
+          .map((x) => normalizeMatchText(x || ''))
+          .filter(Boolean)
+        if (candidateTokens.some((tok) => existingNormSet.has(tok))) {
+          continue
+        }
+        const rawFolder = (preferEn ? entry.en || entry.zh : entry.zh)
+          .replace(/[\\/:*?"<>|]/g, '')
+          .trim()
+        if (!rawFolder || !isSafeSegment(rawFolder)) continue
+        const targetDir = path.join(base, rawFolder)
+        if (!(await pathExists(targetDir))) {
+          markInternalFsMutation()
+          await fs.mkdir(targetDir, { recursive: true })
+          createdCount += 1
+        }
+        for (const tok of candidateTokens) existingNormSet.add(tok)
+        existingNormSet.add(normalizeMatchText(rawFolder))
+        if (entry.kind === 'utility') {
+          const currentMeta = getCharacterMeta(metadata, game.id, rawFolder)
+          if (currentMeta.kind !== 'utility') {
+            metadata = setCharacterMeta(metadata, game.id, rawFolder, {
+              ...currentMeta,
+              kind: 'utility'
+            })
+            metadataChanged = true
+          }
+        }
+      }
+    } catch (err) {
+      logError('roster-sync-folders', err)
+    }
+  }
+  if (metadataChanged) {
+    await saveMetadata(baseDir(), metadata)
+  }
+  return createdCount
 }
 
 const OVERLAY_TOP_LEVEL = 'screen-saver' as const
@@ -1670,7 +2218,7 @@ function registerIpc(): void {
     games: GAMES,
     snapshot: await makeSnapshot(settings.activeGameId),
     appVersion: app.getVersion(),
-    rosterMap: getRosterMap(),
+    rosterMap: getRosterMap(isNonZhEffectiveLocale()),
     customLocales: loadCustomLocales()
   }))
 
@@ -1887,6 +2435,21 @@ function registerIpc(): void {
     return { ok: false, error: '未知路径类型' }
   })
 
+  register(IPC.pickXxmiRoot, async () => {
+    const picked = await openDialog({
+      title: isNonZhEffectiveLocale()
+        ? 'Select XXMI Launcher Root Directory'
+        : '选择 XXMI 启动器安装根目录',
+      properties: ['openDirectory']
+    })
+    if (!picked) {
+      return { ok: false, detectedGames: [] }
+    }
+    return detectXxmiAndGamePaths(picked)
+  })
+
+  register(IPC.autoDetectPaths, async () => detectXxmiAndGamePaths())
+
   register(IPC.pickModsFolder, async () => {
     const picked = await openDialog({
       title: '选择 EFMI 根目录或 Mods 目录',
@@ -2053,6 +2616,9 @@ function registerIpc(): void {
       if (await pathExists(target)) throw new Error('同名目录已存在')
       markInternalFsMutation()
       await fs.mkdir(target)
+      if (input.coverDataUrl && typeof input.coverDataUrl === 'string') {
+        await saveCharacterCoverData(gameId, folder, input.coverDataUrl)
+      }
 
       const current = getCharacterMeta(metadata, gameId, folder)
       metadata = setCharacterMeta(metadata, gameId, folder, {
@@ -2420,6 +2986,9 @@ function registerIpc(): void {
       await saveSettings(baseDir(), settings)
     }
     const res = await syncRemoteRoster(baseDir(), targetUrl, (url) => net.fetch(url))
+    if (res.ok) {
+      res.createdFoldersCount = await syncMissingRosterFoldersToDisk()
+    }
     if (res.ok) {
       broadcastStateChanged({ gameId: settings.activeGameId })
     }

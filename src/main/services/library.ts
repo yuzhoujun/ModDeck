@@ -14,7 +14,7 @@ import type {
 import { isDirectory, pathExists, readdirSafe } from '../core/fsx'
 import { isInside, isSafeSegment } from '../core/safe-path'
 import { getCharacterMeta } from './metadata'
-import { findCanonicalEnName } from '../core/roster'
+import { findCanonicalEnName, findCanonicalZhName } from '../core/roster'
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif'])
 const PREVIEW_PATTERN = /^(preview|cover|thumbnail|thumb|screen|screenshot|showcase)/i
@@ -299,7 +299,7 @@ export async function scanCharacters(
       if (await isModFolderEffectivelyEnabled(child.name, childModPath)) enabledCount += 1
     }
 
-    const displayName = meta.displayName || entry.name
+    const displayName = (meta.displayName && meta.displayName !== entry.name) ? meta.displayName : (findCanonicalZhName(gameId, entry.name) || meta.displayName || entry.name)
     const canonicalEnName =
       meta.canonicalEnName ||
       findCanonicalEnName(gameId, entry.name) ||
