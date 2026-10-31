@@ -1,173 +1,199 @@
-# ModDeck 架构
+# ModDeck 架构设计与系统原理
 
-## 目标与非目标
+## 一、目标与设计哲学
 
-**目标**
+### 核心定位
 
-- 只做本地 Mod 管理：扫描、启停、导入、整理。
-- 兼容现有 3DMigoto / XXMI 目录习惯，可以直接接管已有 `Mods` 文件夹。
-- 角色与 Mod 以磁盘为准，元数据外置，游戏更新后不需要发新版客户端。
-- 本地优先，核心管理无需联网（仅在用户主动触发时请求公开角色数据库）。
+ModDeck 是面向 3DMigoto / XXMI 系游戏的开源、现代、本地优先（Local-First）Windows Mod 管理器与游戏内全功能快捷悬浮工作台。
 
-**非目标（v1）**
+### 设计原则
 
-- 不做 Mod 注入、不做启动器、不做 overlay / 热键。
-- 不做账号、市场、云同步、付费功能。
-- 不内置任何游戏素材。
+1. **专注资源治理，绝不侵入游戏底层**：
+   - ModDeck 专职接管游戏 `Mods` 目录的资源组织、变体持久化与外观配置调度；
+   - 游戏底层的 Direct3D 注入、Shader 替换与显存加载完全交由 3DMigoto / XXMI 处理；
+   - ModDeck **不向游戏进程注入代码、不修改游戏本体客户端与可执行文件**，保证零封号风险。
+2. **磁盘即真相（Disk as Source of Truth）**：
+   - 角色与 Mod 状态直接扫描自磁盘物理结构，不强制绑定外部服务器或写死名单；
+   - 游戏版本更新或新增角色时，只要磁盘目录建立即可自动识别，客户端无需等待发版。
+3. **本地优先与纯离线可用（Local-First & Privacy）**：
+   - 预设快照、方案数据、裁切封面与配置均严格保存在本地设备；
+   - 离线断网完全可用，绝不上传玩家任何本地资产或游戏数据。
 
-## 目录约定
+---
 
-```
+## 二、目录约定与物理状态模型
+
+### 1. 游戏 Mods 目录规范
+
+```text
 Mods/
   角色目录A/
     某个Mod/
       mod.ini
       preview.png
-    DISABLED_另一个Mod/     ← 禁用状态
+    DISABLED_另一个Mod/         ← 目录级禁用状态
   角色目录B/
-  Characters/               ← 兼容旧布局
+  Characters/                   ← 兼容历史嵌套容器
+  _ModDeck_Preset_Bridge/       ← 运行时一次性帧桥接（以 _ 开头在库中隐身）
+    bridge.ini
 ```
 
-- 角色 = `Mods` 下的任意文件夹（`Characters/Characters` 容器也兼容）。
-- 设置里的路径可以是 EFMI 根目录（含 `d3dx.ini`）或 `Mods` 目录；保存时
-  `normalizeModsPath()` 会统一落到 `Mods`。
-- Mod = 角色目录下的文件夹。
-- 禁用 = 目录名前缀 `DISABLED_`，启用 = 去掉前缀。
-- EFMI 的 `d3dx.ini` 默认有 `include_recursive = Mods` 和 `exclude_recursive = DISABLED*`，
-  因此禁用前缀由引擎加载规则生效，不依赖外部管理器；若该行被移除则要另行处理。
-- 以 `.` 或 `_` 开头的目录不参与扫描（例如 `_efmi_ini_tools`）。
+- **角色/分类判定**：`Mods/` 下的任意一级子目录（包括 `Characters/` 容器内的子目录均完全兼容）；
+- **Mod 目录判定**：角色目录下的文件夹；
+- **启用与禁用状态**：
+  - **默认机制（目录重命名）**：启用为原名，禁用为加前缀 `DISABLED_`；
+  - **3DMigoto 规则**：依赖 `d3dx.ini` 中的 `exclude_recursive = DISABLED*` 规则在引擎层忽略禁用项；
+  - **免退游戏热启停降级机制**：若游戏处于运行中导致文件夹被 Windows 系统进程锁定（无法重命名目录），ModDeck 自动降级为将内部主 `.ini` 重命名为 `DISABLED_*.ini`，配合 F10 重载无需退出游戏即可立即生效；
+- **隐身过滤**：以 `.` 或 `_` 开头的目录不参与角色与 Mod 扫描（例如 `_efmi_ini_tools`、`_ModDeck_Preset_Bridge`）。
 
-## 数据文件
+---
 
-全部位于 `%APPDATA%/ModDeck/`：
+## 三、本地数据持久化架构
 
-| 文件 | 内容 |
-| --- | --- |
-| `settings.json` | 游戏路径、导入选项、UI 排序 |
-| `characters.json` | 角色显示名、别名、封面、排序、隐藏，以及每个游戏的角色基线时间 |
-| `covers/<game>/<hash>.<ext>` | 用户设置的封面副本 |
-| `backups/<时间>/...` | 覆盖导入前的旧目录备份 |
-| `logs/moddeck.log` | 错误日志 |
+软件所有运行时配置与用户数据均统一保存在 `%APPDATA%/ModDeck/`：
 
-`characters.json` 的结构：
+| 文件 / 目录 | 内容与职责 | 存储特性 |
+| :--- | :--- | :--- |
+| `settings.json` | 游戏路径、通用/高级开关、快捷键与 UI 偏好 | 核心配置 |
+| `roster-presets.json` | 全角色池阵容预设方案存储 | 核心配置 |
+| `presets/{gameId}/{character}/{mod}.json` | 单 Mod 变体预设树状存储 | 核心数据（微秒级解耦寻址） |
+| `characters.json` | 角色自定义显示名、别名、排序、隐藏与基线时间 | 核心数据 |
+| `roster-cache.json` | 角色离线词库增量缓存与云端同步缓存 | 核心数据 |
+| `covers/{game}/{hash}.png` | 角色头像封面用户媒体资产（1:1 方形裁切） | 用户媒体 |
+| `languages/` | 用户自定义外挂语言包目录（与便携包根目录互通） | 国际化扩展 |
+| `backups/<timestamp>/...` | 覆盖式导入前的旧目录安全快照备份 | 容灾防护 |
+| `logs/moddeck.log` | 运行时排错与诊断日志 | 诊断日志 |
 
-```json
-{
-  "schemaVersion": 1,
-  "games": {
-    "wuthering-waves": {
-      "某个新角色": {
-        "displayName": "新角色",
-        "aliases": ["NewChar"],
-        "canonicalEnName": "NewChar",
-        "coverFile": "wuthering-waves/ab12cd34.png",
-        "order": 10
-      }
-    }
-  }
-}
+### 变体预设树状解耦存储（Presets Subsystem）
+
+单 Mod 变体预设摒弃单文件巨石架构，采用分级文件系统：
+
+```text
+presets/
+  endfield/
+    Xaihi/
+      mod_xaihi_swimming.json
+      mod_xaihi_dress.json
 ```
 
-没有这条记录时，角色仍会显示，只是名称等于目录名、使用占位封面。这是“新角色自动出现”的基础。
+单文件 JSON 记录该 Mod 包含的激活 ini 集合、出厂原生基线及用户保存的持久化变量快照（`variables`），彻底隔离各 Mod 数据，杜绝因单个 Mod 数据损坏导致全库配置失效。
 
-## 角色基线与新角色
+---
 
-第一次扫描某个游戏的 `Mods` 目录时，ModDeck 会把当时存在的所有角色写入
-`characters.json` 的 `games[gameId]`，并记录 `rosterInitialized[gameId]`。
+## 四、核心子系统架构与底层机理
 
-- 基线里的角色：`known = true`，不显示“新”标记。
-- 基线之后新增的目录：没有元数据记录，`known = false`，显示“新”，直到用户编辑并保存。
-- 用户点“恢复默认”会删除该角色的元数据，它会重新变成“新”。
+### 1. 单 Mod 变体预设引擎（Variant Presets Engine）
 
-这样不需要客户端更新角色名单，游戏出新角色时只要目录出现就会被发现。
+现代 3DMigoto Mod 通常包含丰富的服装配色、配件开关与形态滑动条（通过 `mod.ini` 中的 `[KeySwap]` 或持久化变量声明）。
 
-## 主进程模块
+1. **出厂基线快照保护（Factory Default Baseline）**：
+   - 首次解析 Mod 时，引擎深度解析作者原生 `.ini` 中声明的全部持久化变量初始值；
+   - 自动在系统内固化出厂基线快照「默认（Default）」，用户无论如何微调，随时可一键还原出厂形态；
+2. **现场实机变体快照采集**：
+   - 支持在主界面详情抽屉或游戏内快捷窗口现场调好造型后，直接命名保存为独立预设；
+3. **瞬态变量过滤（Transient Variable Filter）**：
+   - 智能识别并过滤非外观临时变量（如菜单开启 `$ui_menu`、页码、鼠标抓手坐标等），只比对和覆盖真正的服装与体型参数。
 
+### 2. `[Present]` 一次性帧桥接与双通道持久化（Frame Bridge & Dual-Channel Sync）
+
+#### 3DMigoto 原版写盘冲突机理
+
+在 3DMigoto 原生机制中，按下 F10 重载的第 1 毫秒会先执行 `SavePersistentSettings()` 将当前旧显存中的变量强制刷入 `d3dx_user.ini`。如果外部管理器直接修改 `d3dx_user.ini`，会被 3DMigoto 在重载瞬间瞬间覆盖回滚。
+
+#### ModDeck 双通道协同换装架构
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant UI as ModDeck (主界面 / 快捷窗口)
+  participant Bridge as Mods/_ModDeck_Preset_Bridge/bridge.ini
+  participant D3D as 3DMigoto 显存 (Direct3D Present Frame)
+  participant INI as d3dx_user.ini (磁盘持久化)
+
+  UI->>Bridge: 1. 写入目标预设变量与 [Present] 自锁脚本
+  UI->>D3D: 2. 发送 F10 重载按键 (物理/模拟按键)
+  Note over D3D: 重载启动：先刷旧显存至 INI，再编译 Shader
+  D3D->>Bridge: 3. 执行 Present 阶段：瞬间注入目标预设变量
+  Note over D3D: $md_preset_applied = 1 触发自锁，首帧即刻变装！
+  UI->>UI: 4. 异步缓冲计时 (用户设定 postReloadSyncDelay，默认 6s)
+  UI->>INI: 5. 缓冲结束：安全将预设持久化写入 d3dx_user.ini
+  UI->>Bridge: 6. 清空 bridge.ini，解除桥接，闭环完成！
 ```
-src/main/
-  index.ts              窗口、IPC、自定义协议、托盘外的生命周期
-  core/
-    games.ts            5 个游戏的静态定义
-    safe-path.ts        路径段校验、越界检查
-    fsx.ts              原子写、跨盘移动、唯一命名
-  services/
-    settings.ts         设置加载/合并/保存
-    metadata.ts         角色元数据与封面
-    library.ts          扫描角色/Mod、排序、快照
-    archive.ts          7za / node-unrar-js 解压
-    imports.ts          目录识别、目标角色、落盘
+
+- **第一阶段（实机首帧生效）**：`bridge.ini` 在 3DMigoto 跨入下一帧（`[Present]` 阶段）的微秒瞬间将目标变量压入 Direct3D 显存并自锁，实机画面第 1 帧即刻呈现换装变身；
+- **第二阶段（冷启动数据一致性）**：重载缓冲结束后，ModDeck 在后台静默将预设补写回 `d3dx_user.ini` 并清空桥接，保证游戏关闭或下次冷启动时依然完美保持该预设。
+
+### 3. 全角色池方案工作台（Roster Scheme Workspace）
+
+- **双分池治理（Dual-Pool Governance）**：方案工作台自动拆分为「🎭 角色预设」与「🧩 功能/UI/世界其他」双分池，彻底避免全局 UI、大世界场景等通用 Mod 与角色皮肤混杂；
+- **分池一键批处理**：各分池提供「⚪ 一键全部不启用 (保持原生) [Alt+U]」与「🟢 一键选中当前使用中 [Alt+R]」，支持秒级清空或快照实机状态；
+- **独立单选 (互斥) 与多选 (共存) 模式**：每个卡片独立支持单选与多选自由切换，兼顾角色皮肤模型互斥与功能 UI 多项共存需求；
+- **指纹防重与未保存改动（Dirty State）拦截**：当选中状态与已有方案完全一致时自动禁用「存为新方案」；若检测到某 Mod 实机参数未保存，自动标亮橙色「⚠️ 当前实机 (未保存改动)」并提供二次确认或一键替换为 Default 安全入库。
+
+### 4. 待生效聚合队列（Pending Preset Queue）
+
+当用户关闭自动重载时，系统自动启用聚合队列：
+- 用户可在主界面或快捷窗口连续挑选多位角色的不同预设；
+- 内存队列以 `character:mod` 自动去重覆盖，界面展示蓝色脉冲指示灯；
+- 快捷窗口底部「重载 F10」按钮动态升级为高亮脉冲 **「● 立即生效 (N)」**；
+- 最终单次 F10 触发全局合成桥接，全队角色同帧瞬间集体变身。
+
+### 5. 游戏内快捷操作台（Overlay）与原生按键驱动
+
+- **多窗口架构**：主窗口、悬浮快捷窗（`?mode=overlay`）与 Mod 详情侧栏（`?mode=overlay-detail`）解耦通信；
+- **置顶通道保证**：快捷窗口与热键侧栏采用 `screen-saver` 级置顶，在无边框窗口化游戏上方沉浸式呼出；
+- **原生按键驱动（ModDeckKeyHelper-v2.exe）**：内建专用无窗口辅助工具，向游戏前台精准模拟硬件级 DirectInput/RawInput 键盘扫描码，突破操作系统焦点抢占限制；
+- **浮动实机秒表测速（Floating Reload Benchmark）**：直接浮于游戏画面之上测量 F10 耗时，按 `实测时间 + 1.5 秒安全余量` 一键计算并持久化最适缓冲同步延迟。
+
+### 6. 多语言国际化架构（i18n Subsystem）
+
+- **双语字典（Builtin Locales）**：
+  - 基准语言：`src/shared/i18n/locales/zh-CN.json`（简体中文）；
+  - 英文语言：`src/shared/i18n/locales/en-US.json`（完整英文镜像，与基准 100% 结构对齐，当前已涵盖 585+ 键位）；
+- **动态语言解析与注入（I18nProvider）**：
+  - 渲染层通过 React Context 注入 `t(key, params)`、`getLocaleGameName`、`getLocaleGameShortName`、`getLocaleCharacterName`；
+  - 支持参数化动态插值（如 `{count}`、`{name}`、`{loader}`）；
+- **外部语言包自动发现（External Locales Discovery）**：
+  - 主进程启动时自动扫描便携包根目录 `languages/` 与用户数据目录 `%APPDATA%/ModDeck/languages/` 下的所有 `.json` 语言包；
+  - 语言下拉框实时热加载外部语言并支持一键切换；
+- **工程级开发维护工具链（`scripts/i18n.mjs`）**：
+  - `npm run i18n:check`：校验键位对称性与未翻译硬编码中文；
+  - `npm run i18n:sync`：以基准语言为模板自动补齐并排序所有语言文件；
+  - `npm run i18n:extract`：深度扫描工程业务代码提取未翻译中文字符串，输出详尽诊断报告；
+  - `node scripts/i18n.mjs new <lang>`：一键脚手架生成新语言模版。
+
+---
+
+## 五、进程模型与安全隔离边界
+
+```text
+┌────────────────────────────────────────────────────────┐
+│                      Electron 主进程                   │
+│  - 路径严格校验 (safe-path.ts / 边界拦截)              │
+│  - 原生文件 IO、原子写盘、系统回收站交互               │
+│  - 全局快捷键注册与多窗口生命周期管理                  │
+│  - ModDeckKeyHelper-v2 按键驱动调度                    │
+└──────────────────────────┬─────────────────────────────┘
+                           │ IPC 通信 (白名单机制)
+┌──────────────────────────┴─────────────────────────────┐
+│                   Preload 隔离安全层                   │
+│  - contextIsolation: true, nodeIntegration: false      │
+│  - 暴露受控的 window.moddeck API                       │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+       ┌───────────────────┴───────────────────┐
+       ▼                                       ▼
+┌─────────────────────────────┐ ┌─────────────────────────────┐
+│      主界面 (App.tsx)       │ │   快捷悬浮台 (OverlayApp)   │
+│  - React 19 UI 状态机       │ │  - 沉浸式轻量紧凑工作台     │
+│  - 方案工作台 / 导入解析    │ │  - 现场变体切换与按键直发   │
+│  - 国际化上下文 (i18n)      │ │  - 浮动实机秒表测速校准     │
+└─────────────────────────────┘ └─────────────────────────────┘
 ```
 
-渲染层通过 `src/preload/index.ts` 暴露的 `window.moddeck` 调用这些能力；主进程对所有路径做二次校验，不信任渲染层传入的目录名。
-
-## 导入策略
-
-1. 解压到 `%APPDATA%/ModDeck/tmp/import-<uuid>/`。
-2. 识别结构：
-   - `Mods/<角色>/<Mod>`
-   - `<角色>/<Mod>`
-   - 单个 `<Mod>`（根目录直接有 `ini`）
-3. 有目标角色时，全部落到该角色下；没有目标角色时，必须能从结构里推断角色，否则提示用户进入角色页导入。
-4. 目标已存在时不覆盖：自动生成 `名字 (2)`；开启覆盖时先把旧目录移到 `backups/`。
-5. 压缩包解压后做一次目录越界检查，拒绝 `..` 与符号链接。
-
-## 安全边界
-
-- `contextIsolation: true`，`nodeIntegration: false`。
-- 渲染层只能看到白名单 API。
-- 角色/Mod 名称必须是单层安全路径段。
-- 图片通过自定义协议 `moddeck://asset/?p=...` 读取，只允许 `covers/` 与已配置的 `Mods` 目录，且只允许图片扩展名。
-- 删除操作走系统回收站。
-
-## 快捷窗口与全局快捷键
-
-- 主进程用 `globalShortcut` 注册 `settings.ui.overlayHotkey`，默认 `Alt+Shift+M`。
-- 快捷键回调创建/切换一个独立的 `BrowserWindow`，加载同一个渲染入口并带
-  `?mode=overlay`，由 `OverlayApp` 渲染紧凑面板。
-- 点击快捷窗口里的 Mod 会创建一个相邻的 `?mode=overlay-detail` 窗口，按屏幕
-  左右剩余空间选择贴左侧或右侧；窗口内容是该 Mod 的热键列表。
-- 快捷窗口复用同一套 preload API，启停 Mod、读取角色列表都走正常 IPC。
-- 热键按钮会先隐藏面板，再通过 PowerShell 发送到当前前台窗口；游戏需要是前台窗口。
-  `toInputPlan()` 支持 `no_*`、修饰键、F1-F24、字母数字、常见符号、`VK_OEM_*`、
-  小键盘和鼠标键；通过 `SendKeys` 发键盘、`mouse_event` 发鼠标。
-- `settings.ui.allowHotkeySend` 是总开关；关闭后热键只展示不发送。
-  多主键、Win 键和未识别的表达式会返回明确错误。
-- `settings.ui.overlayPinned` 控制置顶；快捷窗口和热键侧栏使用 `screen-saver` 级 topmost，
-  并在 focus/show 时重新声明 topmost。两个窗口都在置顶层内，点击哪个就抬升哪个。
-- Windows 独占全屏会绕过桌面合成，普通 topmost 窗口无法稳定覆盖；需要无边框窗口模式。
-- 注册失败时会回退到上一个可用快捷键，并在启动日志里记录。
-- `Escape` 或标题栏按钮隐藏窗口；关闭主窗口不会影响已注册的全局快捷键。
-
-## 排序与筛选
-
-- 角色顺序保存在 `settings.characterOrders[gameId]`，值是角色目录名数组。
-- Mod 顺序保存在 `settings.modOrders["gameId:characterFolder"]`，值是去掉
-  `DISABLED_` 前缀后的 Mod 名数组，启停不会破坏顺序。
-- 自定义排序只影响 `sortCharacters/sortMods = "custom"`；其他排序仍按名称/时间/启用状态。
-- 角色筛选（全部 / 有 Mod / 无 Mod）是纯前端过滤，不改变磁盘扫描结果。
-- `.`、`_` 开头的目录在扫描阶段就被忽略，不会出现在角色或 Mod 列表里。
-- `modSelectMode = "single"` 时，主进程在启用目标 Mod 前先关闭同角色其他已启用 Mod；
-  `"multi"` 时独立启停，并可批量启用/禁用选中的 Mod。
-
-## 角色封面与新建目录
-
-- 角色封面优先级：元数据 `coverFile`（旧的数据目录封面）→ 角色目录
-  `.preview.png/jpg/jpeg/webp`。
-- 新保存的封面统一写到角色目录的 `.preview.png`，800×800 PNG，卡片按 1:1 填充。
-- 新建角色/功能目录由主进程在 `resolveCharacterBase()` 下创建，拒绝 `.`/`_` 开头、
-  兼容保留名和重复目录；`kind = "utility"` 在卡片上显示“功能”标记。
-
-## 诊断
-
-- `npm run smoke`：在 `temp/fixture` 的假库上启动应用，自动验证扫描、角色页、
-  文件夹导入、启停与元数据，并输出截图和 `smoke-result.json`。
-- `--scan-report`：只读扫描 `temp/scan-data/settings.json` 中配置的目录，输出
-  `scan-report.json`（角色数、Mod 数、耗时、每个角色的 known 状态）。不会写 Mods 目录。
-
-## 后续路线
-
-1. 冲突检测（重复 `hash`、同一 ini 覆盖）。
-2. 预设（启用集合快照）。
-3. Mod 健康检查（缺 ini、空目录、重复目录）。
-4. 标签与本地搜索索引。
-5. 可选的角色元数据包导入/导出（社区维护，不依赖服务器）。
+1. **严格的路径边界防御**：
+   - 主进程对渲染层传入的任何路径参数执行 `safe-path.ts` 校验，拦截含有 `..`、绝对路径跳转、非法保留字符的危险输入；
+2. **自定义协议受控访问（`moddeck://`）**：
+   - 渲染层读取本地图片资产通过自定义协议 `moddeck://asset/?p=...` 进行，仅放行 `covers/` 与已配置的合法 `Mods/` 目录内的图片扩展名文件；
+3. **安全删除**：
+   - 所有删除 Mod 或目录的操作一律调用操作系统原生回收站（`shell.trashItem`），严禁静默硬删除，保障用户资产安全。

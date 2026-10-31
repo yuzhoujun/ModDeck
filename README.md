@@ -1,12 +1,13 @@
 # ModDeck
 
+[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D4?logo=windows&logoColor=white)](#五环境要求与兼容说明)
+[![Arch](https://img.shields.io/badge/Arch-Electron%20%7C%20React%20%7C%20TypeScript-3178C6?logo=typescript&logoColor=white)](docs/ARCHITECTURE.md)
+[![Mode](https://img.shields.io/badge/Mode-Local--First-8B5CF6)](docs/ARCHITECTURE.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck?label=release&cacheSeconds=300)](https://github.com/yuzhoujun/ModDeck/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20x64-0078D4?logo=windows&logoColor=white)](#五环境要求与兼容说明)
-[![Language](https://img.shields.io/badge/language-TypeScript-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Framework](https://img.shields.io/badge/framework-Electron%20%7C%20React-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
-[![Architecture](https://img.shields.io/badge/architecture-Local--First-8B5CF6)](docs/ARCHITECTURE.md)
+
+[English Documentation (README_EN.md)](README_EN.md)
 
 面向 3DMigoto / XXMI 系游戏的开源、现代、本地优先（Local-First）Windows Mod 管理器与游戏内全功能快捷悬浮工作台。
 
@@ -16,7 +17,7 @@ ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入�
 
 ## 一、下载与快速上手
 
-- **最新正式版发布包**：前往 [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) 下载 `ModDeck-2.3.0-win-x64.zip`；
+- **最新正式版发布包**：前往 [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) 下载 `ModDeck-2.3.0-win-x64.zip`（或本地构建生成的便携包）；
 - **运行方式**：
   1. 将 ZIP 压缩包完整解压至任意目录（建议非系统只读盘，路径避免特殊符号）；
   2. **双击 `ModDeck.exe` 即可直接启动**；
@@ -47,10 +48,11 @@ ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入�
 ### 3. 单 Mod 变体预设引擎（Mod Variant Presets）
 
 现代 3DMigoto Mod 通常包含丰富的服装配色、配件开关与形态滑动条。
-- **出厂基线快照保护**：自动深度解析作者原生 `.ini` 声明的全部持久化外观变量，生成永久内置的「默认 (初始)」预设基线，随时一键还原；
+
+- **出厂基线快照保护**：自动深度解析作者原生 `.ini` 声明的全部持久化外观变量，生成永久内置的「默认（Default）」预设基线，随时一键还原；
 - **树状分级解耦存储**：所有预设以独立 JSON 存储于 `%APPDATA%/ModDeck/presets/{gameId}/{character}/{modName}.json`，读写微秒级响应且互不干扰；
 - **现场实机快照**：在主界面或游戏内悬浮快捷窗口现场调好造型后，直接输入名称即可一键保存为新预设；
-- **变体详情结构化透视**：双击或点击信息图标即可展开预设详情抽屉，人读友好化直观查看各个持久化变量设定值与对应 `.ini` 归属；
+- **变体详情结构化透视**：双击或点击信息图标即可展开预设详情抽屉，直观查看各个持久化变量设定值与对应 `.ini` 归属；
 - **瞬态变量过滤（Transient Var Filter）**：智能识别并过滤非外观临时变量（如菜单开启 `$ui_menu`、页码、鼠标抓手坐标等），只比对和覆盖真正的服装与体型参数。
 
 ### 4. 全角色池方案工作台（Roster Scheme Workspace）
@@ -61,6 +63,8 @@ ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入�
 - **独立单选 (互斥) 与多选 (共存) 模式**：每个卡片独立支持单选与多选自由切换，兼顾角色皮肤模型互斥与功能 UI 多项共存需求，并根据当前激活数量智能自适应初始默认模式；
 - **方案指纹防重与未保存实机改动拦截**：当选中状态与已有方案完全一致时自动禁用「存为新方案」；若检测到某 Mod 实机参数未保存，自动标亮橙色「⚠️ 当前实机 (未保存改动)」并提供二次确认或一键替换为 Default 安全入库。
 
+![全角色池方案工作台](docs/screenshot-roster-schemes.png)
+
 ### 5. 游戏内快捷操作台（Overlay）与原生按键驱动
 
 - **游戏沉浸呼出**：默认全局快捷键 `Alt+Shift+M`（支持自定义），无需切屏即可在无边框游戏上层直接呼出；
@@ -70,6 +74,15 @@ ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入�
 - **悬浮方案抽屉与实机测速**：底部配备全角色池方案抽屉与「⏱️ 测速校准」秒表工具，无需切屏即可全队换装或精确测量重载耗时。
 
 ![快捷窗口](docs/screenshot-overlay.png)
+
+### 6. 中英双语切换与多语言兼容系统（Multi-Language & i18n）
+
+- **中英双语即时切换**：内置 `zh-CN`（简体中文）与 `en-US`（English）两套完整词典（结构 100% 对齐，当前已涵盖 585+ 项词条），支持“跟随系统 (Auto) / 简体中文 / English”即时热切换，修改后主界面、快捷悬浮窗与各弹窗无需重启立即生效；
+- **国际化标准角色译名**：离线词库全面收录各角色标准英文名（`canonicalEnName`），英文界面自动呈现英文官方名，中文界面呈现中文名，全局检索无缝兼容中英文、拼音与别名；
+- **独立语言包目录（`languages/`）**：便携包根目录独立输出 `languages/` 文件夹（与底层 Chromium 系统的 50+ 个底层 `.pak` 资源物理分离），支持一键定位目录并随时放置社区语言包（如 `ja-JP.json`、`ko-KR.json`），软件启动自动扫描并热加载；
+- **完善的本地化工具链**：工程内自带 `scripts/i18n.mjs`，支持未翻译中文代码全自动提取（`npm run i18n:extract`）、词条对称性校验（`npm run i18n:check`）与自动化结构同步（`npm run i18n:sync`）。
+
+![设置与高级选项](docs/screenshot-settings.png)
 
 ---
 
@@ -93,7 +106,7 @@ ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入�
 
 ### 2. 自动重载三向独立拆分与待生效聚合队列（Pending Preset Queue）
 
-为了满足不同玩家对游戏流畅度的极致要求，ModDeck 将重载行为细分为三个独立维度（可在「设置 → 通用」中自由配置）：
+为了满足不同玩家对游戏流畅度的极致要求，ModDeck 将重载行为细分为三个独立维度（可在「设置 → 高级」中自由配置）：
 - **切换普通 Mod 启停后自动重载**：默认关闭。避免在 Mod 库批量启用/禁用 Mod 时导致游戏画面频繁停顿卡顿；
 - **切换单 Mod 变体预设后自动重载**：推荐常开。点击预设胶囊即刻驱动游戏画面换装；
 - **切换全角色池方案后自动重载**：推荐常开。一键切换整套阵容即刻换装。
@@ -114,7 +127,7 @@ ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入�
 
 由于不同玩家的电脑硬件性能及启用的 Mod 数量/材质贴图大小差异巨大，3DMigoto 执行 F10 重载的实际耗时分布在 `1.1s` 到 `18s+` 不等。
 - **缓冲延迟的作用**：ModDeck 需要等待 3DMigoto 编译完 Shader 并跨过 Present 帧后，才能安全补写 `d3dx_user.ini` 并清除桥接；
-- **纯热生效参数**：在「设置 → 通用」中提供的「3DMigoto 重载缓冲同步延迟」滑动条为纯内存定时器，修改后无需按 F10 或重启，下一次重载即刻按新设时长计时；
+- **纯热生效参数**：在「设置 → 高级」中提供的「3DMigoto 重载缓冲同步延迟」滑动条为纯内存定时器，修改后无需按 F10 或重启，下一次重载即刻按新设时长计时；
 - **游戏内浮动秒表测速（推荐）**：
   1. 在游戏运行中按 `Alt+Shift+M` 呼出快捷窗口，点击底部的 **「⏱️ 测速」** 按钮；
   2. 点击「开始测速」，ModDeck 将向游戏发送 F10 并毫秒级启动计时；
@@ -174,6 +187,7 @@ ModDeck 数据存储位于 `%APPDATA%/ModDeck/`（可在「设置 → 关于」�
 | `characters.json` | 用户自定义角色别名、显示名与覆盖配置 | 核心数据 |
 | `roster-cache.json` | 角色中英文词典增量缓存 | 核心数据 |
 | `covers/` | 用户自定义裁切的角色头像封面（未自定义时初始为空） | 用户媒体 |
+| `languages/` | 外部自定义语言包目录（与便携包根目录语言包互通） | 本地化扩展 |
 | `tmp/` | 压缩包导入解析时的临时暂存目录（导入完成后自动清理为空） | 临时缓存 |
 | `logs/` | 软件启动与运行排错日志 | 诊断日志 |
 | `bin/` | 绿色解压工具二进制套件 | 辅助程序 |
@@ -191,7 +205,7 @@ ModDeck 数据存储位于 `%APPDATA%/ModDeck/`（可在「设置 → 关于」�
 ### 1. 开发环境准备
 
 - Windows 10 / 11 x64
-- Node.js 22+ & npm
+- Node.js 22+（推荐 Node 24）& npm
 - Git
 
 ### 2. 获取代码与依赖安装
@@ -202,7 +216,7 @@ cd ModDeck
 npm install
 ```
 
-### 3. 常用开发与打包指令
+### 3. 常用开发与构建指令
 
 ```bash
 # 启动热重载开发调试模式
@@ -211,10 +225,19 @@ npm run dev
 # 完整静态类型检查（主进程 + Preload + 渲染层）
 npm run typecheck
 
-# 生产环境编译构建
+# 检查多语言一致性与代码中硬编码中文
+npm run i18n:check
+
+# 深度提取代码中未翻译中文字符串并生成 untranslated-report.json
+npm run i18n:extract
+
+# 自动以中文基准递归同步并排序所有语言包结构（当前包含 585+ 项词条）
+npm run i18n:sync
+
+# 生产环境编译构建（生成 out/）
 npm run build
 
-# 打包便携绿色免安装 ZIP 分发包
+# 打包便携绿色免安装 ZIP 分发包（生成 release/ModDeck-<version>-win-x64.zip）
 npm run package:portable
 ```
 
