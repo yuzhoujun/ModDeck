@@ -24,7 +24,7 @@ writeMod('测试角色A', 'DISABLED_旧Mod', ini)
 writeMod('新角色B', '新衣服', ini)
 
 // 验证角色目录默认封面。
-const coverSource = path.join(root, 'docs', 'screenshot-character.png')
+const coverSource = path.join(root, 'docs', 'screenshot-library.png')
 if (fs.existsSync(coverSource)) {
   fs.copyFileSync(coverSource, path.join(modsPath, '测试角色A', '.preview.png'))
   fs.copyFileSync(coverSource, path.join(modsPath, '新角色B', '.preview.png'))

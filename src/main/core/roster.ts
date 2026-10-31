@@ -606,7 +606,7 @@ export function matchCharacterForMod(
 }
 
 /**
- * 根据角色中文名、目录名或别名查询其标准英文名称（供国际化 / en-US 显示）。
+ * 根据角色中文名、目录名或别名查询其标准英文名称（供英文 / en-US 界面显示）。
  */
 export function findCanonicalEnName(gameId: GameId, nameOrFolder: string): string | undefined {
   if (!nameOrFolder) return undefined

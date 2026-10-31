@@ -73,7 +73,7 @@ Modern 3DMigoto mods often feature extensive color variations, toggleable access
 - **Live Variant Sidecar Panel**: Click any mod to expand variant presets, live snapshots, and hotkey triggers;
 - **Floating Stopwatch Benchmark**: Built-in "⏱️ Benchmark" tool measures reload duration on-screen without leaving the game.
 
-![Quick Overlay](docs/screenshot-overlay.png)
+![Quick Overlay](docs/screenshot-overlay-en.png)
 
 ### 6. Multi-Language System & Extensible i18n
 
