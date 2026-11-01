@@ -74,11 +74,12 @@ export function markPendingQueueReloading(gameId?: GameId): void {
 }
 
 export function getPendingPresetCount(gameId?: GameId): number {
-  if (!gameId) return pendingPresetQueue.size
   let count = 0
-  const prefix = `${gameId}:`
-  for (const key of pendingPresetQueue.keys()) {
-    if (key.startsWith(prefix)) count++
+  const prefix = gameId ? `${gameId}:` : ''
+  for (const [key, entry] of pendingPresetQueue.entries()) {
+    if ((!prefix || key.startsWith(prefix)) && entry.status !== 'reloading') {
+      count++
+    }
   }
   return count
 }
@@ -950,24 +951,24 @@ export async function applyModPreset(
   if (Object.keys(mergedVars).length > 0) {
     // 写入 d3dx_user.ini（离线/冷态直接持久化）
     await applyVariablesToD3dxUserIni(modsPath, mergedVars, characterFolder, modFolder)
+  }
 
-    // 加入/覆盖到待生效聚合队列（支持同一 Mod 多次切换，永远只保留最新形态）
-    const qKey = makeQueueKey(gameId, characterFolder, modFolder)
-    pendingPresetQueue.set(qKey, {
-      gameId,
-      presetId,
-      characterFolder,
-      cleanModName,
-      modsPath,
-      variables: mergedVars,
-      updatedAt: Date.now(),
-      status: 'pending'
-    })
+  // 加入/覆盖到待生效聚合队列（支持同一 Mod 多次切换，永远只保留最新形态）
+  const qKey = makeQueueKey(gameId, characterFolder, modFolder)
+  pendingPresetQueue.set(qKey, {
+    gameId,
+    presetId,
+    characterFolder,
+    cleanModName,
+    modsPath,
+    variables: mergedVars,
+    updatedAt: Date.now(),
+    status: 'pending'
+  })
 
-    // 全量合成写入全局 bridge.ini
-    if (!skipBridge) {
-      await syncBridgeFileFromQueue(modsPath, gameId)
-    }
+  // 全量合成写入全局 bridge.ini
+  if (!skipBridge) {
+    await syncBridgeFileFromQueue(modsPath, gameId)
   }
 
   return { ok: true }

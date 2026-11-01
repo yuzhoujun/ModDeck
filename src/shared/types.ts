@@ -192,6 +192,7 @@ export interface RosterSyncResult {
 }
 
 export interface Bootstrap {
+  pendingPresetCount?: number
   settings: Settings
   games: GameDef[]
   snapshot: GameSnapshot | null

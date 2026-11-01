@@ -57,8 +57,14 @@ export function OverlayApp() {
       })
       .catch(() => undefined)
 
+    window.moddeck
+      .getPendingPresetCount(snapshot.game.id)
+      .then((cnt) => {
+        if (active) setPendingCount(cnt)
+      })
+      .catch(() => undefined)
 
-  return () => {
+    return () => {
       active = false
     }
   }, [snapshot?.game.id])
@@ -70,6 +76,9 @@ export function OverlayApp() {
         const data = await window.moddeck.bootstrap()
         if (cancelled) return
         setBoot(data)
+        if (typeof data.pendingPresetCount === 'number') {
+          setPendingCount(data.pendingPresetCount)
+        }
         setSnapshot(data.snapshot)
         setSelectMode(data.settings.ui.modSelectMode)
         setFilter(data.settings.ui.characterFilter)
@@ -104,6 +113,7 @@ export function OverlayApp() {
       window.moddeck.getOverlayHotkey().then((k) => {
         if (k) setOverlayHotkey(k)
       }).catch(() => undefined)
+      window.moddeck.getPendingPresetCount(snapshot?.game.id).then(setPendingCount).catch(() => undefined)
     }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
@@ -112,7 +122,14 @@ export function OverlayApp() {
   useEffect(() => {
     if (loading) return
     let active = true
-    const unsubscribe = window.moddeck.onStateChanged(() => {
+    const unsubscribe = window.moddeck.onStateChanged((evt) => {
+      if (typeof evt?.pendingPresetCount === 'number') {
+        setPendingCount(evt.pendingPresetCount)
+      } else {
+        window.moddeck.getPendingPresetCount(snapshot?.game.id).then((count) => {
+          if (active) setPendingCount(count)
+        }).catch(() => undefined)
+      }
       window.moddeck.getOverlayHotkey().then((k) => {
         if (k && active) setOverlayHotkey(k)
       }).catch(() => undefined)
@@ -121,6 +138,9 @@ export function OverlayApp() {
           const data = await window.moddeck.bootstrap()
           if (!active || !data.snapshot) return
           setBoot(data)
+          if (typeof data.pendingPresetCount === 'number') {
+            setPendingCount(data.pendingPresetCount)
+          }
           setSnapshot(data.snapshot)
           setSelectMode(data.settings.ui.modSelectMode)
           setFilter(data.settings.ui.characterFilter)
@@ -326,6 +346,7 @@ export function OverlayApp() {
         setSelected(first.folder)
         setMods(await window.moddeck.getMods(gameId, first.folder))
       }
+      window.moddeck.getPendingPresetCount(gameId).then(setPendingCount).catch(() => undefined)
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -663,8 +684,12 @@ export function OverlayApp() {
             onClick={() => {
               void (async () => {
                 const result = await window.moddeck.reloadF10()
-                if (!result.ok) setError(result.error || t('overlay.reloadFailed'))
-                else setPendingCount(0)
+                if (!result.ok) {
+                  setError(result.error || t('overlay.reloadFailed'))
+                } else {
+                  const count = await window.moddeck.getPendingPresetCount(snapshot?.game.id).catch(() => 0)
+                  setPendingCount(count)
+                }
               })()
             }}
             title={pendingCount > 0 ? t('overlay.pendingCountHint', { count: pendingCount }) : t('overlay.reloadWithF10Tooltip', { hotkey: boot?.settings.ui.reloadHotkey || 'F10' })}

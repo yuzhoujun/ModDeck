@@ -87,6 +87,7 @@ export const IPC = {
   openEnvironmentFolder: 'env:open-folder',
   reloadF10: 'env:reload-f10',
   setReloadHotkey: 'env:set-reload-hotkey',
+  getPendingPresetCount: 'preset:pending-count',
   rosterStatus: 'roster:status',
   rosterSync: 'roster:sync',
   stateChanged: 'app:state-changed'
@@ -95,6 +96,7 @@ export const IPC = {
 export interface StateChangedEvent {
   gameId?: GameId
   characterFolder?: string
+  pendingPresetCount?: number
 }
 
 export interface ModDeckApi {
@@ -213,6 +215,7 @@ export interface ModDeckApi {
   openEnvironmentFolder(gameId: GameId): Promise<ToggleResult>
   reloadF10(): Promise<ToggleResult>
   setReloadHotkey(hotkey: string): Promise<{ ok: boolean; hotkey?: string; error?: string }>
+  getPendingPresetCount(gameId?: GameId): Promise<number>
   getRosterStatus(): Promise<RosterSyncStatus>
   syncRemoteRoster(customUrl?: string): Promise<RosterSyncResult>
   onStateChanged(listener: (event: StateChangedEvent) => void): () => void

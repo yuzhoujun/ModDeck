@@ -293,10 +293,15 @@ let tray: Tray | null = null
 let isQuitting = false
 
 function broadcastStateChanged(payload: StateChangedEvent = {}): void {
+  const gId = payload.gameId ?? settings.activeGameId
+  const eventWithCount: StateChangedEvent = {
+    ...payload,
+    pendingPresetCount: getPendingPresetCount(gId)
+  }
   for (const win of [mainWindow, overlayWindow, overlayDetailWindow]) {
     if (!win || win.isDestroyed()) continue
     try {
-      win.webContents.send(IPC.stateChanged, payload)
+      win.webContents.send(IPC.stateChanged, eventWithCount)
     } catch {
       // ignore
     }
@@ -3038,6 +3043,11 @@ function registerIpc(): void {
   })
 
   register(IPC.reloadF10, async () => reloadF10())
+
+  register(IPC.getPendingPresetCount, async (gameId?: GameId) => {
+    const gId = gameId ?? settings.activeGameId
+    return getPendingPresetCount(gId)
+  })
   register(IPC.setReloadHotkey, async (hotkey: string) => {
     const value = String(hotkey || '').trim() || 'F10'
     if (

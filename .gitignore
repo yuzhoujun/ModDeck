@@ -2,6 +2,7 @@ node_modules/
 out/
 release/
 release-build/
+build-dist/
 dist/
 temp/
 ModDeck-logs/
