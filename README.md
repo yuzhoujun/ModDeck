@@ -77,10 +77,10 @@ ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入�
 
 ### 6. 中英双语切换与多语言兼容系统（Multi-Language & i18n）
 
-- **中英双语即时切换**：内置 `zh-CN`（简体中文）与 `en-US`（English）两套完整词典（结构 100% 对齐，当前已涵盖 585+ 项词条），支持“跟随系统 (Auto) / 简体中文 / English”即时热切换，修改后主界面、快捷悬浮窗与各弹窗无需重启立即生效；
+- **中英双语即时切换**：内置 `zh-CN`（简体中文）与 `en-US`（English）两套完整词典（结构 100% 对齐，当前已涵盖 660+ 项词条），支持“跟随系统 (Auto) / 简体中文 / English”即时热切换，修改后主界面、快捷悬浮窗与各弹窗无需重启立即生效；
 - **角色英文译名支持**：离线词库全面收录各角色标准英文名（`canonicalEnName`），英文界面自动呈现英文官方名，中文界面呈现中文名，全局检索无缝兼容中英文、拼音与别名；
 - **独立语言包目录（`languages/`）**：便携包根目录独立输出 `languages/` 文件夹（与底层 Chromium 系统的 50+ 个底层 `.pak` 资源物理分离），支持一键定位目录并随时放置社区语言包（如 `ja-JP.json`、`ko-KR.json`），软件启动自动扫描并热加载；
-- **完善的本地化工具链**：工程内自带 `scripts/i18n.mjs`，支持未翻译中文代码全自动提取（`npm run i18n:extract`）、词条对称性校验（`npm run i18n:check`）与自动化结构同步（`npm run i18n:sync`）。
+- **完善的本地化工具链**：工程内自带 `scripts/i18n.mjs`，支持未翻译中文代码全自动抽取（`npm run i18n:extract`）、一键增量合并与待翻译对齐（`npm run i18n:extract:apply`）、词条对称性与代码调用校验（`npm run i18n:check`）与自动化结构同步（`npm run i18n:sync`）。
 
 ![设置与高级选项](docs/screenshot-settings.png)
 
@@ -225,13 +225,16 @@ npm run dev
 # 完整静态类型检查（主进程 + Preload + 渲染层）
 npm run typecheck
 
-# 检查多语言一致性与代码中硬编码中文
+# 检查多语言一致性、代码 t/tMain 调用与未翻译硬编码中文
 npm run i18n:check
 
-# 深度提取代码中未翻译中文字符串并生成 untranslated-report.json
+# 深度提取代码中未翻译中文字符串并生成结构化 JSON 树与详表
 npm run i18n:extract
 
-# 自动以中文基准递归同步并排序所有语言包结构（当前包含 585+ 项词条）
+# 一键安全增量合并提取词条至 zh-CN 并同步 en-US 待翻译占位符（支持 git diff 快速对比）
+npm run i18n:extract:apply
+
+# 自动以中文基准递归同步并排序所有语言包结构（当前包含 660+ 项词条）
 npm run i18n:sync
 
 # 生产环境编译构建（生成 out/）

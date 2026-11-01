@@ -36,31 +36,79 @@ npm install
 | `npm run build` | 编译生产环境产物（输出至 `out/` 目录） |
 | `npm run smoke` | 执行无头冒烟测试，在虚拟沙箱环境下校验扫描、启停与元数据读写 |
 | `npm run scan:report` | 对配置目录执行只读性能测试并输出 `scan-report.json` |
+| `npm run i18n:check` | 校验多语言一致性、代码 `t`/`tMain` 调用有效性与未抽取中文扫描 |
+| `npm run i18n:extract` | 深度扫描抽取未翻译中文，生成结构化 JSON 树与行列报告 |
+| `npm run i18n:extract:apply` | 一键安全增量合并提取词条至基准语言并生成待翻译占位符 |
+| `npm run i18n:sync` | 递归对齐所有语言包结构并按字母排序格式化 |
 
 ---
 
 ## 三、多语言维护与自动化工作流（i18n Toolchain）
 
-ModDeck 内置多语言字典位于 `src/shared/i18n/locales/`，以 `zh-CN.json` 为基准语言，通过自动化脚本确保各语言结构与代码调用的严密对齐：
+ModDeck 内置多语言字典位于 `src/shared/i18n/locales/`，以 `zh-CN.json` 为基准语言，`en-US.json` 保持 100% 结构镜像。当前词典规模已覆盖 **660+** 项核心界面、弹窗、系统托盘及底层 IPC 报错词条。
+
+为了避免手动维护多语言产生遗漏或键位漂移，工程提供了完整的多语言自动化维护工具链（基于 `scripts/i18n.mjs`）：
 
 ```bash
-# 1. 检查多语言一致性与硬编码中文
+# 1. 语法与调用一致性校验（词条对称性 + t/tMain 调用有效性 + 硬编码中文扫描）
 npm run i18n:check
 
-# 2. 深度扫描工程代码中未翻译的中文字符串并生成详尽报告
+# 2. 深度扫描工程代码中未翻译的中文字符串，生成标准结构化 JSON 与位置详表
 npm run i18n:extract
 
-# 3. 自动以基准语言（zh-CN）递归对齐补全所有语言包并格式化排序
+# 3. 一键安全增量合并新词条至 zh-CN.json 并自动同步 en-US.json 待翻译占位符
+npm run i18n:extract:apply
+
+# 4. 递归对齐所有语言包的键位结构并执行字母顺序深度排序格式化
 npm run i18n:sync
 
-# 4. 基于基准模版快速脚手架生成新语言包（例如日语 ja-JP）
+# 5. 基于基准模板快速脚手架生成新语言包（例如创建日语 ja-JP.json）
 node scripts/i18n.mjs new ja-JP
 ```
 
-### 词条规模与对齐保障
+### 1. 自动化工具链核心能力详解
 
-- 目前已收录并对齐超过 **585+** 项核心界面词条；
-- 每次在代码中添加新界面或调整文案时，建议先使用 `npm run i18n:extract` 检查漏译，修改后运行 `npm run i18n:sync` 自动同步结构，并通过 `npm run i18n:check` 与 `npm run typecheck` 验证。
+#### ① 词条一致性与代码调用校验（`npm run i18n:check`）
+
+- **结构对称性**：遍历 `src/shared/i18n/locales/` 下所有语言包，比对与 `zh-CN.json` 的键位差异，报告缺失键或多余冗余键；
+- **调用有效性扫描**：递归扫描 `src/` 下所有 `.ts` 与 `.tsx` 源码中的 `t('xxx')`（渲染层）及 `tMain('xxx')`（主进程 IPC/托盘/弹窗）调用，确保代码中调用的每一个键在基准字典中真实存在，杜绝运行时报错；
+- **硬编码中文扫描**：扫描工程源码中的中文文本，对照字典反查并报告未映射的文本。
+
+#### ② 代码中文深度抽取与结构化生成（`npm run i18n:extract`）
+
+- **全量代码扫描**：覆盖 `src/main`、`src/renderer`、`src/preload`、`src/shared`；
+- **智能过滤**：自动过滤单行与多行注释、控制台与调试日志（`console.*`、`logError`）、冒烟测试沙箱逻辑及核心词库数据（`core/roster.ts`）；
+- **词条比对与语义归类**：与基准字典自动比对：
+  - 若该中文已在字典中存在对应翻译，标记现有 key，提示可直接复用；
+  - 若为新词条，根据文件路径与上下文推导所属命名空间（如 `dialog.*`、`tray.*`、`common.*`、`settings.*`、`overlay.*`、`character.*`、`mod.*` 等）；
+- **生成产物**：
+  - `scripts/extracted-zh-CN.json`：按推导命名空间组织的标准嵌套 JSON 树；
+  - `scripts/extracted-details.json`：包含每个中文字符串在工程中出现的精确文件路径与行号清单。
+
+#### ③ 一键增量合并与多语言对比工作流（`npm run i18n:extract:apply`）
+
+1. 自动将抽取出的新词条通过安全深度合并（`deepMerge`）写入 `src/shared/i18n/locales/zh-CN.json`，已存在的叶子节点绝不覆盖；
+2. 自动格式化并按字母顺序深度重排所有 key；
+3. 自动将新增条目以 `"[TODO: <原中文>]"` 占位符结构同步到 `en-US.json` 等语言包；
+4. **Git Diff 极速翻译对比**：
+   ```bash
+   git diff src/shared/i18n/locales
+   ```
+   直接通过 Git 差异即可清晰查看所有新增的待翻译项，在 `en-US.json` 中将 `[TODO: ...]` 替换为英文翻译即可完成语言对齐闭环。
+
+#### ④ 语言包递归同步与新语言扩展
+
+- **`npm run i18n:sync`**：当手动调整或删改 `zh-CN.json` 后，运行该指令递归同步补齐所有其他语言包结构，并规范化排序缩进；
+- **`node scripts/i18n.mjs new <locale>`**：一键生成如 `ja-JP.json`、`ko-KR.json` 模板，自动填充所有占位符供社区翻译。
+
+### 2. 多语言日常开发实践规范
+
+1. **渲染层文本**：统一使用 `const { t } = useI18n()`，在 JSX 中通过 `{t('namespace.key')}` 渲染；
+2. **主进程文本**：涉及 IPC 错误提示、系统托盘右键菜单、文件选择对话框（`dialog.showOpenDialog`）等，统一使用 `tMain('namespace.key', params)`；
+3. **新增功能后自检**：
+   - 运行 `npm run i18n:extract:apply` 自动提取并合并新词条；
+   - 运行 `git diff src/shared/i18n/locales` 补全 `en-US.json` 对应英文；
+   - 运行 `npm run i18n:check` 与 `npm run typecheck` 验证词条对齐率 100%。
 
 ---
 

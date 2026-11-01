@@ -149,17 +149,19 @@ sequenceDiagram
 
 - **双语字典（Builtin Locales）**：
   - 基准语言：`src/shared/i18n/locales/zh-CN.json`（简体中文）；
-  - 英文语言：`src/shared/i18n/locales/en-US.json`（完整英文镜像，与基准 100% 结构对齐，当前已涵盖 585+ 键位）；
+  - 英文语言：`src/shared/i18n/locales/en-US.json`（完整英文镜像，与基准 100% 结构对齐，当前已涵盖 660+ 键位）；
 - **动态语言解析与注入（I18nProvider）**：
   - 渲染层通过 React Context 注入 `t(key, params)`、`getLocaleGameName`、`getLocaleGameShortName`、`getLocaleCharacterName`；
+  - 主进程通过 `tMain(key, params)` 自适应当前语言注入 IPC 错误、系统托盘与原生对话框；
   - 支持参数化动态插值（如 `{count}`、`{name}`、`{loader}`）；
 - **外部语言包自动发现（External Locales Discovery）**：
   - 主进程启动时自动扫描便携包根目录 `languages/` 与用户数据目录 `%APPDATA%/ModDeck/languages/` 下的所有 `.json` 语言包；
   - 语言下拉框实时热加载外部语言并支持一键切换；
 - **工程级开发维护工具链（`scripts/i18n.mjs`）**：
-  - `npm run i18n:check`：校验键位对称性与未翻译硬编码中文；
+  - `npm run i18n:check`：校验键位对称性、代码 `t`/`tMain` 调用有效性与未提取中文；
+  - `npm run i18n:extract`：深度扫描工程业务代码提取未翻译中文字符串，输出结构化 JSON 树与详尽位置报告；
+  - `npm run i18n:extract:apply`：一键安全增量合并提取词条至 `zh-CN.json` 并自动同步 `en-US.json` 待翻译占位符；
   - `npm run i18n:sync`：以基准语言为模板自动补齐并排序所有语言文件；
-  - `npm run i18n:extract`：深度扫描工程业务代码提取未翻译中文字符串，输出详尽诊断报告；
   - `node scripts/i18n.mjs new <lang>`：一键脚手架生成新语言模版。
 
 ---

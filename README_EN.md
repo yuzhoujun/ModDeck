@@ -77,10 +77,10 @@ Modern 3DMigoto mods often feature extensive color variations, toggleable access
 
 ### 6. Multi-Language System & Extensible i18n
 
-- **Instant Bilingual Switching**: Built-in `zh-CN` (Simplified Chinese) and `en-US` (English) translation dictionaries with 100% structural parity (over **585+** keys); supports instant hot-reloading without restart;
+- **Instant Bilingual Switching**: Built-in `zh-CN` (Simplified Chinese) and `en-US` (English) translation dictionaries with 100% structural parity (over **660+** keys); supports instant hot-reloading without restart;
 - **Canonical English Character Names**: Full offline character database with `canonicalEnName` for international game releases; seamless search by English names, Chinese, or folder names;
 - **Standalone `languages/` Directory**: Independent `languages/` folder separated from Chromium system `.pak` files; drop any community translation (e.g. `ja-JP.json`, `ko-KR.json`) to load dynamically;
-- **Developer Localization Toolchain**: Built-in `scripts/i18n.mjs` with automated Chinese code extraction (`npm run i18n:extract`), parity verification (`npm run i18n:check`), and structural synchronization (`npm run i18n:sync`).
+- **Developer Localization Toolchain**: Built-in `scripts/i18n.mjs` with automated Chinese code extraction (`npm run i18n:extract`), one-click incremental merge and TODO placeholders sync (`npm run i18n:extract:apply`), parity and caller verification (`npm run i18n:check`), and structural synchronization (`npm run i18n:sync`).
 
 ![Settings & Advanced Options](docs/screenshot-settings.png)
 
@@ -225,13 +225,16 @@ npm run dev
 # Full TypeScript static type check (Main + Preload + Renderer)
 npm run typecheck
 
-# Verify i18n key parity and scan for raw Chinese strings
+# Verify i18n key parity, code t/tMain calls, and scan raw Chinese strings
 npm run i18n:check
 
-# Deeply extract untranslated strings from code into untranslated-report.json
+# Deeply extract untranslated strings from code into structured JSON tree & details
 npm run i18n:extract
 
-# Recursively synchronize all locale structures to base zh-CN (585+ keys)
+# One-click incremental merge into zh-CN and sync TODO placeholders to en-US (git diff ready)
+npm run i18n:extract:apply
+
+# Recursively synchronize all locale structures to base zh-CN (660+ keys)
 npm run i18n:sync
 
 # Production build (outputs to out/)
