@@ -4,14 +4,12 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
 $version = (Get-Content 'package.json' -Raw | ConvertFrom-Json).version
-$buildRootName = if ($env:MODDECK_BUILD_ROOT) { $env:MODDECK_BUILD_ROOT } else { 'build-dist' }
-$buildRoot = Join-Path $root $buildRootName
 $outputDir = Join-Path $root 'release'
-$appDir = Join-Path $buildRoot 'win-unpacked'
+$appDir = Join-Path $outputDir 'win-unpacked'
 $zipPath = Join-Path $outputDir "ModDeck-$version-win-x64.zip"
-$tempRoot = Join-Path (Split-Path -Parent $root) 'temp'
+$tempRoot = Join-Path $root 'temp'
 $customTmp = Join-Path $tempRoot 'tmp'
-New-Item -ItemType Directory -Force $tempRoot, $outputDir, $buildRoot, $customTmp | Out-Null
+New-Item -ItemType Directory -Force $tempRoot, $outputDir, $customTmp | Out-Null
 $env:TMP = $customTmp
 $env:TEMP = $customTmp
 
@@ -24,7 +22,7 @@ $env:ELECTRON_CACHE = Join-Path $tempRoot 'electron-cache'
 $env:ELECTRON_BUILDER_BINARIES_MIRROR = 'https://npmmirror.com/mirrors/electron-builder-binaries/'
 $env:ELECTRON_BUILDER_CACHE = Join-Path $tempRoot 'electron-builder-cache'
 $env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'
-node node_modules/electron-builder/out/cli/cli.js --win --x64 --dir --publish never "--config.directories.output=$buildRoot"
+node node_modules/electron-builder/out/cli/cli.js --win --x64 --dir --publish never "--config.directories.output=$outputDir"
 if ($LASTEXITCODE -ne 0) { throw 'electron-builder --dir failed' }
 
 Copy-Item 'packaging\README-portable.txt' (Join-Path $appDir 'README.txt') -Force
