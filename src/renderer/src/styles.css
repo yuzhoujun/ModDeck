@@ -2370,8 +2370,18 @@ input[type='range'].setting-range::-webkit-slider-thumb:active {
 }
 
 .detail-section-head .actions {
+  display: flex;
+  align-items: center;
   flex-wrap: nowrap;
   gap: 6px;
+  min-width: 0;
+}
+
+.detail-section-head .actions .small-btn {
+  padding: 0 8px;
+  gap: 5px;
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .preset-save-box {
