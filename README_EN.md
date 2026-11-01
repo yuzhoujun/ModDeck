@@ -17,12 +17,19 @@ ModDeck exclusively manages game `Mods` directories: sub-second toggling, all-fo
 
 ## 1. Download & Quick Start
 
+> [!IMPORTANT]
+> **Prerequisites & Scope**:
+> ModDeck is a dedicated mod asset manager and in-game quick overlay; **it does not provide installation packages or basic setup tutorials for XXMI or game-specific MIs**. Please refer to the upstream official project [SpectrumQT/XXMI-Launcher: Modding platform for GI, HSR, WW and ZZZ](https://github.com/SpectrumQT/XXMI-Launcher). Using ModDeck requires foundational experience with 3DMigoto/XXMI.
+
 - **Latest Release**: Go to [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) to download `ModDeck-2.3.0-win-x64.zip` (or your locally built portable release);
 - **How to Run**:
   1. Extract the ZIP package to any writable folder (non-system drive recommended; avoid special characters in path);
   2. **Double-click `ModDeck.exe` to launch directly**;
   3. (Compatibility Fallback) If third-party antivirus blocks the Chromium sandbox causing no window to display, launch via **`ModDeck.cmd`** in the same folder (automatically passes `--no-sandbox`);
-  4. On first launch, open "Settings" to configure your game's `Mods` or MI root folder.
+  4. On first launch, open "Settings -> Paths" to configure your game's `Mods` or MI root folder and optional executable paths (supports auto-detection and manual pick):
+     ![Game & Directory Paths Configuration](docs/ModDeck.Paths.en.png)
+  5. **Remote Character Dictionary Settings**: In "Settings -> Import", configure remote character dictionary JSON URLs and mirrors (Official Raw, GitHub, jsDelivr CDN, ghproxy, or custom). One click updates and synchronizes offline bilingual character names, aliases, and Pinyin, ensuring automated recognition and categorization upon mod import:
+     ![Remote Character Dictionary Settings](docs/ModDeck.ModCharacterDictionarySet.en.png)
 
 ---
 
@@ -36,12 +43,12 @@ ModDeck exclusively manages game `Mods` directories: sub-second toggling, all-fo
 - **Visual Drag & Drop Sorting**: Drag cards to customize rank orders (stored locally); supports fuzzy search by character name, English alias, Pinyin, or folder name;
 - **Built-in Cover Cropper**: Drag & drop any image, with 1:1 viewport translation and mouse-wheel zoom, saving lossless `.preview.png`.
 
-![Mod Library](docs/screenshot-library.png)
+![Mod Library](docs/ModDeck.ModLibrary.en.png)
 
 ### 2. Batch Intelligent Import & Mixed Drag-and-Drop
 
+- **Full-Page Mixed Drag & Drop**: Select and drop multiple `.zip`, `.7z`, `.rar` archives and extracted folders simultaneously directly onto the ModDeck window/page to trigger automated batch extraction and classification;
 - **Unified Import Split Button (`ImportDropdown`)**: Clean split button across main library and character views, supporting one-click archive pick or dropdown folder selection;
-- **Full-Page Mixed Drag & Drop**: Select and drop multiple `.zip`, `.7z`, `.rar` archives and extracted folders simultaneously directly into the window;
 - **Offline Character Dictionary Matching**: Built-in multi-lingual offline dictionary covering 5 major games for automatic archive recognition;
 - **Encoding Auto-Repair Engine**: Built-in CP437 -> GB18030 lossless decoding engine, automatically correcting garbled directory names in legacy archives.
 
@@ -55,6 +62,8 @@ Modern 3DMigoto mods often feature extensive color variations, toggleable access
 - **Structured Variables Inspector**: Double-click or click the info icon to inspect active `.ini` files and persistent variables;
 - **Transient Variable Filtering**: Automatically ignores non-cosmetic variables (such as menu toggles `$ui_menu`, page numbers, cursor coordinates) so only true outfit parameters are compared and applied.
 
+![Mod Details & Variant Presets](docs/ModDeck.ModDetials.en.png)
+
 ### 4. Roster Scheme Workspace
 
 - **Whole-Team Batch Outfit Switching**: Configure active mods and variant presets across your entire roster in one master workspace; switch the entire team in a single frame;
@@ -63,17 +72,17 @@ Modern 3DMigoto mods often feature extensive color variations, toggleable access
 - **Independent Single vs Multi Mode**: Every card supports independent single-choice (mutual exclusion) or multi-choice (coexistence) toggles;
 - **Fingerprint Deduplication & Dirty State Safety**: Disables duplicate saves when selection matches an existing scheme; alerts with "⚠️ Current Live (Unsaved changes)" when live parameters have unsaved tweaks.
 
-![Roster Scheme Workspace](docs/screenshot-roster-schemes.png)
+![Roster Scheme Workspace](docs/ModDeck.ModsPersetPool.en.png)
 
 ### 5. In-Game Floating Overlay & Native Key Helper
 
-- **Immersive In-Game Summoning**: Press `Alt+Shift+M` (customizable) to summon the overlay over borderless windowed games without Alt+Tab;
+- **Immersive In-Game Summoning**: Press `Alt+Shift+M` (customizable) to summon the overlay directly over fullscreen (topmost optimized) or windowed games without Alt+Tab;
 - **Sub-Second Mod State Sync**: Continuously listens to disk and `d3dx_user.ini` for real-time external synchronization;
 - **Hardware-Level Key Helper**: Built-in lightweight `ModDeckKeyHelper-v2.exe` simulates hardware-level DirectInput/RawInput scan codes directly to game foreground;
 - **Live Variant Sidecar Panel**: Click any mod to expand variant presets, live snapshots, and hotkey triggers;
 - **Floating Stopwatch Benchmark**: Built-in "⏱️ Benchmark" tool measures reload duration on-screen without leaving the game.
 
-![Quick Overlay](docs/screenshot-overlay-en.png)
+![In-Game Quick Overlay](docs/ModDeck.Quick.en.png)
 
 ### 6. Multi-Language System & Extensible i18n
 
@@ -81,8 +90,6 @@ Modern 3DMigoto mods often feature extensive color variations, toggleable access
 - **Canonical English Character Names**: Full offline character database with `canonicalEnName` for international game releases; seamless search by English names, Chinese, or folder names;
 - **Standalone `languages/` Directory**: Independent `languages/` folder separated from Chromium system `.pak` files; drop any community translation (e.g. `ja-JP.json`, `ko-KR.json`) to load dynamically;
 - **Developer Localization Toolchain**: Built-in `scripts/i18n.mjs` with automated Chinese code extraction (`npm run i18n:extract`), one-click incremental merge and TODO placeholders sync (`npm run i18n:extract:apply`), parity and caller verification (`npm run i18n:check`), and structural synchronization (`npm run i18n:sync`).
-
-![Settings & Advanced Options](docs/screenshot-settings.png)
 
 ---
 
@@ -170,7 +177,7 @@ Because hardware specs and mod sizes vary drastically, 3DMigoto F10 reload times
 
 - **Operating System**: Windows 10 / Windows 11 64-bit (x64);
 - **Runtime Environment**: Standalone green release with all native dependencies self-contained (no Python or system Node.js required);
-- **Windowed Mode Requirement**: To display the overlay over gameplay, games must run in **Borderless Windowed** or **Windowed Mode**. Exclusive Fullscreen prevents Windows topmost window composition;
+- **Display & Topmost Compatibility**: The Quick Overlay is natively optimized to run topmost over **Fullscreen** gameplay, while **Borderless Windowed** and standard windowed modes are also seamlessly supported as fallbacks;
 - **Local-First & Data Privacy**: All presets, covers, and configs are stored strictly in local `%APPDATA%/ModDeck/`. Completely functional offline with zero cloud telemetry.
 
 ---

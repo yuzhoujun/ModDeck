@@ -141,7 +141,7 @@ sequenceDiagram
 ### 5. 游戏内快捷操作台（Overlay）与原生按键驱动
 
 - **多窗口架构**：主窗口、悬浮快捷窗（`?mode=overlay`）与 Mod 详情侧栏（`?mode=overlay-detail`）解耦通信；
-- **置顶通道保证**：快捷窗口与热键侧栏采用 `screen-saver` 级置顶，在无边框窗口化游戏上方沉浸式呼出；
+- **置顶通道保证**：快捷窗口与热键侧栏采用 `screen-saver` 级置顶，在游戏全屏或窗口化上方沉浸式呼出；
 - **原生按键驱动（ModDeckKeyHelper-v2.exe）**：内建专用无窗口辅助工具，向游戏前台精准模拟硬件级 DirectInput/RawInput 键盘扫描码，突破操作系统焦点抢占限制；
 - **浮动实机秒表测速（Floating Reload Benchmark）**：直接浮于游戏画面之上测量 F10 耗时，按 `实测时间 + 1.5 秒安全余量` 一键计算并持久化最适缓冲同步延迟。
 
