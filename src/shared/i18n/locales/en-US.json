@@ -398,6 +398,7 @@
     "disableAllInPool": "Disable All in Pool",
     "enterPresetNameErr": "Please enter preset name",
     "enterSchemeNameErr": "Please enter scheme name",
+    "exportAllModPresets": "Export All Presets",
     "exportFailed": "Export failed",
     "exportModPreset": "Export Presets",
     "exportModPresetSuccess": "Exported presets to {path}",

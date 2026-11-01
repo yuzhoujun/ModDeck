@@ -398,6 +398,7 @@
     "disableAllInPool": "一键全部不启用",
     "enterPresetNameErr": "请输入预设名称",
     "enterSchemeNameErr": "请输入预设方案名称",
+    "exportAllModPresets": "导出全部预设",
     "exportFailed": "导出失败",
     "exportModPreset": "导出预设",
     "exportModPresetSuccess": "已导出预设至 {path}",

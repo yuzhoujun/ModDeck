@@ -440,16 +440,6 @@ export function ModDetailsPanel({
                   <Icon name="upload" size={13} />
                   {t('preset.importModPreset')}
                 </button>
-                {presets.filter((p) => p.id !== '__default__').length > 0 ? (
-                  <button
-                    className="btn ghost small-btn"
-                    onClick={() => void handleExportAllPresets()}
-                    title={t('preset.exportModPresetTooltip')}
-                  >
-                    <Icon name="download" size={13} />
-                    {t('preset.exportModPreset')}
-                  </button>
-                ) : null}
                 <button
                   className="btn ghost small-btn"
                   onClick={() => setShowSavePreset(!showSavePreset)}
@@ -557,6 +547,19 @@ export function ModDetailsPanel({
                 })}
               </div>
             )}
+
+            {presets.filter((p) => p.id !== '__default__').length > 0 ? (
+              <div className="detail-presets-footer">
+                <button
+                  className="btn ghost small-btn detail-export-all-btn"
+                  onClick={() => void handleExportAllPresets()}
+                  title={t('preset.exportModPresetTooltip')}
+                >
+                  <Icon name="download" size={12} />
+                  {t('preset.exportAllModPresets')}
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="detail-section">
