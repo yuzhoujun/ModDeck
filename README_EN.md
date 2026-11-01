@@ -86,10 +86,16 @@ Modern 3DMigoto mods often feature extensive color variations, toggleable access
 
 ### 6. Multi-Language System & Extensible i18n
 
-- **Instant Bilingual Switching**: Built-in `zh-CN` (Simplified Chinese) and `en-US` (English) translation dictionaries with 100% structural parity (over **660+** keys); supports instant hot-reloading without restart;
+- **Instant Bilingual Switching**: Built-in `zh-CN` (Simplified Chinese) and `en-US` (English) translation dictionaries with 100% structural parity (nearly **700** keys); supports instant hot-reloading without restart;
 - **Canonical English Character Names**: Full offline character database with `canonicalEnName` for international game releases; seamless search by English names, Chinese, or folder names;
 - **Standalone `languages/` Directory**: Independent `languages/` folder separated from Chromium system `.pak` files; drop any community translation (e.g. `ja-JP.json`, `ko-KR.json`) to load dynamically;
 - **Developer Localization Toolchain**: Built-in `scripts/i18n.mjs` with automated Chinese code extraction (`npm run i18n:extract`), one-click incremental merge and TODO placeholders sync (`npm run i18n:extract:apply`), parity and caller verification (`npm run i18n:check`), and structural synchronization (`npm run i18n:sync`).
+
+### 7. Preset & Roster Scheme Export/Import Sharing
+
+- **Single Mod Variant Preset Sharing (`.moddeck-preset.json`)**: Export a single variant preset or all custom presets of a mod into lightweight standard files directly from the Mod Details panel; supports file picker or direct drag & drop onto the details drawer, automatically validating parameter structures and merging into the target mod while intelligently renaming on duplicate collision;
+- **Whole-Team Roster Scheme Portability (`.moddeck-scheme.json`)**: Export full team roster outfit schemes into shareable scheme files directly from the Roster Scheme modal; deeply encapsulates active mod identifiers, variant preset names, factory default states, and variable snapshots, breaking free from local machine preset IDs;
+- **Interactive Match Inspection & Automated Variant Reconstruction (`ImportSchemeModal`)**: Interactive inspection modal when importing schemes, verifying local installed characters and mod directories, displaying match rates and missing item tags; warns on cross-game imports and supports on-import scheme renaming; upon confirmation, if the scheme references custom variant parameters that do not yet exist locally, ModDeck automatically creates and binds the preset under the target mod for zero-barrier outfit sharing.
 
 ---
 
@@ -241,7 +247,7 @@ npm run i18n:extract
 # One-click incremental merge into zh-CN and sync TODO placeholders to en-US (git diff ready)
 npm run i18n:extract:apply
 
-# Recursively synchronize all locale structures to base zh-CN (660+ keys)
+# Recursively synchronize all locale structures to base zh-CN (nearly 700 keys)
 npm run i18n:sync
 
 # Production build (outputs to out/)
