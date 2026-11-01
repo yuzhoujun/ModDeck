@@ -50,17 +50,98 @@ export interface PendingPresetEntry {
   status?: 'pending' | 'reloading'
 }
 
+export interface PendingModToggleEntry {
+  gameId: GameId
+  characterFolder: string
+  modName: string
+  initialEnabled: boolean
+  currentEnabled: boolean
+}
+
 // 内存中的待生效聚合队列：Key 为 `${gameId}:${characterFolder.toLowerCase()}:${cleanModName.toLowerCase()}`
 const pendingPresetQueue = new Map<string, PendingPresetEntry>()
+// 内存中的普通 Mod 启停待生效队列
+const pendingModToggles = new Map<string, PendingModToggleEntry>()
+// 方案待生效标记集合（按游戏记录）
+const pendingRosterSchemes = new Set<GameId>()
 
 function makeQueueKey(gameId: GameId, characterFolder: string, modFolder: string): string {
   const cleanMod = modFolder.replace(/^DISABLED_/i, '').toLowerCase()
   return `${gameId}:${characterFolder.toLowerCase()}:${cleanMod}`
 }
 
+function makeToggleKey(gameId: GameId, characterFolder: string, modName: string): string {
+  const cleanMod = modName.replace(/^DISABLED_/i, '').toLowerCase()
+  return `${gameId}:${characterFolder.toLowerCase()}:${cleanMod}`
+}
+
 /**
- * 获取当前游戏待生效（等待手动 F10）的预设数量
+ * 记录普通 Mod 的启停变更（智能去重与往返自抵消）
  */
+export function recordPendingModToggle(
+  gameId: GameId,
+  characterFolder: string,
+  modName: string,
+  newEnabled: boolean
+): void {
+  const key = makeToggleKey(gameId, characterFolder, modName)
+  const existing = pendingModToggles.get(key)
+  if (!existing) {
+    pendingModToggles.set(key, {
+      gameId,
+      characterFolder,
+      modName: modName.replace(/^DISABLED_/i, ''),
+      initialEnabled: !newEnabled,
+      currentEnabled: newEnabled
+    })
+  } else {
+    existing.currentEnabled = newEnabled
+    // 若当前状态回滚到与实机初始状态一致（如 开->关->开），自抵消移除
+    if (existing.currentEnabled === existing.initialEnabled) {
+      pendingModToggles.delete(key)
+    }
+  }
+}
+
+export function clearPendingModToggles(gameId?: GameId): void {
+  if (!gameId) {
+    pendingModToggles.clear()
+    return
+  }
+  const prefix = `${gameId}:`
+  for (const key of pendingModToggles.keys()) {
+    if (key.startsWith(prefix)) pendingModToggles.delete(key)
+  }
+}
+
+export function recordPendingRosterScheme(gameId: GameId): void {
+  pendingRosterSchemes.add(gameId)
+}
+
+export function clearPendingRosterSchemes(gameId?: GameId): void {
+  if (!gameId) {
+    pendingRosterSchemes.clear()
+  } else {
+    pendingRosterSchemes.delete(gameId)
+  }
+}
+
+export function hasPendingRosterScheme(gameId?: GameId): boolean {
+  if (!gameId) return pendingRosterSchemes.size > 0
+  return pendingRosterSchemes.has(gameId)
+}
+
+export function clearPendingForMod(
+  gameId: GameId,
+  characterFolder: string,
+  modName: string
+): void {
+  const queueKey = makeQueueKey(gameId, characterFolder, modName)
+  pendingPresetQueue.delete(queueKey)
+  const toggleKey = makeToggleKey(gameId, characterFolder, modName)
+  pendingModToggles.delete(toggleKey)
+}
+
 /**
  * 将待生效队列标记为正在重载生效中（触发乐观内存缓存）
  */
@@ -73,13 +154,28 @@ export function markPendingQueueReloading(gameId?: GameId): void {
   }
 }
 
+/**
+ * 获取当前游戏所有待生效（等待手动 F10）的实体总数（包含变体预设、普通启停和方案）
+ */
 export function getPendingPresetCount(gameId?: GameId): number {
-  let count = 0
   const prefix = gameId ? `${gameId}:` : ''
+  const pendingKeys = new Set<string>()
+
   for (const [key, entry] of pendingPresetQueue.entries()) {
     if ((!prefix || key.startsWith(prefix)) && entry.status !== 'reloading') {
-      count++
+      pendingKeys.add(key)
     }
+  }
+
+  for (const [key] of pendingModToggles.entries()) {
+    if (!prefix || key.startsWith(prefix)) {
+      pendingKeys.add(key)
+    }
+  }
+
+  let count = pendingKeys.size
+  if (hasPendingRosterScheme(gameId) && count === 0) {
+    count = 1
   }
   return count
 }
@@ -98,17 +194,21 @@ export function getPendingQueueEntries(gameId?: GameId): PendingPresetEntry[] {
 }
 
 /**
- * 清空待生效队列
+ * 清空待生效队列与所有待重载状态
  */
 export function clearPendingPresetQueue(gameId?: GameId): void {
   if (!gameId) {
     pendingPresetQueue.clear()
+    clearPendingModToggles()
+    clearPendingRosterSchemes()
     return
   }
   const prefix = `${gameId}:`
   for (const key of pendingPresetQueue.keys()) {
     if (key.startsWith(prefix)) pendingPresetQueue.delete(key)
   }
+  clearPendingModToggles(gameId)
+  clearPendingRosterSchemes(gameId)
 }
 
 /**
@@ -1086,6 +1186,9 @@ export async function applyRosterPreset(
   const list = store.presets[gameId] ?? []
   const preset = list.find((p) => p.id === presetId)
   if (!preset) return { ok: false, error: '未找到指定方案' }
+
+  // 方案切换会全局重塑各角色的 Mod 启停状态，清空该游戏之前的普通单个 Mod 临时启停队列
+  clearPendingModToggles(gameId)
 
   for (const [charFolder, assignment] of Object.entries(preset.assignments)) {
     if (!isSafeSegment(charFolder)) continue

@@ -72,7 +72,12 @@ import {
   getD3dxAutoSaveInterval,
   setD3dxAutoSaveInterval,
   markPendingQueueReloading,
-  syncBridgeFileFromQueue
+  syncBridgeFileFromQueue,
+  recordPendingModToggle,
+  clearPendingModToggles,
+  recordPendingRosterScheme,
+  clearPendingRosterSchemes,
+  clearPendingForMod
 } from './services/presets'
 import {
   buildSnapshot,
@@ -2084,9 +2089,11 @@ async function reloadF10(): Promise<ToggleResult> {
   const res = await executeKeyPlan(plan)
   if (res.ok) {
     const gId = settings.activeGameId
-    // 无论是手动在快捷窗口/设置中点击发送，还是自动发送，只要队列中有待生效预设，均启动同步与清理
+    // 无论是手动在快捷窗口/设置中点击发送，还是自动发送，只要队列中有待生效预设或启停变更，均启动同步与清理
     if (getPendingPresetCount(gId) > 0) {
       markPendingQueueReloading(gId)
+      clearPendingModToggles(gId)
+      clearPendingRosterSchemes(gId)
       schedulePostReloadPresetSync(gId)
       broadcastStateChanged({ gameId: gId })
     }
@@ -2252,7 +2259,8 @@ function registerIpc(): void {
     snapshot: await makeSnapshot(settings.activeGameId),
     appVersion: app.getVersion(),
     rosterMap: getRosterMap(isNonZhEffectiveLocale()),
-    customLocales: loadCustomLocales()
+    customLocales: loadCustomLocales(),
+    pendingPresetCount: getPendingPresetCount(settings.activeGameId)
   }))
 
   register(IPC.appInfo, async (): Promise<AppInfo> => ({
@@ -2327,6 +2335,7 @@ function registerIpc(): void {
           assetUrl,
           'name'
         )
+        const autoReload = settings.ui.autoReloadModToggle === true || settings.ui.autoReloadF10 === true
         for (const mod of mods) {
           if (!mod.enabled || mod.name === baseName) continue
           const result = await renameModAt(characterDir, mod.folderName, false)
@@ -2335,6 +2344,9 @@ function registerIpc(): void {
               ok: false,
               error: tMain('common.closeModFailed', { name: mod.name, error: result.error || 'error' })
             }
+          }
+          if (!autoReload) {
+            recordPendingModToggle(gameId, characterFolder, mod.name, false)
           }
         }
       }
@@ -2345,8 +2357,13 @@ function registerIpc(): void {
         await recordRecentMod(gameId, characterFolder, recentFolder, baseName).catch((error) =>
           logError('recent', error)
         )
+        const autoReload = settings.ui.autoReloadModToggle === true || settings.ui.autoReloadF10 === true
+        if (autoReload) {
+          scheduleAutoReload('mod-toggle', gameId)
+        } else {
+          recordPendingModToggle(gameId, characterFolder, baseName, enable)
+        }
         broadcastStateChanged({ gameId, characterFolder })
-        scheduleAutoReload('mod-toggle', gameId)
       }
       return result
     }
@@ -2364,15 +2381,22 @@ function registerIpc(): void {
       const gameSettings = settings.games[gameId]
       if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
+      const autoReload = settings.ui.autoReloadModToggle === true || settings.ui.autoReloadF10 === true
       for (const folder of Array.isArray(folders) ? folders : []) {
         const result = await renameModAt(characterDir, folder, enable)
         if (!result.ok) {
           broadcastStateChanged({ gameId, characterFolder })
           return result
         }
+        if (!autoReload) {
+          const base = folder.replace(/^DISABLED_/i, '')
+          recordPendingModToggle(gameId, characterFolder, base, enable)
+        }
+      }
+      if (autoReload) {
+        scheduleAutoReload('mod-toggle', gameId)
       }
       broadcastStateChanged({ gameId, characterFolder })
-      scheduleAutoReload('mod-toggle', gameId)
       return { ok: true }
     }
   )
@@ -2394,6 +2418,7 @@ function registerIpc(): void {
       if (!isInside(characterDir, target)) return { ok: false, error: tMain('common.pathOutOfBounds') }
       if (!(await pathExists(target))) return { ok: false, error: tMain('common.dirNotExist') }
       markInternalFsMutation()
+      clearPendingForMod(gameId, characterFolder, baseName)
       await shell.trashItem(target)
       const filteredRecent = settings.recentMods.filter(
         (item) =>
@@ -2799,12 +2824,14 @@ function registerIpc(): void {
         (root, folder) => resolveCharacterDir(root, folder)
       )
       if (res.ok) {
-        broadcastStateChanged({ gameId })
         const autoReload = settings.ui.autoReloadRosterPreset !== false
         if (autoReload) {
           scheduleAutoReload('roster-preset', gameId)
           schedulePostReloadPresetSync(gameId)
+        } else {
+          recordPendingRosterScheme(gameId)
         }
+        broadcastStateChanged({ gameId })
       }
       return res
     }

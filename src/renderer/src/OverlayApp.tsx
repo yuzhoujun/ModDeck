@@ -200,9 +200,8 @@ export function OverlayApp() {
       const res = await window.moddeck.applyRosterPreset(snapshot.game.id, preset.id)
       if (res.ok) {
         setActivePresetId(preset.id)
-        if (boot?.settings.ui.autoReloadRosterPreset === false) {
-          setPendingCount((c) => Math.max(1, c + 1))
-        }
+        const count = await window.moddeck.getPendingPresetCount(snapshot.game.id).catch(() => 0)
+        setPendingCount(count)
         if (selected) {
           const list = await window.moddeck.getMods(snapshot.game.id, selected)
           setMods(list)
@@ -275,6 +274,8 @@ export function OverlayApp() {
         setMods(await window.moddeck.getMods(snapshot.game.id, selected))
       }
       if (result.ok) {
+        const count = await window.moddeck.getPendingPresetCount(snapshot.game.id).catch(() => 0)
+        setPendingCount(count)
         const entry: RecentMod = {
           gameId: snapshot.game.id,
           characterFolder: selected,
