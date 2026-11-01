@@ -98,6 +98,8 @@ import {
   syncRemoteRoster
 } from './core/roster'
 import type { MetadataStore } from '../shared/types'
+import zhCnLocale from '../shared/i18n/locales/zh-CN.json'
+import enUsLocale from '../shared/i18n/locales/en-US.json'
 
 // 部分地区安全软件会阻止 Chromium 沙箱初始化，导致主进程直接退出。
 // ModDeck 只加载本地打包内容，开启 contextIsolation，关闭 OS 沙箱以兼容这类环境。
@@ -540,8 +542,8 @@ async function openDialog(
 }
 
 async function openInShell(target: string): Promise<ToggleResult> {
-  if (!target) return { ok: false, error: '路径为空' }
-  if (!(await pathExists(target))) return { ok: false, error: `路径不存在: ${target}` }
+  if (!target) return { ok: false, error: tMain('common.pathEmpty') }
+  if (!(await pathExists(target))) return { ok: false, error: tMain('common.pathNotExist', { path: target }) }
   const error = await shell.openPath(target)
   return error ? { ok: false, error } : { ok: true }
 }
@@ -562,11 +564,11 @@ async function _legacyLaunchConfigured(
 ): Promise<{ ok: boolean; error?: string; path?: string }> {
   requireGame(gameId)
   const gameSettings = settings.games[gameId]
-  if (!gameSettings) return { ok: false, error: '未知游戏' }
+  if (!gameSettings) return { ok: false, error: tMain('common.unknownGame') }
   const target = kind === 'game' ? gameSettings.gamePath : gameSettings.loaderPath
   const label = kind === 'game' ? '游戏程序' : '启动器'
-  if (!target) return { ok: false, error: `未配置${label}` }
-  if (!(await pathExists(target))) return { ok: false, error: `${label}不存在: ${target}` }
+  if (!target) return { ok: false, error: tMain('common.launcherNotConfigured') }
+  if (!(await pathExists(target))) return { ok: false, error: tMain('common.launcherNotFound', { path: target }) }
 
   const args = kind === 'game' ? splitArgs(gameSettings.launchArgs || '') : []
   try {
@@ -593,13 +595,47 @@ async function _legacyLaunchConfigured(
   }
 }
 
-function isNonZhEffectiveLocale(): boolean {
+function getEffectiveLocale(): string {
   const lang = settings?.ui?.language || 'auto'
   if (lang === 'auto') {
     const sys = (app.getLocale() || 'zh-CN').toLowerCase()
-    return !sys.startsWith('zh')
+    return sys.startsWith('zh') ? 'zh-CN' : 'en-US'
   }
-  return lang !== 'zh-CN'
+  return lang
+}
+
+function isNonZhEffectiveLocale(): boolean {
+  return getEffectiveLocale() !== 'zh-CN'
+}
+
+function tMain(key: string, params?: Record<string, string | number>): string {
+  const locale = getEffectiveLocale()
+  const custom = loadCustomLocales()[locale]
+  const dict = custom || (locale === 'en-US' ? enUsLocale : zhCnLocale)
+  const parts = key.split('.')
+  let current: any = dict
+  for (const part of parts) {
+    if (current && typeof current === 'object' && part in current) {
+      current = current[part]
+    } else {
+      current = undefined
+      break
+    }
+  }
+  if (typeof current !== 'string') {
+    let fallback: any = zhCnLocale
+    for (const part of parts) {
+      if (fallback && typeof fallback === 'object' && part in fallback) {
+        fallback = fallback[part]
+      } else {
+        fallback = undefined
+        break
+      }
+    }
+    current = typeof fallback === 'string' ? fallback : key
+  }
+  if (!params) return current
+  return current.replace(/\{(\w+)\}/g, (_: string, k: string) => String(params[k] ?? `{${k}}`))
 }
 
 async function spawnOrShellExecute(
@@ -952,7 +988,7 @@ async function detectXxmiAndGamePaths(manualXxmiRoot?: string): Promise<AutoDete
     xxmiRoot: settings.xxmiRoot,
     detectedGames,
     settings,
-    error: !xxmiRoot && detectedGames.length === 0 ? '未能在系统中自动检测到 XXMI 或游戏启动器路径，请手动选择目录' : undefined
+    error: !xxmiRoot && detectedGames.length === 0 ? tMain('settings.notify.autoDetectNone') : undefined
   }
 }
 
@@ -962,7 +998,7 @@ async function launchConfigured(
 ): Promise<{ ok: boolean; error?: string; path?: string }> {
   const game = requireGame(gameId)
   const gameSettings = settings.games[gameId]
-  if (!gameSettings) return { ok: false, error: '未知游戏' }
+  if (!gameSettings) return { ok: false, error: tMain('common.unknownGame') }
 
   if (kind === 'loader') {
     const customLoader = (gameSettings.loaderPath || '').trim()
@@ -1006,9 +1042,7 @@ async function launchConfigured(
     if (!xxmiExe) {
       return {
         ok: false,
-        error: isNonZhEffectiveLocale()
-          ? `XXMI Launcher not configured or found. Please set XXMI Root Directory in Settings.`
-          : `未找到 XXMI 启动器，请在「设置 → 配置」顶部填写 XXMI 安装根目录或点击一键检测`
+        error: tMain('common.xxmiNotFound')
       }
     }
 
@@ -1025,17 +1059,13 @@ async function launchConfigured(
   if (!target) {
     return {
       ok: false,
-      error: isNonZhEffectiveLocale()
-        ? 'Official launcher or game executable is not configured'
-        : '未配置官方启动器或游戏程序'
+      error: tMain('common.launcherNotConfigured')
     }
   }
   if (!(await pathExists(target))) {
     return {
       ok: false,
-      error: isNonZhEffectiveLocale()
-        ? `Path does not exist: ${target}`
-        : `启动器或游戏程序不存在: ${target}`
+      error: tMain('common.launcherNotFound', { path: target })
     }
   }
 
@@ -1049,9 +1079,7 @@ async function launchConfigured(
   if (!resolvedFile) {
     return {
       ok: false,
-      error: isNonZhEffectiveLocale()
-        ? `No executable found in directory: ${target}`
-        : `在该目录下未找到可执行的启动器程序: ${target}`
+      error: tMain('common.noExeFoundInDir', { path: target })
     }
   }
   target = resolvedFile
@@ -1830,7 +1858,7 @@ function applyOverlayHotkey(value: string): { ok: boolean; error?: string } {
   try {
     const registered = globalShortcut.register(hotkey, () => toggleOverlay())
     if (!registered) {
-      return { ok: false, error: '快捷键注册失败，可能被其他程序占用或格式无效' }
+      return { ok: false, error: tMain('common.hotkeyRegisterFailed') }
     }
     return { ok: true }
   } catch (error) {
@@ -1855,8 +1883,8 @@ const LEGACY_CHARACTER_COVERS = [
 async function characterDirFor(gameId: GameId, characterFolder: string): Promise<string> {
   requireGame(gameId)
   const gameSettings = settings.games[gameId]
-  if (!gameSettings?.modsPath) throw new Error('未配置 Mods 目录')
-  if (!isSafeSegment(characterFolder)) throw new Error('角色目录名不合法')
+  if (!gameSettings?.modsPath) throw new Error(tMain('common.modsDirNotConfigured'))
+  if (!isSafeSegment(characterFolder)) throw new Error(tMain('common.characterFolderInvalid'))
   return resolveCharacterDir(gameSettings.modsPath, characterFolder)
 }
 
@@ -1867,10 +1895,10 @@ async function saveCharacterCoverData(
 ): Promise<void> {
   const characterDir = await characterDirFor(gameId, characterFolder)
   const match = /^data:image\/png;base64,([A-Za-z0-9+/=\s]+)$/.exec(String(dataUrl || ''))
-  if (!match) throw new Error('封面数据格式不正确')
+  if (!match) throw new Error(tMain('common.coverDataFormatInvalid'))
   const buffer = Buffer.from(match[1], 'base64')
-  if (buffer.length === 0) throw new Error('封面数据为空')
-  if (buffer.length > 8 * 1024 * 1024) throw new Error('封面图片过大（>8MB）')
+  if (buffer.length === 0) throw new Error(tMain('common.coverDataEmpty'))
+  if (buffer.length > 8 * 1024 * 1024) throw new Error(tMain('common.coverImageTooLarge'))
 
   const target = path.join(characterDir, CHARACTER_COVER_FILE)
   const temp = path.join(characterDir, `${CHARACTER_COVER_FILE}.tmp-${process.pid}`)
@@ -1944,7 +1972,7 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
         root: '',
         d3dxPath: '',
         status: 'no-root',
-        detail: '未配置 Mods 目录'
+        detail: tMain('common.modsDirNotConfigured')
       })
       continue
     }
@@ -1957,7 +1985,7 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
         root,
         d3dxPath,
         status: 'missing-file',
-        detail: '没有找到 EFMI 根目录下的 d3dx.ini'
+        detail: tMain('common.d3dxMissingFile')
       })
       continue
     }
@@ -1993,7 +2021,7 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
         root,
         d3dxPath,
         status: ok ? 'ok' : 'missing-line',
-        detail: ok ? undefined : 'd3dx.ini 缺少 exclude_recursive = DISABLED*'
+        detail: ok ? undefined : tMain('common.d3dxMissingLine')
       })
     } catch (error) {
       result.push({
@@ -2047,7 +2075,7 @@ function schedulePostReloadPresetSync(gameId?: GameId): void {
 async function reloadF10(): Promise<ToggleResult> {
   const hotkey = (settings?.ui?.reloadHotkey || 'F10').trim() || 'F10'
   const plan = toKeyPlan(hotkey)
-  if (!plan) return { ok: false, error: '按键生成失败' }
+  if (!plan) return { ok: false, error: tMain('common.keyPlanFailed') }
   const res = await executeKeyPlan(plan)
   if (res.ok) {
     const gId = settings.activeGameId
@@ -2121,7 +2149,7 @@ async function renameModAt(
   enable: boolean
 ): Promise<ToggleResult> {
   const baseName = String(modFolder || '').replace(/^DISABLED_/i, '')
-  if (!isSafeSegment(baseName)) return { ok: false, error: 'Mod 名称不合法' }
+  if (!isSafeSegment(baseName)) return { ok: false, error: tMain('common.modNameInvalid') }
 
   const currentName = enable ? `DISABLED_${baseName}` : baseName
   const nextName = enable ? baseName : `DISABLED_${baseName}`
@@ -2140,9 +2168,9 @@ async function renameModAt(
       }
       return { ok: true }
     }
-    return { ok: false, error: '目标目录已存在' }
+    return { ok: false, error: tMain('common.targetDirExists') }
   }
-  if (!(await pathExists(currentPath))) return { ok: false, error: 'Mod 目录不存在' }
+  if (!(await pathExists(currentPath))) return { ok: false, error: tMain('common.modDirNotExist') }
 
   let lastError: unknown = null
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -2175,7 +2203,7 @@ async function renameModAt(
     ok: false,
     error:
       code === 'EPERM' || code === 'EBUSY' || code === 'EACCES'
-        ? '目录被占用，请关闭游戏或占用的程序后重试'
+        ? tMain('common.dirLockedRetry')
         : lastError instanceof Error
           ? lastError.message
           : String(lastError)
@@ -2235,6 +2263,7 @@ function registerIpc(): void {
     settings = mergeSettings(settings, patch ?? {})
     await saveSettings(baseDir(), settings)
     refreshModsWatcher()
+    updateTrayMenu()
     broadcastStateChanged({ gameId: settings.activeGameId })
     return settings
   })
@@ -2280,7 +2309,7 @@ function registerIpc(): void {
     ): Promise<ToggleResult> => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
-      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
       const baseName = String(modFolder || '').replace(/^DISABLED_/i, '')
       if (!isSafeSegment(baseName)) return { ok: false, error: 'Mod 名称不合法' }
@@ -2299,7 +2328,7 @@ function registerIpc(): void {
           if (!result.ok) {
             return {
               ok: false,
-              error: `关闭 ${mod.name} 失败：${result.error || '未知错误'}`
+              error: tMain('common.closeModFailed', { name: mod.name, error: result.error || 'error' })
             }
           }
         }
@@ -2328,7 +2357,7 @@ function registerIpc(): void {
     ): Promise<ToggleResult> => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
-      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
       for (const folder of Array.isArray(folders) ? folders : []) {
         const result = await renameModAt(characterDir, folder, enable)
@@ -2348,8 +2377,8 @@ function registerIpc(): void {
     async (gameId: GameId, characterFolder: string, modFolder: string): Promise<ToggleResult> => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
-      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
-      if (!isSafeSegment(modFolder)) return { ok: false, error: 'Mod 名称不合法' }
+      if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
+      if (!isSafeSegment(modFolder)) return { ok: false, error: tMain('common.modNameInvalid') }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
       const baseName = modFolder.replace(/^DISABLED_/i, '')
       let target = path.join(characterDir, modFolder)
@@ -2357,8 +2386,8 @@ function registerIpc(): void {
         const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
         target = path.join(characterDir, altFolder)
       }
-      if (!isInside(characterDir, target)) return { ok: false, error: '路径越界' }
-      if (!(await pathExists(target))) return { ok: false, error: '目录不存在' }
+      if (!isInside(characterDir, target)) return { ok: false, error: tMain('common.pathOutOfBounds') }
+      if (!(await pathExists(target))) return { ok: false, error: tMain('common.dirNotExist') }
       markInternalFsMutation()
       await shell.trashItem(target)
       const filteredRecent = settings.recentMods.filter(
@@ -2383,7 +2412,7 @@ function registerIpc(): void {
     async (gameId: GameId, characterFolder: string, modFolder: string) => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
-      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
       if (!isSafeSegment(modFolder)) return { ok: false, error: 'Mod 名称不合法' }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
       let target = path.join(characterDir, modFolder)
@@ -2402,7 +2431,7 @@ function registerIpc(): void {
     async (gameId: GameId, characterFolder: string) => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
-      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
       return openInShell(characterDir)
     }
@@ -2426,20 +2455,18 @@ function registerIpc(): void {
       }
       return openInShell(target)
     }
-    if (!gameId) return { ok: false, error: '缺少游戏参数' }
+    if (!gameId) return { ok: false, error: tMain('common.missingGameParam') }
     const gameSettings = settings.games[gameId]
     if (!gameSettings) return { ok: false, error: '未知游戏' }
     if (kind === 'mods') return openInShell(gameSettings.modsPath)
     if (kind === 'game') return openInShell(gameSettings.gamePath ?? '')
     if (kind === 'loader') return openInShell(gameSettings.loaderPath ?? '')
-    return { ok: false, error: '未知路径类型' }
+    return { ok: false, error: tMain('common.unknownPathType') }
   })
 
   register(IPC.pickXxmiRoot, async () => {
     const picked = await openDialog({
-      title: isNonZhEffectiveLocale()
-        ? 'Select XXMI Launcher Root Directory'
-        : '选择 XXMI 启动器安装根目录',
+      title: tMain('dialog.pickXxmiRoot'),
       properties: ['openDirectory']
     })
     if (!picked) {
@@ -2452,7 +2479,7 @@ function registerIpc(): void {
 
   register(IPC.pickModsFolder, async () => {
     const picked = await openDialog({
-      title: '选择 EFMI 根目录或 Mods 目录',
+      title: tMain('dialog.pickModsFolder'),
       properties: ['openDirectory', 'createDirectory']
     })
     return picked ? normalizeModsPath(picked) : null
@@ -2460,26 +2487,26 @@ function registerIpc(): void {
 
   register(IPC.pickGameExe, async () =>
     openDialog({
-      title: '选择游戏可执行文件',
+      title: tMain('dialog.pickGameExe'),
       properties: ['openFile'],
-      filters: [{ name: '可执行文件', extensions: ['exe'] }]
+      filters: [{ name: tMain('dialog.filterExe'), extensions: ['exe'] }]
     })
   )
 
   register(IPC.pickLoader, async () =>
     openDialog({
-      title: '选择启动器',
+      title: tMain('dialog.pickLoader'),
       properties: ['openFile'],
-      filters: [{ name: '启动器', extensions: ['exe', 'cmd', 'bat'] }]
+      filters: [{ name: tMain('dialog.filterLoader'), extensions: ['exe', 'cmd', 'bat'] }]
     })
   )
 
   register(IPC.pickImportFiles, async () => {
     const result = mainWindow
       ? await dialog.showOpenDialog(mainWindow, {
-          title: '选择要导入的 Mod 压缩包',
+          title: tMain('dialog.pickImportArchives'),
           properties: ['openFile', 'multiSelections'],
-          filters: [{ name: '压缩包', extensions: ['zip', '7z', 'rar'] }]
+          filters: [{ name: tMain('dialog.filterArchive'), extensions: ['zip', '7z', 'rar'] }]
         })
       : await dialog.showOpenDialog({
           title: '选择要导入的 Mod 压缩包',
@@ -2490,13 +2517,13 @@ function registerIpc(): void {
   })
 
   register(IPC.pickImportFolder, async () =>
-    openDialog({ title: '选择 Mod 文件夹', properties: ['openDirectory'] })
+    openDialog({ title: tMain('dialog.pickImportFolder'), properties: ['openDirectory'] })
   )
 
   register(IPC.pickImportFolders, async () => {
     const result = mainWindow
       ? await dialog.showOpenDialog(mainWindow, {
-          title: '选择要导入的 Mod 文件夹（可多选，也可选择包含多个 Mod 的总文件夹）',
+          title: tMain('dialog.pickImportFolders'),
           properties: ['openDirectory', 'multiSelections']
         })
       : await dialog.showOpenDialog({
@@ -2508,9 +2535,9 @@ function registerIpc(): void {
 
   register(IPC.pickCover, async () =>
     openDialog({
-      title: '选择角色封面',
+      title: tMain('dialog.pickCover'),
       properties: ['openFile'],
-      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'] }]
+      filters: [{ name: tMain('dialog.filterImage'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'] }]
     })
   )
 
@@ -2573,7 +2600,7 @@ function registerIpc(): void {
       properties: ['openFile'],
       filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'] }]
     })
-    if (!source) return { ok: false, error: '已取消' }
+    if (!source) return { ok: false, error: tMain('common.canceled') }
     const coverFile = await saveCover(baseDir(), gameId, characterFolder, source)
     const current = getCharacterMeta(metadata, gameId, characterFolder)
     metadata = setCharacterMeta(metadata, gameId, characterFolder, { ...current, coverFile })
@@ -2598,22 +2625,22 @@ function registerIpc(): void {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
       if (!gameSettings?.modsPath) throw new Error('未配置 Mods 目录')
-      if (!(await pathExists(gameSettings.modsPath))) throw new Error('Mods 目录不存在')
+      if (!(await pathExists(gameSettings.modsPath))) throw new Error(tMain('library.modsDirNotExist'))
 
       const folder = String(input?.folder || '').trim()
-      if (!folder) throw new Error('目录名不能为空')
+      if (!folder) throw new Error(tMain('common.folderNameEmpty'))
       if (folder.startsWith('.') || folder.startsWith('_')) {
-        throw new Error('目录名不能以 . 或 _ 开头（会被隐藏）')
+        throw new Error(tMain('common.folderNameDotUnderscore'))
       }
-      if (!isSafeSegment(folder)) throw new Error('目录名包含非法字符')
+      if (!isSafeSegment(folder)) throw new Error(tMain('common.folderNameInvalidChars'))
       if (['character', 'characters'].includes(folder.toLowerCase())) {
-        throw new Error('这个目录名是兼容容器保留名')
+        throw new Error(tMain('common.folderNameReserved'))
       }
 
       const base = await resolveCharacterBase(gameSettings.modsPath)
       const target = path.join(base, folder)
-      if (!isInside(base, target)) throw new Error('目录越界')
-      if (await pathExists(target)) throw new Error('同名目录已存在')
+      if (!isInside(base, target)) throw new Error(tMain('common.pathOutOfBounds'))
+      if (await pathExists(target)) throw new Error(tMain('common.targetDirExists'))
       markInternalFsMutation()
       await fs.mkdir(target)
       if (input.coverDataUrl && typeof input.coverDataUrl === 'string') {
@@ -2678,8 +2705,8 @@ function registerIpc(): void {
     async (gameId: GameId, characterFolder: string, modFolder: string, presetName: string) => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
-      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
-      if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return { ok: false, error: '目录参数不合法' }
+      if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
+      if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return { ok: false, error: tMain('common.paramInvalid') }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
       const baseName = modFolder.replace(/^DISABLED_/i, '')
       let targetModDir = path.join(characterDir, modFolder)
@@ -2701,7 +2728,7 @@ function registerIpc(): void {
     async (gameId: GameId, characterFolder: string, modFolder: string, presetId: string) => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
-      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
       if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return { ok: false, error: '目录参数不合法' }
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
       const baseName = modFolder.replace(/^DISABLED_/i, '')
@@ -2757,7 +2784,7 @@ function registerIpc(): void {
     async (gameId: GameId, presetId: string) => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
-      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
       markInternalFsMutation()
       const res = await applyRosterPreset(
         baseDir(),
@@ -2788,7 +2815,7 @@ function registerIpc(): void {
   register(IPC.setD3dxAutoSaveInterval, async (gameId: GameId, interval: number) => {
     requireGame(gameId)
     const gameSettings = settings.games[gameId]
-    if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+    if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
     return setD3dxAutoSaveInterval(gameSettings.modsPath, interval)
   })
 
@@ -2833,7 +2860,7 @@ function registerIpc(): void {
     ): Promise<ToggleResult> => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
-      if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+      if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
       if (!isSafeSegment(modFolder)) return { ok: false, error: 'Mod 名称不合法' }
 
       const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
@@ -2844,24 +2871,24 @@ function registerIpc(): void {
         const altPath = path.join(characterDir, altFolder)
         if (await pathExists(altPath)) targetModDir = altPath
       }
-      if (!isInside(characterDir, targetModDir)) return { ok: false, error: 'Mod 路径越界' }
-      if (!(await pathExists(targetModDir))) return { ok: false, error: 'Mod 目录不存在' }
+      if (!isInside(characterDir, targetModDir)) return { ok: false, error: tMain('common.modPathOutOfBounds') }
+      if (!(await pathExists(targetModDir))) return { ok: false, error: tMain('common.modDirNotExist') }
 
       let picked = sourcePath ? String(sourcePath).trim() : ''
       if (!picked) {
         const selectedFile = await openDialog({
-          title: '选择 Mod 预览图',
+          title: tMain('dialog.pickModPreview'),
           properties: ['openFile'],
           filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'avif'] }]
         })
-        if (!selectedFile) return { ok: false, error: '已取消' }
+        if (!selectedFile) return { ok: false, error: tMain('common.canceled') }
         picked = selectedFile
       }
 
-      if (!(await pathExists(picked))) return { ok: false, error: '所选图片文件不存在' }
+      if (!(await pathExists(picked))) return { ok: false, error: tMain('common.imageFileNotFound') }
       const ext = path.extname(picked).toLowerCase()
       if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif'].includes(ext)) {
-        return { ok: false, error: '仅支持 .png / .jpg / .jpeg / .webp / .gif / .avif 格式的图片' }
+        return { ok: false, error: tMain('common.unsupportedImageFormat') }
       }
 
       markInternalFsMutation()
@@ -2954,10 +2981,10 @@ function registerIpc(): void {
 
   register(IPC.showOverlayDetail, async (request: OverlayDetailRequest) => {
     if (!request || !isSafeSegment(request.characterFolder) || !isSafeSegment(request.modFolder)) {
-      return { ok: false, error: '参数不合法' }
+      return { ok: false, error: tMain('common.paramInvalid') }
     }
     requireGame(request.gameId)
-    if (!overlayWindow) return { ok: false, error: '快捷窗口未打开' }
+    if (!overlayWindow) return { ok: false, error: tMain('common.overlayNotOpen') }
     showOverlayDetail(request)
     return { ok: true }
   })
@@ -2968,11 +2995,11 @@ function registerIpc(): void {
 
   register(IPC.sendModHotkey, async (key: string) => {
     if (!settings.ui.allowHotkeySend) {
-      return { ok: false, error: '设置中已关闭“允许点击热键发送”' }
+      return { ok: false, error: tMain('common.hotkeySendDisabled') }
     }
     const plan = toKeyPlan(key)
     if (!plan) {
-      return { ok: false, error: '暂不支持这个热键格式（目前只发送键盘热键）' }
+      return { ok: false, error: tMain('common.hotkeyFormatUnsupported') }
     }
     return executeKeyPlan(plan)
   })
@@ -3003,9 +3030,9 @@ function registerIpc(): void {
   register(IPC.openEnvironmentFolder, async (gameId: GameId) => {
     requireGame(gameId)
     const gameSettings = settings.games[gameId]
-    if (!gameSettings?.modsPath) return { ok: false, error: '未配置 Mods 目录' }
+    if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
     const root = path.dirname(gameSettings.modsPath)
-    if (!(await pathExists(root))) return { ok: false, error: 'EFMI 根目录不存在' }
+    if (!(await pathExists(root))) return { ok: false, error: tMain('common.pathNotExist', { path: root }) }
     const error = await shell.openPath(root)
     return error ? { ok: false, error } : { ok: true, path: root }
   })
@@ -3017,11 +3044,11 @@ function registerIpc(): void {
       settings.ui.overlayHotkey &&
       value.toLowerCase() === settings.ui.overlayHotkey.trim().toLowerCase()
     ) {
-      return { ok: false, error: '重载快捷键不能与呼出快捷窗口热键相同' }
+      return { ok: false, error: tMain('common.hotkeyConflict') }
     }
     const plan = toKeyPlan(value)
     if (!plan) {
-      return { ok: false, error: '不支持该按键格式，请使用标准键盘按键（如 F10）' }
+      return { ok: false, error: tMain('common.hotkeyInvalidFormat') }
     }
     settings = mergeSettings(settings, { ui: { reloadHotkey: value } })
     await saveSettings(baseDir(), settings)
@@ -3062,6 +3089,25 @@ function showMainWindow(): void {
   mainWindow.focus()
 }
 
+function updateTrayMenu(): void {
+  if (!tray) return
+  tray.setToolTip('ModDeck')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: tMain('tray.open'), click: () => showMainWindow() },
+      { label: tMain('tray.overlay'), click: () => toggleOverlay() },
+      { type: 'separator' },
+      {
+        label: tMain('tray.quit'),
+        click: () => {
+          isQuitting = true
+          app.quit()
+        }
+      }
+    ])
+  )
+}
+
 function createTray(): void {
   if (tray) return
   const iconPath = app.isPackaged
@@ -3072,11 +3118,11 @@ function createTray(): void {
   tray.setToolTip('ModDeck')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: '打开 ModDeck', click: () => showMainWindow() },
-      { label: '快捷窗口', click: () => toggleOverlay() },
+      { label: tMain('tray.open'), click: () => showMainWindow() },
+      { label: tMain('tray.overlay'), click: () => toggleOverlay() },
       { type: 'separator' },
       {
-        label: '退出 ModDeck',
+        label: tMain('tray.quit'),
         click: () => {
           isQuitting = true
           app.quit()

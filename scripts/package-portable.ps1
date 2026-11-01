@@ -4,13 +4,13 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
 $version = (Get-Content 'package.json' -Raw | ConvertFrom-Json).version
-$buildRootName = if ($env:MODDECK_BUILD_ROOT) { $env:MODDECK_BUILD_ROOT } else { 'release' }
+$buildRootName = if ($env:MODDECK_BUILD_ROOT) { $env:MODDECK_BUILD_ROOT } else { 'build-dist' }
 $buildRoot = Join-Path $root $buildRootName
 $outputDir = Join-Path $root 'release'
 $appDir = Join-Path $buildRoot 'win-unpacked'
 $zipPath = Join-Path $outputDir "ModDeck-$version-win-x64.zip"
 $tempRoot = Join-Path (Split-Path -Parent $root) 'temp'
-New-Item -ItemType Directory -Force $tempRoot, $outputDir | Out-Null
+New-Item -ItemType Directory -Force $tempRoot, $outputDir, $buildRoot | Out-Null
 
 Write-Host "Building ModDeck $version ..."
 node node_modules/electron-vite/bin/electron-vite.js build
@@ -52,6 +52,12 @@ try {
 } finally {
   Pop-Location
 }
+
+$finalUnpacked = Join-Path $outputDir 'win-unpacked'
+if (Test-Path $finalUnpacked) {
+  Remove-Item $finalUnpacked -Recurse -Force -ErrorAction SilentlyContinue
+}
+Copy-Item $appDir $finalUnpacked -Recurse -Force -ErrorAction SilentlyContinue
 
 $hash = (Get-FileHash $zipPath -Algorithm SHA256).Hash
 Write-Host ""

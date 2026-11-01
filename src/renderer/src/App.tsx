@@ -20,7 +20,7 @@ import { CharacterView } from './views/CharacterView'
 import { LibraryView } from './views/LibraryView'
 import { SettingsView } from './views/SettingsView'
 import { errorMessage } from './utils'
-import { useI18n, getLocaleGameShortName } from './i18n'
+import { useI18n, getLocaleGameShortName, getLocaleGameName } from './i18n'
 
 type View = 'library' | 'character' | 'settings'
 type ToastKind = 'ok' | 'err' | 'info'
@@ -681,7 +681,7 @@ export default function App() {
                 style={active ? { borderColor: `${game.accent}55` } : undefined}
                 role="radio"
                 aria-checked={active}
-                title={active ? (effectiveLocale === 'zh-CN' ? '当前游戏' : 'Current game') : (effectiveLocale === 'zh-CN' ? `切换到 ${game.name}` : `Switch to ${game.nameEn || game.name}`)}
+                title={active ? t('sidebar.currentGame') : t('sidebar.switchToGame', { game: getLocaleGameName(game, effectiveLocale) })}
               >
                 <span className="dot" style={{ background: game.accent }} />
                 <span className="grow">{getLocaleGameShortName(game, effectiveLocale)}</span>

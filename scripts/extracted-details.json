@@ -1,0 +1,3893 @@
+[
+  {
+    "text": "已取消",
+    "existingKey": "common.canceled",
+    "suggestedKey": "common.auto_已取消",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/App.tsx",
+        "line": 456
+      },
+      {
+        "file": "src/renderer/src/views/CharacterView.tsx",
+        "line": 138
+      }
+    ]
+  },
+  {
+    "text": "其他",
+    "existingKey": null,
+    "suggestedKey": "common.auto_其他",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 13
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 77
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 169
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 234
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 275
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 334
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 354
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 355
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 355
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 359
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 427
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 530
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 1122
+      },
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 291
+      },
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 394
+      },
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 395
+      },
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 480
+      }
+    ]
+  },
+  {
+    "text": "男主",
+    "existingKey": null,
+    "suggestedKey": "common.auto_男主",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 14
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 78
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 170
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 235
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 276
+      }
+    ]
+  },
+  {
+    "text": "女主",
+    "existingKey": null,
+    "suggestedKey": "common.auto_女主",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 15
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 79
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 171
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 236
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 277
+      }
+    ]
+  },
+  {
+    "text": "今汐",
+    "existingKey": null,
+    "suggestedKey": "common.auto_今汐",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 16
+      }
+    ]
+  },
+  {
+    "text": "长离",
+    "existingKey": null,
+    "suggestedKey": "common.auto_长离",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 17
+      }
+    ]
+  },
+  {
+    "text": "守岸人",
+    "existingKey": null,
+    "suggestedKey": "common.auto_守岸人",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 19
+      }
+    ]
+  },
+  {
+    "text": "珂莱塔",
+    "existingKey": null,
+    "suggestedKey": "common.auto_珂莱塔",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 20
+      }
+    ]
+  },
+  {
+    "text": "吟霖",
+    "existingKey": null,
+    "suggestedKey": "common.auto_吟霖",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 21
+      }
+    ]
+  },
+  {
+    "text": "折枝",
+    "existingKey": null,
+    "suggestedKey": "common.auto_折枝",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 22
+      }
+    ]
+  },
+  {
+    "text": "相里要",
+    "existingKey": null,
+    "suggestedKey": "common.auto_相里要",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 23
+      }
+    ]
+  },
+  {
+    "text": "忌炎",
+    "existingKey": null,
+    "suggestedKey": "common.auto_忌炎",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 24
+      }
+    ]
+  },
+  {
+    "text": "维里奈",
+    "existingKey": null,
+    "suggestedKey": "common.auto_维里奈",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 25
+      }
+    ]
+  },
+  {
+    "text": "安可",
+    "existingKey": null,
+    "suggestedKey": "common.auto_安可",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 26
+      }
+    ]
+  },
+  {
+    "text": "卡卡罗",
+    "existingKey": null,
+    "suggestedKey": "common.auto_卡卡罗",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 27
+      }
+    ]
+  },
+  {
+    "text": "鉴心",
+    "existingKey": null,
+    "suggestedKey": "common.auto_鉴心",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 28
+      }
+    ]
+  },
+  {
+    "text": "凌阳",
+    "existingKey": null,
+    "suggestedKey": "common.auto_凌阳",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 29
+      }
+    ]
+  },
+  {
+    "text": "散华",
+    "existingKey": null,
+    "suggestedKey": "common.auto_散华",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 30
+      }
+    ]
+  },
+  {
+    "text": "白芷",
+    "existingKey": null,
+    "suggestedKey": "common.auto_白芷",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 31
+      }
+    ]
+  },
+  {
+    "text": "秧秧",
+    "existingKey": null,
+    "suggestedKey": "common.auto_秧秧",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 32
+      }
+    ]
+  },
+  {
+    "text": "炽霞",
+    "existingKey": null,
+    "suggestedKey": "common.auto_炽霞",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 33
+      }
+    ]
+  },
+  {
+    "text": "丹瑾",
+    "existingKey": null,
+    "suggestedKey": "common.auto_丹瑾",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 34
+      }
+    ]
+  },
+  {
+    "text": "桃祈",
+    "existingKey": null,
+    "suggestedKey": "common.auto_桃祈",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 35
+      }
+    ]
+  },
+  {
+    "text": "莫特斐",
+    "existingKey": null,
+    "suggestedKey": "common.auto_莫特斐",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 36
+      }
+    ]
+  },
+  {
+    "text": "渊武",
+    "existingKey": null,
+    "suggestedKey": "common.auto_渊武",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 37
+      }
+    ]
+  },
+  {
+    "text": "秋水",
+    "existingKey": null,
+    "suggestedKey": "common.auto_秋水",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 38
+      }
+    ]
+  },
+  {
+    "text": "釉瑚",
+    "existingKey": null,
+    "suggestedKey": "common.auto_釉瑚",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 39
+      }
+    ]
+  },
+  {
+    "text": "灯灯",
+    "existingKey": null,
+    "suggestedKey": "common.auto_灯灯",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 40
+      }
+    ]
+  },
+  {
+    "text": "洛可可",
+    "existingKey": null,
+    "suggestedKey": "common.auto_洛可可",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 41
+      }
+    ]
+  },
+  {
+    "text": "布兰特",
+    "existingKey": null,
+    "suggestedKey": "common.auto_布兰特",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 42
+      }
+    ]
+  },
+  {
+    "text": "菲比",
+    "existingKey": null,
+    "suggestedKey": "common.auto_菲比",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 43
+      }
+    ]
+  },
+  {
+    "text": "坎特蕾拉",
+    "existingKey": null,
+    "suggestedKey": "common.auto_坎特蕾拉",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 44
+      }
+    ]
+  },
+  {
+    "text": "赞妮",
+    "existingKey": null,
+    "suggestedKey": "common.auto_赞妮",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 45
+      }
+    ]
+  },
+  {
+    "text": "夏空",
+    "existingKey": null,
+    "suggestedKey": "common.auto_夏空",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 46
+      }
+    ]
+  },
+  {
+    "text": "卡提希娅",
+    "existingKey": null,
+    "suggestedKey": "common.auto_卡提希娅",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 47
+      }
+    ]
+  },
+  {
+    "text": "露帕",
+    "existingKey": null,
+    "suggestedKey": "common.auto_露帕",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 48
+      }
+    ]
+  },
+  {
+    "text": "弗洛洛",
+    "existingKey": null,
+    "suggestedKey": "common.auto_弗洛洛",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 49
+      }
+    ]
+  },
+  {
+    "text": "奥古斯塔",
+    "existingKey": null,
+    "suggestedKey": "common.auto_奥古斯塔",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 50
+      }
+    ]
+  },
+  {
+    "text": "尤诺",
+    "existingKey": null,
+    "suggestedKey": "common.auto_尤诺",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 51
+      }
+    ]
+  },
+  {
+    "text": "嘉贝莉娜",
+    "existingKey": null,
+    "suggestedKey": "common.auto_嘉贝莉娜",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 52
+      }
+    ]
+  },
+  {
+    "text": "仇远",
+    "existingKey": null,
+    "suggestedKey": "common.auto_仇远",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 53
+      }
+    ]
+  },
+  {
+    "text": "千咲",
+    "existingKey": null,
+    "suggestedKey": "common.auto_千咲",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 54
+      }
+    ]
+  },
+  {
+    "text": "卜灵",
+    "existingKey": null,
+    "suggestedKey": "common.auto_卜灵",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 55
+      }
+    ]
+  },
+  {
+    "text": "爱弥斯",
+    "existingKey": null,
+    "suggestedKey": "common.auto_爱弥斯",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 56
+      }
+    ]
+  },
+  {
+    "text": "绯雪",
+    "existingKey": null,
+    "suggestedKey": "common.auto_绯雪",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 57
+      }
+    ]
+  },
+  {
+    "text": "洛瑟菈",
+    "existingKey": null,
+    "suggestedKey": "common.auto_洛瑟菈",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 58
+      }
+    ]
+  },
+  {
+    "text": "陆·赫斯",
+    "existingKey": null,
+    "suggestedKey": "common.auto_陆赫斯",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 59
+      }
+    ]
+  },
+  {
+    "text": "琳奈",
+    "existingKey": null,
+    "suggestedKey": "common.auto_琳奈",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 60
+      }
+    ]
+  },
+  {
+    "text": "莫宁",
+    "existingKey": null,
+    "suggestedKey": "common.auto_莫宁",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 61
+      }
+    ]
+  },
+  {
+    "text": "希格莉卡",
+    "existingKey": null,
+    "suggestedKey": "common.auto_希格莉卡",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 62
+      }
+    ]
+  },
+  {
+    "text": "达妮娅",
+    "existingKey": null,
+    "suggestedKey": "common.auto_达妮娅",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 63
+      }
+    ]
+  },
+  {
+    "text": "丽贝卡",
+    "existingKey": null,
+    "suggestedKey": "common.auto_丽贝卡",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 64
+      }
+    ]
+  },
+  {
+    "text": "露西",
+    "existingKey": null,
+    "suggestedKey": "common.auto_露西",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 65
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 221
+      }
+    ]
+  },
+  {
+    "text": "穗穗",
+    "existingKey": null,
+    "suggestedKey": "common.auto_穗穗",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 66
+      }
+    ]
+  },
+  {
+    "text": "秧秧·玄翎",
+    "existingKey": null,
+    "suggestedKey": "common.auto_秧秧玄翎",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 67
+      }
+    ]
+  },
+  {
+    "text": "武器",
+    "existingKey": null,
+    "suggestedKey": "common.auto_武器",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 68
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 227
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 268
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 302
+      }
+    ]
+  },
+  {
+    "text": "滑翔翼",
+    "existingKey": null,
+    "suggestedKey": "common.auto_滑翔翼",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 69
+      }
+    ]
+  },
+  {
+    "text": "载具",
+    "existingKey": null,
+    "suggestedKey": "common.auto_载具",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 70
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 303
+      }
+    ]
+  },
+  {
+    "text": "功能",
+    "existingKey": "character.tagUtility",
+    "suggestedKey": "common.auto_功能",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 72
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 164
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 229
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 270
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 305
+      }
+    ]
+  },
+  {
+    "text": "大世界",
+    "existingKey": null,
+    "suggestedKey": "common.auto_大世界",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 73
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 165
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 230
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 271
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 306
+      }
+    ]
+  },
+  {
+    "text": "流萤",
+    "existingKey": null,
+    "suggestedKey": "common.auto_流萤",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 80
+      }
+    ]
+  },
+  {
+    "text": "黄泉",
+    "existingKey": null,
+    "suggestedKey": "common.auto_黄泉",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 81
+      }
+    ]
+  },
+  {
+    "text": "飞霄",
+    "existingKey": null,
+    "suggestedKey": "common.auto_飞霄",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 82
+      }
+    ]
+  },
+  {
+    "text": "知更鸟",
+    "existingKey": null,
+    "suggestedKey": "common.auto_知更鸟",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 83
+      }
+    ]
+  },
+  {
+    "text": "阮梅",
+    "existingKey": null,
+    "suggestedKey": "common.auto_阮梅",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 84
+      }
+    ]
+  },
+  {
+    "text": "花火",
+    "existingKey": null,
+    "suggestedKey": "common.auto_花火",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 85
+      }
+    ]
+  },
+  {
+    "text": "黑天鹅",
+    "existingKey": null,
+    "suggestedKey": "common.auto_黑天鹅",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 86
+      }
+    ]
+  },
+  {
+    "text": "卡芙卡",
+    "existingKey": null,
+    "suggestedKey": "common.auto_卡芙卡",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 87
+      }
+    ]
+  },
+  {
+    "text": "镜流",
+    "existingKey": null,
+    "suggestedKey": "common.auto_镜流",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 88
+      }
+    ]
+  },
+  {
+    "text": "丹恒-饮月",
+    "existingKey": null,
+    "suggestedKey": "common.auto_丹恒饮月",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 89
+      }
+    ]
+  },
+  {
+    "text": "丹恒-腾荒",
+    "existingKey": null,
+    "suggestedKey": "common.auto_丹恒腾荒",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 90
+      }
+    ]
+  },
+  {
+    "text": "丹恒",
+    "existingKey": null,
+    "suggestedKey": "common.auto_丹恒",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 91
+      }
+    ]
+  },
+  {
+    "text": "三月七-存护",
+    "existingKey": null,
+    "suggestedKey": "common.auto_三月七存护",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 92
+      }
+    ]
+  },
+  {
+    "text": "三月七-巡猎",
+    "existingKey": null,
+    "suggestedKey": "common.auto_三月七巡猎",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 93
+      }
+    ]
+  },
+  {
+    "text": "符玄",
+    "existingKey": null,
+    "suggestedKey": "common.auto_符玄",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 94
+      }
+    ]
+  },
+  {
+    "text": "银狼",
+    "existingKey": null,
+    "suggestedKey": "common.auto_银狼",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 95
+      }
+    ]
+  },
+  {
+    "text": "银狼LV.999",
+    "existingKey": null,
+    "suggestedKey": "common.auto_银狼LV999",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 96
+      }
+    ]
+  },
+  {
+    "text": "希儿",
+    "existingKey": null,
+    "suggestedKey": "common.auto_希儿",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 97
+      }
+    ]
+  },
+  {
+    "text": "布洛妮娅",
+    "existingKey": null,
+    "suggestedKey": "common.auto_布洛妮娅",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 98
+      }
+    ]
+  },
+  {
+    "text": "姬子",
+    "existingKey": null,
+    "suggestedKey": "common.auto_姬子",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 99
+      }
+    ]
+  },
+  {
+    "text": "瓦尔特",
+    "existingKey": null,
+    "suggestedKey": "common.auto_瓦尔特",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 100
+      }
+    ]
+  },
+  {
+    "text": "景元",
+    "existingKey": null,
+    "suggestedKey": "common.auto_景元",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 101
+      }
+    ]
+  },
+  {
+    "text": "刃-千治",
+    "existingKey": null,
+    "suggestedKey": "common.auto_刃千治",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 103
+      }
+    ]
+  },
+  {
+    "text": "罗刹",
+    "existingKey": null,
+    "suggestedKey": "common.auto_罗刹",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 104
+      }
+    ]
+  },
+  {
+    "text": "托帕&账账",
+    "existingKey": null,
+    "suggestedKey": "common.auto_托帕账账",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 105
+      }
+    ]
+  },
+  {
+    "text": "藿藿",
+    "existingKey": null,
+    "suggestedKey": "common.auto_藿藿",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 106
+      }
+    ]
+  },
+  {
+    "text": "银枝",
+    "existingKey": null,
+    "suggestedKey": "common.auto_银枝",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 107
+      }
+    ]
+  },
+  {
+    "text": "真理医生",
+    "existingKey": null,
+    "suggestedKey": "common.auto_真理医生",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 108
+      }
+    ]
+  },
+  {
+    "text": "砂金",
+    "existingKey": null,
+    "suggestedKey": "common.auto_砂金",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 109
+      }
+    ]
+  },
+  {
+    "text": "波提欧",
+    "existingKey": null,
+    "suggestedKey": "common.auto_波提欧",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 110
+      }
+    ]
+  },
+  {
+    "text": "翡翠",
+    "existingKey": null,
+    "suggestedKey": "common.auto_翡翠",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 111
+      }
+    ]
+  },
+  {
+    "text": "云璃",
+    "existingKey": null,
+    "suggestedKey": "common.auto_云璃",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 112
+      }
+    ]
+  },
+  {
+    "text": "椒丘",
+    "existingKey": null,
+    "suggestedKey": "common.auto_椒丘",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 113
+      }
+    ]
+  },
+  {
+    "text": "灵砂",
+    "existingKey": null,
+    "suggestedKey": "common.auto_灵砂",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 114
+      }
+    ]
+  },
+  {
+    "text": "乱破",
+    "existingKey": null,
+    "suggestedKey": "common.auto_乱破",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 115
+      }
+    ]
+  },
+  {
+    "text": "星期日",
+    "existingKey": null,
+    "suggestedKey": "common.auto_星期日",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 116
+      }
+    ]
+  },
+  {
+    "text": "忘归人",
+    "existingKey": null,
+    "suggestedKey": "common.auto_忘归人",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 117
+      }
+    ]
+  },
+  {
+    "text": "大黑塔",
+    "existingKey": null,
+    "suggestedKey": "common.auto_大黑塔",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 118
+      }
+    ]
+  },
+  {
+    "text": "阿格莱雅",
+    "existingKey": null,
+    "suggestedKey": "common.auto_阿格莱雅",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 119
+      }
+    ]
+  },
+  {
+    "text": "缇宝",
+    "existingKey": null,
+    "suggestedKey": "common.auto_缇宝",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 120
+      }
+    ]
+  },
+  {
+    "text": "万敌",
+    "existingKey": null,
+    "suggestedKey": "common.auto_万敌",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 121
+      }
+    ]
+  },
+  {
+    "text": "遐蝶",
+    "existingKey": null,
+    "suggestedKey": "common.auto_遐蝶",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 122
+      }
+    ]
+  },
+  {
+    "text": "那刻夏",
+    "existingKey": null,
+    "suggestedKey": "common.auto_那刻夏",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 123
+      }
+    ]
+  },
+  {
+    "text": "风堇",
+    "existingKey": null,
+    "suggestedKey": "common.auto_风堇",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 124
+      }
+    ]
+  },
+  {
+    "text": "赛飞儿",
+    "existingKey": null,
+    "suggestedKey": "common.auto_赛飞儿",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 125
+      }
+    ]
+  },
+  {
+    "text": "白厄",
+    "existingKey": null,
+    "suggestedKey": "common.auto_白厄",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 126
+      }
+    ]
+  },
+  {
+    "text": "海瑟音",
+    "existingKey": null,
+    "suggestedKey": "common.auto_海瑟音",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 129
+      }
+    ]
+  },
+  {
+    "text": "刻律德菈",
+    "existingKey": null,
+    "suggestedKey": "common.auto_刻律德菈",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 130
+      }
+    ]
+  },
+  {
+    "text": "长夜月",
+    "existingKey": null,
+    "suggestedKey": "common.auto_长夜月",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 131
+      }
+    ]
+  },
+  {
+    "text": "昔涟",
+    "existingKey": null,
+    "suggestedKey": "common.auto_昔涟",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 132
+      }
+    ]
+  },
+  {
+    "text": "大丽花",
+    "existingKey": null,
+    "suggestedKey": "common.auto_大丽花",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 133
+      }
+    ]
+  },
+  {
+    "text": "爻光",
+    "existingKey": null,
+    "suggestedKey": "common.auto_爻光",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 134
+      }
+    ]
+  },
+  {
+    "text": "火花",
+    "existingKey": null,
+    "suggestedKey": "common.auto_火花",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 135
+      }
+    ]
+  },
+  {
+    "text": "不死途",
+    "existingKey": null,
+    "suggestedKey": "common.auto_不死途",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 136
+      }
+    ]
+  },
+  {
+    "text": "绯英",
+    "existingKey": null,
+    "suggestedKey": "common.auto_绯英",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 137
+      }
+    ]
+  },
+  {
+    "text": "白露",
+    "existingKey": null,
+    "suggestedKey": "common.auto_白露",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 138
+      }
+    ]
+  },
+  {
+    "text": "克拉拉",
+    "existingKey": null,
+    "suggestedKey": "common.auto_克拉拉",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 139
+      }
+    ]
+  },
+  {
+    "text": "杰帕德",
+    "existingKey": null,
+    "suggestedKey": "common.auto_杰帕德",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 140
+      }
+    ]
+  },
+  {
+    "text": "彦卿",
+    "existingKey": null,
+    "suggestedKey": "common.auto_彦卿",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 141
+      }
+    ]
+  },
+  {
+    "text": "黑塔",
+    "existingKey": null,
+    "suggestedKey": "common.auto_黑塔",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 142
+      }
+    ]
+  },
+  {
+    "text": "停云",
+    "existingKey": null,
+    "suggestedKey": "common.auto_停云",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 143
+      }
+    ]
+  },
+  {
+    "text": "青雀",
+    "existingKey": null,
+    "suggestedKey": "common.auto_青雀",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 144
+      }
+    ]
+  },
+  {
+    "text": "佩拉",
+    "existingKey": null,
+    "suggestedKey": "common.auto_佩拉",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 145
+      }
+    ]
+  },
+  {
+    "text": "艾丝妲",
+    "existingKey": null,
+    "suggestedKey": "common.auto_艾丝妲",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 146
+      }
+    ]
+  },
+  {
+    "text": "娜塔莎",
+    "existingKey": null,
+    "suggestedKey": "common.auto_娜塔莎",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 147
+      }
+    ]
+  },
+  {
+    "text": "素裳",
+    "existingKey": null,
+    "suggestedKey": "common.auto_素裳",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 148
+      }
+    ]
+  },
+  {
+    "text": "希露瓦",
+    "existingKey": null,
+    "suggestedKey": "common.auto_希露瓦",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 149
+      }
+    ]
+  },
+  {
+    "text": "桑博",
+    "existingKey": null,
+    "suggestedKey": "common.auto_桑博",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 150
+      }
+    ]
+  },
+  {
+    "text": "虎克",
+    "existingKey": null,
+    "suggestedKey": "common.auto_虎克",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 151
+      }
+    ]
+  },
+  {
+    "text": "阿兰",
+    "existingKey": null,
+    "suggestedKey": "common.auto_阿兰",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 152
+      }
+    ]
+  },
+  {
+    "text": "驭空",
+    "existingKey": null,
+    "suggestedKey": "common.auto_驭空",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 153
+      }
+    ]
+  },
+  {
+    "text": "卢卡",
+    "existingKey": null,
+    "suggestedKey": "common.auto_卢卡",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 154
+      }
+    ]
+  },
+  {
+    "text": "玲可",
+    "existingKey": null,
+    "suggestedKey": "common.auto_玲可",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 155
+      }
+    ]
+  },
+  {
+    "text": "桂乃芬",
+    "existingKey": null,
+    "suggestedKey": "common.auto_桂乃芬",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 156
+      }
+    ]
+  },
+  {
+    "text": "寒鸦",
+    "existingKey": null,
+    "suggestedKey": "common.auto_寒鸦",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 157
+      }
+    ]
+  },
+  {
+    "text": "雪衣",
+    "existingKey": null,
+    "suggestedKey": "common.auto_雪衣",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 158
+      }
+    ]
+  },
+  {
+    "text": "米沙",
+    "existingKey": null,
+    "suggestedKey": "common.auto_米沙",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 159
+      }
+    ]
+  },
+  {
+    "text": "加拉赫",
+    "existingKey": null,
+    "suggestedKey": "common.auto_加拉赫",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 160
+      }
+    ]
+  },
+  {
+    "text": "貊泽",
+    "existingKey": null,
+    "suggestedKey": "common.auto_貊泽",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 161
+      }
+    ]
+  },
+  {
+    "text": "光锥",
+    "existingKey": null,
+    "suggestedKey": "common.auto_光锥",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 162
+      }
+    ]
+  },
+  {
+    "text": "艾莲",
+    "existingKey": null,
+    "suggestedKey": "common.auto_艾莲",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 173
+      }
+    ]
+  },
+  {
+    "text": "朱鸢",
+    "existingKey": null,
+    "suggestedKey": "common.auto_朱鸢",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 174
+      }
+    ]
+  },
+  {
+    "text": "青衣",
+    "existingKey": null,
+    "suggestedKey": "common.auto_青衣",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 175
+      }
+    ]
+  },
+  {
+    "text": "凯撒",
+    "existingKey": null,
+    "suggestedKey": "common.auto_凯撒",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 177
+      }
+    ]
+  },
+  {
+    "text": "柏妮思",
+    "existingKey": null,
+    "suggestedKey": "common.auto_柏妮思",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 178
+      }
+    ]
+  },
+  {
+    "text": "莱特",
+    "existingKey": null,
+    "suggestedKey": "common.auto_莱特",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 180
+      }
+    ]
+  },
+  {
+    "text": "悠真",
+    "existingKey": null,
+    "suggestedKey": "common.auto_悠真",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 181
+      }
+    ]
+  },
+  {
+    "text": "耀嘉音",
+    "existingKey": null,
+    "suggestedKey": "common.auto_耀嘉音",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 182
+      }
+    ]
+  },
+  {
+    "text": "伊芙琳",
+    "existingKey": null,
+    "suggestedKey": "common.auto_伊芙琳",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 183
+      }
+    ]
+  },
+  {
+    "text": "零号·安比",
+    "existingKey": null,
+    "suggestedKey": "common.auto_零号安比",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 184
+      }
+    ]
+  },
+  {
+    "text": "扳机",
+    "existingKey": null,
+    "suggestedKey": "common.auto_扳机",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 185
+      }
+    ]
+  },
+  {
+    "text": "薇薇安",
+    "existingKey": null,
+    "suggestedKey": "common.auto_薇薇安",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 186
+      }
+    ]
+  },
+  {
+    "text": "雨果",
+    "existingKey": null,
+    "suggestedKey": "common.auto_雨果",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 187
+      }
+    ]
+  },
+  {
+    "text": "仪玄",
+    "existingKey": null,
+    "suggestedKey": "common.auto_仪玄",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 188
+      }
+    ]
+  },
+  {
+    "text": "橘福福",
+    "existingKey": null,
+    "suggestedKey": "common.auto_橘福福",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 189
+      }
+    ]
+  },
+  {
+    "text": "柚叶",
+    "existingKey": null,
+    "suggestedKey": "common.auto_柚叶",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 190
+      }
+    ]
+  },
+  {
+    "text": "爱丽丝",
+    "existingKey": null,
+    "suggestedKey": "common.auto_爱丽丝",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 191
+      }
+    ]
+  },
+  {
+    "text": "席德",
+    "existingKey": null,
+    "suggestedKey": "common.auto_席德",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 192
+      }
+    ]
+  },
+  {
+    "text": "奥菲丝&鬼火",
+    "existingKey": null,
+    "suggestedKey": "common.auto_奥菲丝鬼火",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 193
+      }
+    ]
+  },
+  {
+    "text": "卢西娅",
+    "existingKey": null,
+    "suggestedKey": "common.auto_卢西娅",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 194
+      }
+    ]
+  },
+  {
+    "text": "伊德海莉",
+    "existingKey": null,
+    "suggestedKey": "common.auto_伊德海莉",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 195
+      }
+    ]
+  },
+  {
+    "text": "琉音",
+    "existingKey": null,
+    "suggestedKey": "common.auto_琉音",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 196
+      }
+    ]
+  },
+  {
+    "text": "般岳",
+    "existingKey": null,
+    "suggestedKey": "common.auto_般岳",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 197
+      }
+    ]
+  },
+  {
+    "text": "叶瞬光",
+    "existingKey": null,
+    "suggestedKey": "common.auto_叶瞬光",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 198
+      }
+    ]
+  },
+  {
+    "text": "千夏",
+    "existingKey": null,
+    "suggestedKey": "common.auto_千夏",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 200
+      }
+    ]
+  },
+  {
+    "text": "爱芮",
+    "existingKey": null,
+    "suggestedKey": "common.auto_爱芮",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 201
+      }
+    ]
+  },
+  {
+    "text": "南宫羽",
+    "existingKey": null,
+    "suggestedKey": "common.auto_南宫羽",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 202
+      }
+    ]
+  },
+  {
+    "text": "希希芙",
+    "existingKey": null,
+    "suggestedKey": "common.auto_希希芙",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 203
+      }
+    ]
+  },
+  {
+    "text": "普罗米娅",
+    "existingKey": null,
+    "suggestedKey": "common.auto_普罗米娅",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 204
+      }
+    ]
+  },
+  {
+    "text": "维琳娜",
+    "existingKey": null,
+    "suggestedKey": "common.auto_维琳娜",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 205
+      }
+    ]
+  },
+  {
+    "text": "诺姆",
+    "existingKey": null,
+    "suggestedKey": "common.auto_诺姆",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 206
+      }
+    ]
+  },
+  {
+    "text": "佩洛伊斯",
+    "existingKey": null,
+    "suggestedKey": "common.auto_佩洛伊斯",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 207
+      }
+    ]
+  },
+  {
+    "text": "安比",
+    "existingKey": null,
+    "suggestedKey": "common.auto_安比",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 208
+      }
+    ]
+  },
+  {
+    "text": "妮可",
+    "existingKey": null,
+    "suggestedKey": "common.auto_妮可",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 209
+      }
+    ]
+  },
+  {
+    "text": "比利",
+    "existingKey": null,
+    "suggestedKey": "common.auto_比利",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 210
+      }
+    ]
+  },
+  {
+    "text": "猫又",
+    "existingKey": null,
+    "suggestedKey": "common.auto_猫又",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 211
+      }
+    ]
+  },
+  {
+    "text": "11号",
+    "existingKey": null,
+    "suggestedKey": "common.auto_11号",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 212
+      }
+    ]
+  },
+  {
+    "text": "珂蕾妲",
+    "existingKey": null,
+    "suggestedKey": "common.auto_珂蕾妲",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 213
+      }
+    ]
+  },
+  {
+    "text": "格莉丝",
+    "existingKey": null,
+    "suggestedKey": "common.auto_格莉丝",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 214
+      }
+    ]
+  },
+  {
+    "text": "安东",
+    "existingKey": null,
+    "suggestedKey": "common.auto_安东",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 215
+      }
+    ]
+  },
+  {
+    "text": "莱卡恩",
+    "existingKey": null,
+    "suggestedKey": "common.auto_莱卡恩",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 217
+      }
+    ]
+  },
+  {
+    "text": "丽娜",
+    "existingKey": null,
+    "suggestedKey": "common.auto_丽娜",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 218
+      }
+    ]
+  },
+  {
+    "text": "可琳",
+    "existingKey": null,
+    "suggestedKey": "common.auto_可琳",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 219
+      }
+    ]
+  },
+  {
+    "text": "苍角",
+    "existingKey": null,
+    "suggestedKey": "common.auto_苍角",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 220
+      }
+    ]
+  },
+  {
+    "text": "派派",
+    "existingKey": null,
+    "suggestedKey": "common.auto_派派",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 222
+      }
+    ]
+  },
+  {
+    "text": "赛斯",
+    "existingKey": null,
+    "suggestedKey": "common.auto_赛斯",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 223
+      }
+    ]
+  },
+  {
+    "text": "波可娜",
+    "existingKey": null,
+    "suggestedKey": "common.auto_波可娜",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 224
+      }
+    ]
+  },
+  {
+    "text": "潘引壶",
+    "existingKey": null,
+    "suggestedKey": "common.auto_潘引壶",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 225
+      }
+    ]
+  },
+  {
+    "text": "真斗",
+    "existingKey": null,
+    "suggestedKey": "common.auto_真斗",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 226
+      }
+    ]
+  },
+  {
+    "text": "佩丽卡",
+    "existingKey": null,
+    "suggestedKey": "common.auto_佩丽卡",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 237
+      }
+    ]
+  },
+  {
+    "text": "陈千语",
+    "existingKey": null,
+    "suggestedKey": "common.auto_陈千语",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 238
+      }
+    ]
+  },
+  {
+    "text": "莱万汀",
+    "existingKey": null,
+    "suggestedKey": "common.auto_莱万汀",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 239
+      }
+    ]
+  },
+  {
+    "text": "伊冯",
+    "existingKey": null,
+    "suggestedKey": "common.auto_伊冯",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 240
+      }
+    ]
+  },
+  {
+    "text": "洁尔佩塔",
+    "existingKey": null,
+    "suggestedKey": "common.auto_洁尔佩塔",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 241
+      }
+    ]
+  },
+  {
+    "text": "艾尔黛拉",
+    "existingKey": null,
+    "suggestedKey": "common.auto_艾尔黛拉",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 242
+      }
+    ]
+  },
+  {
+    "text": "余烬",
+    "existingKey": null,
+    "suggestedKey": "common.auto_余烬",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 243
+      }
+    ]
+  },
+  {
+    "text": "别礼",
+    "existingKey": null,
+    "suggestedKey": "common.auto_别礼",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 244
+      }
+    ]
+  },
+  {
+    "text": "黎风",
+    "existingKey": null,
+    "suggestedKey": "common.auto_黎风",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 245
+      }
+    ]
+  },
+  {
+    "text": "骏卫",
+    "existingKey": null,
+    "suggestedKey": "common.auto_骏卫",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 246
+      }
+    ]
+  },
+  {
+    "text": "阿列什",
+    "existingKey": null,
+    "suggestedKey": "common.auto_阿列什",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 247
+      }
+    ]
+  },
+  {
+    "text": "弧光",
+    "existingKey": null,
+    "suggestedKey": "common.auto_弧光",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 248
+      }
+    ]
+  },
+  {
+    "text": "艾维文娜",
+    "existingKey": null,
+    "suggestedKey": "common.auto_艾维文娜",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 249
+      }
+    ]
+  },
+  {
+    "text": "大潘",
+    "existingKey": null,
+    "suggestedKey": "common.auto_大潘",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 250
+      }
+    ]
+  },
+  {
+    "text": "昼雪",
+    "existingKey": null,
+    "suggestedKey": "common.auto_昼雪",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 251
+      }
+    ]
+  },
+  {
+    "text": "狼卫",
+    "existingKey": null,
+    "suggestedKey": "common.auto_狼卫",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 252
+      }
+    ]
+  },
+  {
+    "text": "赛希",
+    "existingKey": null,
+    "suggestedKey": "common.auto_赛希",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 253
+      }
+    ]
+  },
+  {
+    "text": "秋栗",
+    "existingKey": null,
+    "suggestedKey": "common.auto_秋栗",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 254
+      }
+    ]
+  },
+  {
+    "text": "安塔尔",
+    "existingKey": null,
+    "suggestedKey": "common.auto_安塔尔",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 255
+      }
+    ]
+  },
+  {
+    "text": "卡契尔",
+    "existingKey": null,
+    "suggestedKey": "common.auto_卡契尔",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 256
+      }
+    ]
+  },
+  {
+    "text": "埃特拉",
+    "existingKey": null,
+    "suggestedKey": "common.auto_埃特拉",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 257
+      }
+    ]
+  },
+  {
+    "text": "萤石",
+    "existingKey": null,
+    "suggestedKey": "common.auto_萤石",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 258
+      }
+    ]
+  },
+  {
+    "text": "汤汤",
+    "existingKey": null,
+    "suggestedKey": "common.auto_汤汤",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 259
+      }
+    ]
+  },
+  {
+    "text": "洛茜",
+    "existingKey": null,
+    "suggestedKey": "common.auto_洛茜",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 260
+      }
+    ]
+  },
+  {
+    "text": "庄方宜",
+    "existingKey": null,
+    "suggestedKey": "common.auto_庄方宜",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 261
+      }
+    ]
+  },
+  {
+    "text": "弭弗",
+    "existingKey": null,
+    "suggestedKey": "common.auto_弭弗",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 262
+      }
+    ]
+  },
+  {
+    "text": "卡繆",
+    "existingKey": null,
+    "suggestedKey": "common.auto_卡繆",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 263
+      }
+    ]
+  },
+  {
+    "text": "梨诺",
+    "existingKey": null,
+    "suggestedKey": "common.auto_梨诺",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 265
+      }
+    ]
+  },
+  {
+    "text": "提弗洛斯",
+    "existingKey": null,
+    "suggestedKey": "common.auto_提弗洛斯",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 267
+      }
+    ]
+  },
+  {
+    "text": "薄荷",
+    "existingKey": null,
+    "suggestedKey": "common.auto_薄荷",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 278
+      }
+    ]
+  },
+  {
+    "text": "早雾",
+    "existingKey": null,
+    "suggestedKey": "common.auto_早雾",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 279
+      }
+    ]
+  },
+  {
+    "text": "娜娜莉",
+    "existingKey": null,
+    "suggestedKey": "common.auto_娜娜莉",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 280
+      }
+    ]
+  },
+  {
+    "text": "法蒂亚",
+    "existingKey": null,
+    "suggestedKey": "common.auto_法蒂亚",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 282
+      }
+    ]
+  },
+  {
+    "text": "阿德勒",
+    "existingKey": null,
+    "suggestedKey": "common.auto_阿德勒",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 283
+      }
+    ]
+  },
+  {
+    "text": "安魂曲",
+    "existingKey": null,
+    "suggestedKey": "common.auto_安魂曲",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 285
+      }
+    ]
+  },
+  {
+    "text": "九原",
+    "existingKey": null,
+    "suggestedKey": "common.auto_九原",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 286
+      }
+    ]
+  },
+  {
+    "text": "伊洛伊",
+    "existingKey": null,
+    "suggestedKey": "common.auto_伊洛伊",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 287
+      }
+    ]
+  },
+  {
+    "text": "凛子",
+    "existingKey": null,
+    "suggestedKey": "common.auto_凛子",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 288
+      }
+    ]
+  },
+  {
+    "text": "哈尼娅",
+    "existingKey": null,
+    "suggestedKey": "common.auto_哈尼娅",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 289
+      }
+    ]
+  },
+  {
+    "text": "哈索尔",
+    "existingKey": null,
+    "suggestedKey": "common.auto_哈索尔",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 290
+      }
+    ]
+  },
+  {
+    "text": "埃德加",
+    "existingKey": null,
+    "suggestedKey": "common.auto_埃德加",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 291
+      }
+    ]
+  },
+  {
+    "text": "小吱",
+    "existingKey": null,
+    "suggestedKey": "common.auto_小吱",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 292
+      }
+    ]
+  },
+  {
+    "text": "尼察",
+    "existingKey": null,
+    "suggestedKey": "common.auto_尼察",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 293
+      }
+    ]
+  },
+  {
+    "text": "真红",
+    "existingKey": null,
+    "suggestedKey": "common.auto_真红",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 294
+      }
+    ]
+  },
+  {
+    "text": "海月",
+    "existingKey": null,
+    "suggestedKey": "common.auto_海月",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 295
+      }
+    ]
+  },
+  {
+    "text": "白藏",
+    "existingKey": null,
+    "suggestedKey": "common.auto_白藏",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 296
+      }
+    ]
+  },
+  {
+    "text": "赤音",
+    "existingKey": null,
+    "suggestedKey": "common.auto_赤音",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 297
+      }
+    ]
+  },
+  {
+    "text": "达芙迪尔",
+    "existingKey": null,
+    "suggestedKey": "common.auto_达芙迪尔",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 298
+      }
+    ]
+  },
+  {
+    "text": "阿尔法德",
+    "existingKey": null,
+    "suggestedKey": "common.auto_阿尔法德",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 299
+      }
+    ]
+  },
+  {
+    "text": "黑鸟",
+    "existingKey": null,
+    "suggestedKey": "common.auto_黑鸟",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 300
+      }
+    ]
+  },
+  {
+    "text": "卡厄斯",
+    "existingKey": null,
+    "suggestedKey": "common.auto_卡厄斯",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 301
+      }
+    ]
+  },
+  {
+    "text": "其他（新建目录）",
+    "existingKey": null,
+    "suggestedKey": "common.auto_其他新建目录",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 355
+      }
+    ]
+  },
+  {
+    "text": "${folder}（新建目录）",
+    "existingKey": null,
+    "suggestedKey": "common.auto_folder新建",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 363
+      }
+    ]
+  },
+  {
+    "text": "${name}（新建目录）",
+    "existingKey": null,
+    "suggestedKey": "common.auto_name新建目录",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 375
+      }
+    ]
+  },
+  {
+    "text": "导入 Mod 到「${targetCharacter}」",
+    "existingKey": null,
+    "suggestedKey": "common.auto_导入Mod到ta",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 438
+      }
+    ]
+  },
+  {
+    "text": "导入解析 · ${game.shortName}",
+    "existingKey": null,
+    "suggestedKey": "common.auto_导入解析game",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 438
+      }
+    ]
+  },
+  {
+    "text": "正在导入…",
+    "existingKey": null,
+    "suggestedKey": "common.auto_正在导入",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 458
+      }
+    ]
+  },
+  {
+    "text": "导入 (${selectedIds.size})",
+    "existingKey": null,
+    "suggestedKey": "common.auto_导入select",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 458
+      }
+    ]
+  },
+  {
+    "text": "已有角色目录",
+    "existingKey": null,
+    "suggestedKey": "common.auto_已有角色目录",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 490
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 575
+      }
+    ]
+  },
+  {
+    "text": "自动新建角色目录",
+    "existingKey": null,
+    "suggestedKey": "common.auto_自动新建角色目录",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 499
+      },
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 584
+      }
+    ]
+  },
+  {
+    "text": "未检测到 .ini 文件",
+    "existingKey": null,
+    "suggestedKey": "common.auto_未检测到ini文",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 552
+      }
+    ]
+  },
+  {
+    "text": "选择要导入到的角色目录",
+    "existingKey": null,
+    "suggestedKey": "dialog.pickFolder",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ImportPreviewModal.tsx",
+        "line": 572
+      }
+    ]
+  },
+  {
+    "text": "默认",
+    "existingKey": "common.default",
+    "suggestedKey": "mod.auto_默认",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ModDetailsPanel.tsx",
+        "line": 396
+      },
+      {
+        "file": "src/renderer/src/components/RosterPresetModal.tsx",
+        "line": 884
+      },
+      {
+        "file": "src/renderer/src/OverlayDetailApp.tsx",
+        "line": 259
+      },
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 757
+      },
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 774
+      }
+    ]
+  },
+  {
+    "text": "默认 (初始)",
+    "existingKey": "mod.defaultPreset",
+    "suggestedKey": "mod.auto_默认初始",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/components/ModDetailsPanel.tsx",
+        "line": 396
+      },
+      {
+        "file": "src/renderer/src/components/RosterPresetModal.tsx",
+        "line": 884
+      },
+      {
+        "file": "src/renderer/src/OverlayDetailApp.tsx",
+        "line": 259
+      },
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 756
+      }
+    ]
+  },
+  {
+    "text": "预设「${preset.name}」已应用",
+    "existingKey": null,
+    "suggestedKey": "overlay.auto_预设preset",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/OverlayDetailApp.tsx",
+        "line": 125
+      }
+    ]
+  },
+  {
+    "text": "当前状态已存为预设「${name}」",
+    "existingKey": null,
+    "suggestedKey": "overlay.auto_当前状态已存为预",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/OverlayDetailApp.tsx",
+        "line": 151
+      }
+    ]
+  },
+  {
+    "text": "未设置",
+    "existingKey": "settings.advanced.overlayHotkeyNotSet",
+    "suggestedKey": "settings.auto_未设置",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/views/SettingsView.tsx",
+        "line": 473
+      }
+    ]
+  },
+  {
+    "text": "已禁用定时",
+    "existingKey": "settings.advanced.autoSaveIntervalNotSet",
+    "suggestedKey": "settings.auto_已禁用定时",
+    "occurrences": [
+      {
+        "file": "src/renderer/src/views/SettingsView.tsx",
+        "line": 693
+      }
+    ]
+  },
+  {
+    "text": "无法为 ${name} 生成唯一名称",
+    "existingKey": null,
+    "suggestedKey": "main.auto_无法为name生",
+    "occurrences": [
+      {
+        "file": "src/main/core/fsx.ts",
+        "line": 70
+      }
+    ]
+  },
+  {
+    "text": "鸣潮",
+    "existingKey": null,
+    "suggestedKey": "main.auto_鸣潮",
+    "occurrences": [
+      {
+        "file": "src/main/core/games.ts",
+        "line": 6
+      },
+      {
+        "file": "src/main/core/games.ts",
+        "line": 8
+      }
+    ]
+  },
+  {
+    "text": "崩坏：星穹铁道",
+    "existingKey": null,
+    "suggestedKey": "main.auto_崩坏星穹铁道",
+    "occurrences": [
+      {
+        "file": "src/main/core/games.ts",
+        "line": 16
+      }
+    ]
+  },
+  {
+    "text": "星穹铁道",
+    "existingKey": null,
+    "suggestedKey": "main.auto_星穹铁道",
+    "occurrences": [
+      {
+        "file": "src/main/core/games.ts",
+        "line": 18
+      }
+    ]
+  },
+  {
+    "text": "绝区零",
+    "existingKey": null,
+    "suggestedKey": "main.auto_绝区零",
+    "occurrences": [
+      {
+        "file": "src/main/core/games.ts",
+        "line": 26
+      },
+      {
+        "file": "src/main/core/games.ts",
+        "line": 28
+      }
+    ]
+  },
+  {
+    "text": "明日方舟：终末地",
+    "existingKey": null,
+    "suggestedKey": "main.auto_明日方舟终末地",
+    "occurrences": [
+      {
+        "file": "src/main/core/games.ts",
+        "line": 36
+      }
+    ]
+  },
+  {
+    "text": "终末地",
+    "existingKey": null,
+    "suggestedKey": "main.auto_终末地",
+    "occurrences": [
+      {
+        "file": "src/main/core/games.ts",
+        "line": 38
+      }
+    ]
+  },
+  {
+    "text": "异环",
+    "existingKey": null,
+    "suggestedKey": "main.auto_异环",
+    "occurrences": [
+      {
+        "file": "src/main/core/games.ts",
+        "line": 46
+      },
+      {
+        "file": "src/main/core/games.ts",
+        "line": 48
+      }
+    ]
+  },
+  {
+    "text": "未知游戏: ${id}",
+    "existingKey": null,
+    "suggestedKey": "main.auto_未知游戏id",
+    "occurrences": [
+      {
+        "file": "src/main/core/games.ts",
+        "line": 68
+      }
+    ]
+  },
+  {
+    "text": "名称",
+    "existingKey": null,
+    "suggestedKey": "main.auto_名称",
+    "occurrences": [
+      {
+        "file": "src/main/core/safe-path.ts",
+        "line": 16
+      }
+    ]
+  },
+  {
+    "text": "${label}不合法: ${name}",
+    "existingKey": null,
+    "suggestedKey": "common.invalidParam",
+    "occurrences": [
+      {
+        "file": "src/main/core/safe-path.ts",
+        "line": 18
+      }
+    ]
+  },
+  {
+    "text": "路径",
+    "existingKey": null,
+    "suggestedKey": "main.auto_路径",
+    "occurrences": [
+      {
+        "file": "src/main/core/safe-path.ts",
+        "line": 42
+      }
+    ]
+  },
+  {
+    "text": "${label}越界: ${target}",
+    "existingKey": null,
+    "suggestedKey": "main.auto_label越界t",
+    "occurrences": [
+      {
+        "file": "src/main/core/safe-path.ts",
+        "line": 43
+      }
+    ]
+  },
+  {
+    "text": "游戏程序",
+    "existingKey": null,
+    "suggestedKey": "main.auto_游戏程序",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 569
+      }
+    ]
+  },
+  {
+    "text": "启动器",
+    "existingKey": "dialog.filterLoader",
+    "suggestedKey": "main.auto_启动器",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 569
+      }
+    ]
+  },
+  {
+    "text": "启动失败 (code ${code})",
+    "existingKey": null,
+    "suggestedKey": "common.failed",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 725
+      }
+    ]
+  },
+  {
+    "text": "XXMI|Hypergryph|GRYPHLINK|鹰角|终末地|miHoYo|HoYoPlay|米哈游|绝区零|星穹|Wuthering|鸣潮|库洛|Kuro|Neverness|异环|NTE",
+    "existingKey": null,
+    "suggestedKey": "main.auto_XXMIHype",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 786
+      }
+    ]
+  },
+  {
+    "text": "角色目录名不合法",
+    "existingKey": "common.characterFolderInvalid",
+    "suggestedKey": "common.invalidParam",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2290
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 2582
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 2597
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 2614
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 2930
+      }
+    ]
+  },
+  {
+    "text": "Mod 名称不合法",
+    "existingKey": "common.modNameInvalid",
+    "suggestedKey": "common.invalidParam",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2315
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 2416
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 2864
+      },
+      {
+        "file": "src/main/services/library.ts",
+        "line": 432
+      }
+    ]
+  },
+  {
+    "text": "未知游戏",
+    "existingKey": "common.unknownGame",
+    "suggestedKey": "main.auto_未知游戏",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2460
+      }
+    ]
+  },
+  {
+    "text": "选择要导入的 Mod 压缩包",
+    "existingKey": "dialog.pickImportArchives",
+    "suggestedKey": "dialog.pickArchive",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2512
+      }
+    ]
+  },
+  {
+    "text": "压缩包",
+    "existingKey": "dialog.filterArchive",
+    "suggestedKey": "main.auto_压缩包",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2514
+      }
+    ]
+  },
+  {
+    "text": "选择要导入的 Mod 文件夹（可多选，也可选择包含多个 Mod 的总文件夹）",
+    "existingKey": null,
+    "suggestedKey": "dialog.pickFolder",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2530
+      }
+    ]
+  },
+  {
+    "text": "选择角色封面",
+    "existingKey": "dialog.pickCover",
+    "suggestedKey": "dialog.pickCover",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2599
+      }
+    ]
+  },
+  {
+    "text": "图片",
+    "existingKey": "dialog.filterImage",
+    "suggestedKey": "main.auto_图片",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2601
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 2882
+      }
+    ]
+  },
+  {
+    "text": "未配置 Mods 目录",
+    "existingKey": null,
+    "suggestedKey": "common.modsDirNotConfigured",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2627
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 2839
+      }
+    ]
+  },
+  {
+    "text": "目录参数不合法",
+    "existingKey": null,
+    "suggestedKey": "common.invalidParam",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 2732
+      }
+    ]
+  },
+  {
+    "text": "[...document.querySelectorAll('button')].find((button) => button.textContent?.trim() === '编辑')?.click()",
+    "existingKey": null,
+    "suggestedKey": "main.auto_document",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 3253
+      }
+    ]
+  },
+  {
+    "text": "测试角色A",
+    "existingKey": null,
+    "suggestedKey": "main.auto_测试角色A",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 3307
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 3326
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 3332
+      }
+    ]
+  },
+  {
+    "text": "window.moddeck.getMods('wuthering-waves', '测试角色A')",
+    "existingKey": null,
+    "suggestedKey": "main.auto_windowmo",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 3310
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 3316
+      }
+    ]
+  },
+  {
+    "text": "window.moddeck.toggleMod('wuthering-waves', '测试角色A', 'TestImport', false)",
+    "existingKey": null,
+    "suggestedKey": "main.auto_windowmo",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 3313
+      }
+    ]
+  },
+  {
+    "text": "window.moddeck.toggleMod('wuthering-waves', '测试角色A', 'TestImport', true)",
+    "existingKey": null,
+    "suggestedKey": "main.auto_windowmo",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 3319
+      }
+    ]
+  },
+  {
+    "text": "window.moddeck.updateCharacterMeta('wuthering-waves', '测试角色A', { displayName: '测试角色A改', aliases: ['TestA'], order: 7 })",
+    "existingKey": null,
+    "suggestedKey": "main.auto_windowmo",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 3323
+      }
+    ]
+  },
+  {
+    "text": "window.moddeck.resetCharacterMeta('wuthering-waves', '测试角色A')",
+    "existingKey": null,
+    "suggestedKey": "main.auto_windowmo",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 3329
+      }
+    ]
+  },
+  {
+    "text": "window.moddeck.createCharacter('wuthering-waves', { folder: '冒烟新建', displayName: '冒烟新建', kind: 'utility' })",
+    "existingKey": null,
+    "suggestedKey": "main.auto_windowmo",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 3335
+      }
+    ]
+  },
+  {
+    "text": "冒烟新建",
+    "existingKey": null,
+    "suggestedKey": "main.auto_冒烟新建",
+    "occurrences": [
+      {
+        "file": "src/main/index.ts",
+        "line": 3338
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 3343
+      },
+      {
+        "file": "src/main/index.ts",
+        "line": 3349
+      }
+    ]
+  },
+  {
+    "text": "该压缩包带有密码保护，请先自行使用解压软件解压为文件夹后再导入",
+    "existingKey": null,
+    "suggestedKey": "main.auto_该压缩包带有密码",
+    "occurrences": [
+      {
+        "file": "src/main/services/archive.ts",
+        "line": 128
+      }
+    ]
+  },
+  {
+    "text": "压缩包解压失败（退出码 ${code}），文件可能已损坏或受密码保护，建议自行解压为文件夹后导入${detail ?",
+    "existingKey": null,
+    "suggestedKey": "common.failed",
+    "occurrences": [
+      {
+        "file": "src/main/services/archive.ts",
+        "line": 133
+      }
+    ]
+  },
+  {
+    "text": "该 RAR 压缩包带有密码保护，请先自行使用解压软件解压为文件夹后再导入",
+    "existingKey": null,
+    "suggestedKey": "main.auto_该RAR压缩包带",
+    "occurrences": [
+      {
+        "file": "src/main/services/archive.ts",
+        "line": 161
+      }
+    ]
+  },
+  {
+    "text": "RAR 解压失败（${msg}），若包含密码或分卷请先自行解压为文件夹后再导入",
+    "existingKey": null,
+    "suggestedKey": "common.failed",
+    "occurrences": [
+      {
+        "file": "src/main/services/archive.ts",
+        "line": 163
+      }
+    ]
+  },
+  {
+    "text": "压缩包包含越界路径，已中止解压",
+    "existingKey": null,
+    "suggestedKey": "main.auto_压缩包包含越界路",
+    "occurrences": [
+      {
+        "file": "src/main/services/archive.ts",
+        "line": 174
+      }
+    ]
+  },
+  {
+    "text": "压缩包包含符号链接，已中止解压",
+    "existingKey": null,
+    "suggestedKey": "main.auto_压缩包包含符号链",
+    "occurrences": [
+      {
+        "file": "src/main/services/archive.ts",
+        "line": 175
+      }
+    ]
+  },
+  {
+    "text": "不是文件: ${archivePath}",
+    "existingKey": null,
+    "suggestedKey": "main.auto_不是文件arch",
+    "occurrences": [
+      {
+        "file": "src/main/services/archive.ts",
+        "line": 183
+      }
+    ]
+  },
+  {
+    "text": "不支持的压缩格式: ${ext || '(无扩展名)'}",
+    "existingKey": null,
+    "suggestedKey": "main.auto_不支持的压缩格式",
+    "occurrences": [
+      {
+        "file": "src/main/services/archive.ts",
+        "line": 192
+      }
+    ]
+  },
+  {
+    "text": "目标角色目录越界",
+    "existingKey": null,
+    "suggestedKey": "main.auto_目标角色目录越界",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 200
+      }
+    ]
+  },
+  {
+    "text": "请先在设置里选择这个游戏的 Mods 目录",
+    "existingKey": null,
+    "suggestedKey": "dialog.pickFolder",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 236
+      },
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 355
+      }
+    ]
+  },
+  {
+    "text": "Mods 目录不存在: ${gameSettings.modsPath}",
+    "existingKey": null,
+    "suggestedKey": "common.notFound",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 238
+      },
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 357
+      }
+    ]
+  },
+  {
+    "text": "没有选择要导入的文件或文件夹",
+    "existingKey": null,
+    "suggestedKey": "dialog.pickFolder",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 244
+      }
+    ]
+  },
+  {
+    "text": "路径不存在",
+    "existingKey": null,
+    "suggestedKey": "common.notFound",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 262
+      }
+    ]
+  },
+  {
+    "text": "不支持的文件格式，仅支持 .zip / .7z / .rar 压缩包或解压后的文件夹",
+    "existingKey": null,
+    "suggestedKey": "main.auto_不支持的文件格式",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 271
+      }
+    ]
+  },
+  {
+    "text": "未在其中找到可导入的 Mod 文件",
+    "existingKey": null,
+    "suggestedKey": "main.auto_未在其中找到可导",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 276
+      }
+    ]
+  },
+  {
+    "text": "未匹配（默认其他）",
+    "existingKey": null,
+    "suggestedKey": "main.auto_未匹配默认其他",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 292
+      }
+    ]
+  },
+  {
+    "text": "当前角色页",
+    "existingKey": null,
+    "suggestedKey": "main.auto_当前角色页",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 296
+      }
+    ]
+  },
+  {
+    "text": "导入会话已过期，请重新选择或拖入文件",
+    "existingKey": null,
+    "suggestedKey": "main.auto_导入会话已过期请",
+    "occurrences": [
+      {
+        "file": "src/main/services/imports.ts",
+        "line": 351
+      }
+    ]
+  },
+  {
+    "text": "角色目录名不合法: ${characterFolder}",
+    "existingKey": null,
+    "suggestedKey": "common.invalidParam",
+    "occurrences": [
+      {
+        "file": "src/main/services/library.ts",
+        "line": 72
+      }
+    ]
+  },
+  {
+    "text": "角色目录越界",
+    "existingKey": null,
+    "suggestedKey": "main.auto_角色目录越界",
+    "occurrences": [
+      {
+        "file": "src/main/services/library.ts",
+        "line": 75
+      }
+    ]
+  },
+  {
+    "text": "角色目录不存在: ${characterFolder}",
+    "existingKey": null,
+    "suggestedKey": "common.notFound",
+    "occurrences": [
+      {
+        "file": "src/main/services/library.ts",
+        "line": 76
+      }
+    ]
+  },
+  {
+    "text": "Mod 路径越界",
+    "existingKey": "common.modPathOutOfBounds",
+    "suggestedKey": "main.auto_Mod路径越界",
+    "occurrences": [
+      {
+        "file": "src/main/services/library.ts",
+        "line": 437
+      }
+    ]
+  },
+  {
+    "text": "Mod 目录不存在",
+    "existingKey": "common.modDirNotExist",
+    "suggestedKey": "common.notFound",
+    "occurrences": [
+      {
+        "file": "src/main/services/library.ts",
+        "line": 445
+      },
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 819
+      },
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 908
+      }
+    ]
+  },
+  {
+    "text": "封面只支持 png / jpg / webp / gif / avif",
+    "existingKey": null,
+    "suggestedKey": "main.auto_封面只支持png",
+    "occurrences": [
+      {
+        "file": "src/main/services/metadata.ts",
+        "line": 143
+      }
+    ]
+  },
+  {
+    "text": "封面不是文件",
+    "existingKey": null,
+    "suggestedKey": "main.auto_封面不是文件",
+    "occurrences": [
+      {
+        "file": "src/main/services/metadata.ts",
+        "line": 146
+      }
+    ]
+  },
+  {
+    "text": "封面图片过大（>12MB）",
+    "existingKey": null,
+    "suggestedKey": "main.auto_封面图片过大12",
+    "occurrences": [
+      {
+        "file": "src/main/services/metadata.ts",
+        "line": 147
+      }
+    ]
+  },
+  {
+    "text": "未找到 d3dx.ini 配置文件",
+    "existingKey": null,
+    "suggestedKey": "main.auto_未找到d3dxi",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 277
+      }
+    ]
+  },
+  {
+    "text": "默认(初始)",
+    "existingKey": null,
+    "suggestedKey": "main.auto_默认初始",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 756
+      }
+    ]
+  },
+  {
+    "text": "预设名称不能为空",
+    "existingKey": null,
+    "suggestedKey": "main.auto_预设名称不能为空",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 818
+      }
+    ]
+  },
+  {
+    "text": "当前造型配置与已有预设「${duplicatePreset.name}」完全一致，无需重复保存",
+    "existingKey": null,
+    "suggestedKey": "main.auto_当前造型配置与已",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 862
+      }
+    ]
+  },
+  {
+    "text": "未找到指定预设",
+    "existingKey": null,
+    "suggestedKey": "main.auto_未找到指定预设",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 906
+      }
+    ]
+  },
+  {
+    "text": "默认初始预设不允许删除",
+    "existingKey": null,
+    "suggestedKey": "main.auto_默认初始预设不允",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 987
+      }
+    ]
+  },
+  {
+    "text": "未找到该预设",
+    "existingKey": null,
+    "suggestedKey": "main.auto_未找到该预设",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 992
+      }
+    ]
+  },
+  {
+    "text": "方案名称不能为空",
+    "existingKey": null,
+    "suggestedKey": "main.auto_方案名称不能为空",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 1037
+      }
+    ]
+  },
+  {
+    "text": "未找到该方案",
+    "existingKey": null,
+    "suggestedKey": "main.auto_未找到该方案",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 1070
+      }
+    ]
+  },
+  {
+    "text": "未找到指定方案",
+    "existingKey": null,
+    "suggestedKey": "main.auto_未找到指定方案",
+    "occurrences": [
+      {
+        "file": "src/main/services/presets.ts",
+        "line": 1087
+      }
+    ]
+  }
+]
