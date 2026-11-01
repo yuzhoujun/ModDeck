@@ -10,7 +10,10 @@ $outputDir = Join-Path $root 'release'
 $appDir = Join-Path $buildRoot 'win-unpacked'
 $zipPath = Join-Path $outputDir "ModDeck-$version-win-x64.zip"
 $tempRoot = Join-Path (Split-Path -Parent $root) 'temp'
-New-Item -ItemType Directory -Force $tempRoot, $outputDir, $buildRoot | Out-Null
+$customTmp = Join-Path $tempRoot 'tmp'
+New-Item -ItemType Directory -Force $tempRoot, $outputDir, $buildRoot, $customTmp | Out-Null
+$env:TMP = $customTmp
+$env:TEMP = $customTmp
 
 Write-Host "Building ModDeck $version ..."
 node node_modules/electron-vite/bin/electron-vite.js build

@@ -28,6 +28,7 @@ import type {
   ImportParseRequest,
   ImportRequest,
   OverlayDetailRequest,
+  RosterPresetExportFile,
   Settings,
   SaveRosterPresetInput,
   SettingsPatch,
@@ -77,7 +78,12 @@ import {
   clearPendingModToggles,
   recordPendingRosterScheme,
   clearPendingRosterSchemes,
-  clearPendingForMod
+  clearPendingForMod,
+  buildModPresetExportData,
+  importModPresetsFromFile,
+  buildRosterPresetExportData,
+  inspectRosterPresetFileContent,
+  confirmImportRosterPreset
 } from './services/presets'
 import {
   buildSnapshot,
@@ -2856,6 +2862,178 @@ function registerIpc(): void {
     async (gameId: GameId, presetId: string) => {
       requireGame(gameId)
       const res = await deleteRosterPreset(baseDir(), gameId, presetId)
+      if (res.ok) {
+        broadcastStateChanged({ gameId })
+      }
+      return res
+    }
+  )
+
+  register(
+    IPC.exportModPresets,
+    async (gameId: GameId, characterFolder: string, modFolder: string, presetId?: string) => {
+      requireGame(gameId)
+      const res = await buildModPresetExportData(baseDir(), gameId, characterFolder, modFolder, presetId)
+      if (!res.ok || !res.data) return { ok: false, error: res.error || tMain('preset.exportFailed') }
+      const saveRes = mainWindow
+        ? await dialog.showSaveDialog(mainWindow, {
+            title: tMain('dialog.exportModPresets'),
+            defaultPath: res.defaultFileName,
+            filters: [{ name: 'ModDeck Preset (*.moddeck-preset.json, *.json)', extensions: ['moddeck-preset.json', 'json'] }]
+          })
+        : await dialog.showSaveDialog({
+            title: tMain('dialog.exportModPresets'),
+            defaultPath: res.defaultFileName,
+            filters: [{ name: 'ModDeck Preset (*.moddeck-preset.json, *.json)', extensions: ['moddeck-preset.json', 'json'] }]
+          })
+      if (saveRes.canceled || !saveRes.filePath) return { ok: false, error: tMain('dialog.canceled') }
+      await fs.writeFile(saveRes.filePath, JSON.stringify(res.data, null, 2), 'utf8')
+      return { ok: true, filePath: saveRes.filePath, count: res.data.presets.length }
+    }
+  )
+
+  register(
+    IPC.importModPresets,
+    async (gameId: GameId, characterFolder: string, modFolder: string) => {
+      requireGame(gameId)
+      const openRes = mainWindow
+        ? await dialog.showOpenDialog(mainWindow, {
+            title: tMain('dialog.importModPresets'),
+            filters: [{ name: 'ModDeck Preset (*.moddeck-preset.json, *.json)', extensions: ['moddeck-preset.json', 'json'] }],
+            properties: ['openFile']
+          })
+        : await dialog.showOpenDialog({
+            title: tMain('dialog.importModPresets'),
+            filters: [{ name: 'ModDeck Preset (*.moddeck-preset.json, *.json)', extensions: ['moddeck-preset.json', 'json'] }],
+            properties: ['openFile']
+          })
+      if (openRes.canceled || !openRes.filePaths?.[0]) return { ok: false, error: tMain('dialog.canceled') }
+      const res = await importModPresetsFromFile(baseDir(), gameId, characterFolder, modFolder, openRes.filePaths[0])
+      if (res.ok) {
+        broadcastStateChanged({ gameId, characterFolder })
+      }
+      return res
+    }
+  )
+
+  register(
+    IPC.importModPresetsFromPath,
+    async (gameId: GameId, characterFolder: string, modFolder: string, filePath: string) => {
+      requireGame(gameId)
+      const res = await importModPresetsFromFile(baseDir(), gameId, characterFolder, modFolder, filePath)
+      if (res.ok) {
+        broadcastStateChanged({ gameId, characterFolder })
+      }
+      return res
+    }
+  )
+
+  register(
+    IPC.exportRosterPreset,
+    async (gameId: GameId, presetId: string) => {
+      requireGame(gameId)
+      const res = await buildRosterPresetExportData(baseDir(), gameId, presetId)
+      if (!res.ok || !res.data) return { ok: false, error: res.error || tMain('preset.exportFailed') }
+      const saveRes = mainWindow
+        ? await dialog.showSaveDialog(mainWindow, {
+            title: tMain('dialog.exportRosterPreset'),
+            defaultPath: res.defaultFileName,
+            filters: [{ name: 'ModDeck Scheme (*.moddeck-scheme.json, *.json)', extensions: ['moddeck-scheme.json', 'json'] }]
+          })
+        : await dialog.showSaveDialog({
+            title: tMain('dialog.exportRosterPreset'),
+            defaultPath: res.defaultFileName,
+            filters: [{ name: 'ModDeck Scheme (*.moddeck-scheme.json, *.json)', extensions: ['moddeck-scheme.json', 'json'] }]
+          })
+      if (saveRes.canceled || !saveRes.filePath) return { ok: false, error: tMain('dialog.canceled') }
+      await fs.writeFile(saveRes.filePath, JSON.stringify(res.data, null, 2), 'utf8')
+      return { ok: true, filePath: saveRes.filePath }
+    }
+  )
+
+  register(
+    IPC.inspectRosterPresetFile,
+    async (gameId: GameId) => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath) {
+        return {
+          ok: false,
+          error: tMain('common.modsDirNotConfigured'),
+          totalCharacters: 0,
+          matchedCharacters: 0,
+          totalMods: 0,
+          matchedMods: 0,
+          missingCharacters: [],
+          missingMods: [],
+          matchedItems: []
+        }
+      }
+      const openRes = mainWindow
+        ? await dialog.showOpenDialog(mainWindow, {
+            title: tMain('dialog.importRosterPreset'),
+            filters: [{ name: 'ModDeck Scheme (*.moddeck-scheme.json, *.json)', extensions: ['moddeck-scheme.json', 'json'] }],
+            properties: ['openFile']
+          })
+        : await dialog.showOpenDialog({
+            title: tMain('dialog.importRosterPreset'),
+            filters: [{ name: 'ModDeck Scheme (*.moddeck-scheme.json, *.json)', extensions: ['moddeck-scheme.json', 'json'] }],
+            properties: ['openFile']
+          })
+      if (openRes.canceled || !openRes.filePaths?.[0]) {
+        return {
+          ok: false,
+          error: tMain('dialog.canceled'),
+          totalCharacters: 0,
+          matchedCharacters: 0,
+          totalMods: 0,
+          matchedMods: 0,
+          missingCharacters: [],
+          missingMods: [],
+          matchedItems: []
+        }
+      }
+      return inspectRosterPresetFileContent(
+        gameId,
+        gameSettings.modsPath,
+        openRes.filePaths[0],
+        (root, folder) => resolveCharacterDir(root, folder)
+      )
+    }
+  )
+
+  register(
+    IPC.inspectRosterPresetFileFromPath,
+    async (gameId: GameId, filePath: string) => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath) {
+        return {
+          ok: false,
+          error: tMain('common.modsDirNotConfigured'),
+          totalCharacters: 0,
+          matchedCharacters: 0,
+          totalMods: 0,
+          matchedMods: 0,
+          missingCharacters: [],
+          missingMods: [],
+          matchedItems: []
+        }
+      }
+      return inspectRosterPresetFileContent(
+        gameId,
+        gameSettings.modsPath,
+        filePath,
+        (root, folder) => resolveCharacterDir(root, folder)
+      )
+    }
+  )
+
+  register(
+    IPC.confirmImportRosterPreset,
+    async (gameId: GameId, rawExport: RosterPresetExportFile, customName?: string) => {
+      requireGame(gameId)
+      const res = await confirmImportRosterPreset(baseDir(), gameId, rawExport, customName)
       if (res.ok) {
         broadcastStateChanged({ gameId })
       }

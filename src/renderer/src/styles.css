@@ -3294,3 +3294,109 @@ input[type='range'].setting-range::-webkit-slider-thumb:active {
   gap: 10px;
   margin-top: 8px;
 }
+
+/* 2.3.2 方案导入导出与匹配预览样式 */
+.import-scheme-stat-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.import-scheme-stat-card .stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.import-scheme-stat-card .stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.import-scheme-stat-card .stat-sub {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.import-scheme-list-box {
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.import-scheme-items-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.import-scheme-item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.import-scheme-item-row.is-missing {
+  opacity: 0.75;
+  background: rgba(239, 68, 68, 0.04);
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+.import-scheme-item-row .item-char-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.import-scheme-item-row .item-char-badge.missing {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.import-scheme-item-row .item-mod-name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  overflow: hidden;
+}
+
+.import-scheme-item-row .item-mod-name.missing {
+  color: var(--text-muted);
+}
+
+.import-scheme-item-row .item-preset-badge {
+  font-size: 11px;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.import-scheme-item-row .item-status-tag {
+  font-size: 11px;
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
+.roster-chip-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+}

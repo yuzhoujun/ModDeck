@@ -215,6 +215,94 @@ export function ModDetailsPanel({
     }
   }
 
+  async function handleExportAllPresets() {
+    if (!details) return
+    try {
+      const res = await window.moddeck.exportModPresets(
+        gameId,
+        details.characterFolder,
+        details.folderName
+      )
+      if (res.ok) {
+        onNotify?.(t('preset.exportModPresetSuccess', { path: res.filePath || '' }), 'ok')
+      } else if (res.error && res.error !== t('dialog.canceled') && res.error !== '用户取消') {
+        onNotify?.(res.error || t('preset.exportFailed'), 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
+  async function handleExportSinglePreset(preset: ModVariantPreset) {
+    if (!details) return
+    try {
+      const res = await window.moddeck.exportModPresets(
+        gameId,
+        details.characterFolder,
+        details.folderName,
+        preset.id
+      )
+      if (res.ok) {
+        onNotify?.(t('preset.exportModPresetSuccess', { path: res.filePath || '' }), 'ok')
+      } else if (res.error && res.error !== t('dialog.canceled') && res.error !== '用户取消') {
+        onNotify?.(res.error || t('preset.exportFailed'), 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
+  async function handleImportPreset() {
+    if (!details) return
+    try {
+      const res = await window.moddeck.importModPresets(
+        gameId,
+        details.characterFolder,
+        details.folderName
+      )
+      if (res.ok) {
+        onNotify?.(
+          t('preset.importModPresetSuccess', {
+            count: res.count ?? 0,
+            names: res.names?.join(', ') || ''
+          }),
+          'ok'
+        )
+        void refreshPresets()
+      } else if (res.error && res.error !== t('dialog.canceled') && res.error !== '用户取消') {
+        onNotify?.(res.error || t('preset.importModPresetFailed'), 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
+  async function handleDropImportPreset(filePath: string) {
+    if (!details) return
+    try {
+      const res = await window.moddeck.importModPresetsFromPath(
+        gameId,
+        details.characterFolder,
+        details.folderName,
+        filePath
+      )
+      if (res.ok) {
+        onNotify?.(
+          t('preset.importModPresetSuccess', {
+            count: res.count ?? 0,
+            names: res.names?.join(', ') || ''
+          }),
+          'ok'
+        )
+        void refreshPresets()
+      } else {
+        onNotify?.(res.error || t('preset.importModPresetFailed'), 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
   function handlePreviewDragOver(event: DragEvent<HTMLDivElement>) {
     if (!onSetPreview) return
     if (!Array.from(event.dataTransfer.types).includes('Files')) return
@@ -322,17 +410,55 @@ export function ModDetailsPanel({
           </div>
 
           {/* 2.2.1 Level 1: 单 Mod 专属预设与变体管理 */}
-          <div className="detail-section">
+          <div
+            className="detail-section"
+            onDragOver={(e) => {
+              if (Array.from(e.dataTransfer.types).includes('Files')) {
+                e.preventDefault()
+                e.stopPropagation()
+                e.dataTransfer.dropEffect = 'copy'
+              }
+            }}
+            onDrop={(e) => {
+              if (!Array.from(e.dataTransfer.types).includes('Files')) return
+              e.preventDefault()
+              e.stopPropagation()
+              const file = e.dataTransfer.files[0]
+              if (file && (file as any).path) {
+                void handleDropImportPreset((file as any).path)
+              }
+            }}
+          >
             <div className="detail-section-head">
               <span className="detail-section-title">{t('mod.presets')}</span>
-              <button
-                className="btn ghost small-btn"
-                onClick={() => setShowSavePreset(!showSavePreset)}
-                title={t('preset.saveAsModPresetTooltip')}
-              >
-                <Icon name="plus" size={13} />
-                {showSavePreset ? t('common.cancel') : t('mod.saveAsNew')}
-              </button>
+              <div className="actions" style={{ gap: '6px' }}>
+                <button
+                  className="btn ghost small-btn"
+                  onClick={() => void handleImportPreset()}
+                  title={t('preset.importModPresetTooltip')}
+                >
+                  <Icon name="upload" size={13} />
+                  {t('preset.importModPreset')}
+                </button>
+                {presets.filter((p) => p.id !== '__default__').length > 0 ? (
+                  <button
+                    className="btn ghost small-btn"
+                    onClick={() => void handleExportAllPresets()}
+                    title={t('preset.exportModPresetTooltip')}
+                  >
+                    <Icon name="download" size={13} />
+                    {t('preset.exportModPreset')}
+                  </button>
+                ) : null}
+                <button
+                  className="btn ghost small-btn"
+                  onClick={() => setShowSavePreset(!showSavePreset)}
+                  title={t('preset.saveAsModPresetTooltip')}
+                >
+                  <Icon name="plus" size={13} />
+                  {showSavePreset ? t('common.cancel') : t('mod.saveAsNew')}
+                </button>
+              </div>
             </div>
 
             {showSavePreset ? (
@@ -406,13 +532,25 @@ export function ModDetailsPanel({
                         <Icon name="info" size={12} />
                       </button>
                       {!isDefault ? (
-                        <button
-                          className="icon-btn danger preset-del-btn"
-                          onClick={() => void handleDeletePreset(preset)}
-                          title={t('preset.deletePresetBtnTooltip')}
-                        >
-                          <Icon name="close" size={12} />
-                        </button>
+                        <>
+                          <button
+                            className="icon-btn preset-export-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void handleExportSinglePreset(preset)
+                            }}
+                            title={t('preset.exportSinglePresetTooltip')}
+                          >
+                            <Icon name="download" size={12} />
+                          </button>
+                          <button
+                            className="icon-btn danger preset-del-btn"
+                            onClick={() => void handleDeletePreset(preset)}
+                            title={t('preset.deletePresetBtnTooltip')}
+                          >
+                            <Icon name="close" size={12} />
+                          </button>
+                        </>
                       ) : null}
                     </div>
                   )

@@ -8,16 +8,21 @@ import type {
   CharacterMeta,
   CreateCharacterInput,
   EnvironmentCheck,
+  ExportPresetResult,
   GameId,
   GameSnapshot,
   ImportCommitRequest,
   ImportParseRequest,
   ImportParseResult,
+  ImportPresetsResult,
   ImportRequest,
   ImportResult,
+  ImportRosterResult,
   ModDetails,
   ModInfo,
   OverlayDetailRequest,
+  RosterPresetExportFile,
+  RosterSchemeImportInspection,
   RosterSyncResult,
   RosterSyncStatus,
   Settings,
@@ -66,6 +71,13 @@ export const IPC = {
   saveRosterPreset: 'presets:save-roster-preset',
   applyRosterPreset: 'presets:apply-roster-preset',
   deleteRosterPreset: 'presets:delete-roster-preset',
+  exportModPresets: 'presets:export-mod-presets',
+  importModPresets: 'presets:import-mod-presets',
+  importModPresetsFromPath: 'presets:import-mod-presets-from-path',
+  exportRosterPreset: 'presets:export-roster-preset',
+  inspectRosterPresetFile: 'presets:inspect-roster-preset-file',
+  inspectRosterPresetFileFromPath: 'presets:inspect-roster-preset-file-from-path',
+  confirmImportRosterPreset: 'presets:confirm-import-roster-preset',
   getD3dxAutoSaveInterval: 'd3dx:get-auto-save-interval',
   setD3dxAutoSaveInterval: 'd3dx:set-auto-save-interval',
   setModPreview: 'mods:set-preview',
@@ -187,6 +199,31 @@ export interface ModDeckApi {
     modFolder: string,
     presetId: string
   ): Promise<ToggleResult>
+  exportModPresets(
+    gameId: GameId,
+    characterFolder: string,
+    modFolder: string,
+    presetId?: string
+  ): Promise<ExportPresetResult>
+  importModPresets(
+    gameId: GameId,
+    characterFolder: string,
+    modFolder: string
+  ): Promise<ImportPresetsResult>
+  importModPresetsFromPath(
+    gameId: GameId,
+    characterFolder: string,
+    modFolder: string,
+    filePath: string
+  ): Promise<ImportPresetsResult>
+  exportRosterPreset(gameId: GameId, presetId: string): Promise<ExportPresetResult>
+  inspectRosterPresetFile(gameId: GameId): Promise<RosterSchemeImportInspection>
+  inspectRosterPresetFileFromPath(gameId: GameId, filePath: string): Promise<RosterSchemeImportInspection>
+  confirmImportRosterPreset(
+    gameId: GameId,
+    rawExport: RosterPresetExportFile,
+    customName?: string
+  ): Promise<ImportRosterResult>
   getModDetails(
     gameId: GameId,
     characterFolder: string,

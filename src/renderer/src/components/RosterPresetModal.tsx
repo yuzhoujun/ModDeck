@@ -6,12 +6,14 @@ import type {
   ModAssignmentItem,
   ModInfo,
   ModVariantPreset,
-  RosterPreset
+  RosterPreset,
+  RosterSchemeImportInspection
 } from '../../../shared/types'
 import { getAssignmentModItems, isUtilityCategory } from '../../../shared/types'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { ScrollTitle } from './ScrollTitle'
+import { ImportSchemeModal } from './ImportSchemeModal'
 import { useI18n, getLocaleCharacterName, getLocaleGameName } from '../i18n'
 
 export function RosterPresetModal({
@@ -43,6 +45,8 @@ export function RosterPresetModal({
   const [activePoolTab, setActivePoolTab] = useState<'character' | 'utility' | 'all'>('character')
   const [showDirtyWarningModal, setShowDirtyWarningModal] = useState(false)
   const [dirtyWarningList, setDirtyWarningList] = useState<{ charName: string; modName: string }[]>([])
+  const [inspectionResult, setInspectionResult] = useState<RosterSchemeImportInspection | null>(null)
+  const [importingScheme, setImportingScheme] = useState(false)
 
   // 1. 加载已有方案列表
   const fetchPresets = async () => {
@@ -444,6 +448,68 @@ export function RosterPresetModal({
     }
   }
 
+  // 导出方案
+  const handleExportScheme = async (preset: RosterPreset) => {
+    try {
+      const res = await window.moddeck.exportRosterPreset(game.id, preset.id)
+      if (res.ok) {
+        onNotify?.(t('preset.schemeExported', { name: preset.name }), 'ok')
+      } else if (res.error && res.error !== t('dialog.canceled') && res.error !== '用户取消') {
+        onNotify?.(res.error || t('preset.schemeExportFailed'), 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
+  // 导入方案（打开文件对话框预览）
+  const handleStartImportScheme = async () => {
+    try {
+      const res = await window.moddeck.inspectRosterPresetFile(game.id)
+      if (res.ok) {
+        setInspectionResult(res)
+      } else if (res.error && res.error !== t('dialog.canceled') && res.error !== '用户取消') {
+        onNotify?.(res.error || t('preset.schemeImportFailed'), 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
+  // 拖拽导入文件
+  const handleDropImportFile = async (filePath: string) => {
+    try {
+      const res = await window.moddeck.inspectRosterPresetFileFromPath(game.id, filePath)
+      if (res.ok) {
+        setInspectionResult(res)
+      } else {
+        onNotify?.(res.error || t('preset.schemeImportFailed'), 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    }
+  }
+
+  // 确认导入方案
+  const handleConfirmImportScheme = async (customName: string) => {
+    if (!inspectionResult?.rawExport) return
+    try {
+      setImportingScheme(true)
+      const res = await window.moddeck.confirmImportRosterPreset(game.id, inspectionResult.rawExport, customName)
+      if (res.ok) {
+        onNotify?.(t('preset.schemeImportSuccess', { name: res.schemeName || '' }), 'ok')
+        setInspectionResult(null)
+        await fetchPresets()
+      } else {
+        onNotify?.(res.error || t('preset.schemeImportFailed'), 'err')
+      }
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    } finally {
+      setImportingScheme(false)
+    }
+  }
+
   const validCharacters = snapshot.characters.filter((c) => {
     if (c.modCount === 0) return false
     if (!charFilter) return true
@@ -559,24 +625,52 @@ export function RosterPresetModal({
         </div>
       }
     >
-      <div className="roster-preset-modal-content">
+      <div
+        className="roster-preset-modal-content"
+        onDragOver={(e) => {
+          if (Array.from(e.dataTransfer.types).includes('Files')) {
+            e.preventDefault()
+            e.stopPropagation()
+            e.dataTransfer.dropEffect = 'copy'
+          }
+        }}
+        onDrop={(e) => {
+          if (!Array.from(e.dataTransfer.types).includes('Files')) return
+          e.preventDefault()
+          e.stopPropagation()
+          const file = e.dataTransfer.files[0]
+          if (file && (file as any).path) {
+            void handleDropImportFile((file as any).path)
+          }
+        }}
+      >
         {/* 顶部方案栏 */}
         <div className="roster-presets-bar">
           <div className="roster-presets-bar-head">
             <strong>{t('preset.savedSchemes', { count: presets.length })}</strong>
-            <button
-              className="btn small-btn primary"
-              disabled={!showCreateForm && Boolean(matchingExistingPreset)}
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              title={
-                matchingExistingPreset
-                  ? t('preset.schemeIdenticalNotice', { name: matchingExistingPreset.name })
-                  : t('preset.saveWorkbenchAsNewTooltip')
-              }
-            >
-              <Icon name="plus" size={14} />
-              {showCreateForm ? t('common.cancel') : t('preset.saveAsNewScheme')}
-            </button>
+            <div className="actions" style={{ gap: '6px' }}>
+              <button
+                className="btn small-btn ghost"
+                onClick={() => void handleStartImportScheme()}
+                title={t('preset.importSchemeTooltip')}
+              >
+                <Icon name="upload" size={13} />
+                {t('preset.importScheme')}
+              </button>
+              <button
+                className="btn small-btn primary"
+                disabled={!showCreateForm && Boolean(matchingExistingPreset)}
+                onClick={() => setShowCreateForm(!showCreateForm)}
+                title={
+                  matchingExistingPreset
+                    ? t('preset.schemeIdenticalNotice', { name: matchingExistingPreset.name })
+                    : t('preset.saveWorkbenchAsNewTooltip')
+                }
+              >
+                <Icon name="plus" size={13} />
+                {showCreateForm ? t('common.cancel') : t('preset.saveAsNewScheme')}
+              </button>
+            </div>
           </div>
 
           {showCreateForm ? (
@@ -640,16 +734,28 @@ export function RosterPresetModal({
                         ({charCount} · {totalModCount})
                       </span>
                     </button>
-                    <button
-                      className="icon-btn danger preset-del-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void handleDeletePreset(p)
-                      }}
-                      title={t('preset.deleteSchemeTooltip')}
-                    >
-                      <Icon name="close" size={12} />
-                    </button>
+                    <div className="roster-chip-actions">
+                      <button
+                        className="icon-btn preset-export-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleExportScheme(p)
+                        }}
+                        title={t('preset.exportSchemeTooltip')}
+                      >
+                        <Icon name="download" size={12} />
+                      </button>
+                      <button
+                        className="icon-btn danger preset-del-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleDeletePreset(p)
+                        }}
+                        title={t('preset.deleteSchemeTooltip')}
+                      >
+                        <Icon name="close" size={12} />
+                      </button>
+                    </div>
                   </div>
                 )
               })
@@ -952,6 +1058,14 @@ export function RosterPresetModal({
           </div>
         </Modal>
       )}
+      {inspectionResult ? (
+        <ImportSchemeModal
+          inspection={inspectionResult}
+          loading={importingScheme}
+          onConfirm={handleConfirmImportScheme}
+          onClose={() => setInspectionResult(null)}
+        />
+      ) : null}
     </Modal>
   )
 }

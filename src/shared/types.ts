@@ -349,6 +349,90 @@ export interface SaveRosterPresetInput {
 }
 
 /**
+ * 单 Mod 预设导出/导入文件结构 (*.moddeck-preset.json)
+ */
+export interface ModPresetExportFile {
+  moddeckFileType: 'mod-preset'
+  version: 1
+  gameId: GameId
+  characterFolder: string
+  modName: string
+  exportedAt: number
+  presets: Array<{
+    name: string
+    activeIniFiles: string[]
+    variables: Record<string, string>
+  }>
+}
+
+/**
+ * 全角色池方案导出/导入文件结构 (*.moddeck-scheme.json)
+ * 增强携带预设名称、变体变量与 ini 映射，确保跨设备导入时可自动匹配并恢复变体
+ */
+export interface RosterPresetExportFile {
+  moddeckFileType: 'roster-scheme'
+  version: 1
+  gameId: GameId
+  exportedAt: number
+  scheme: {
+    name: string
+    gameId: GameId
+    assignments: Record<
+      string,
+      {
+        mods: Array<{
+          modName: string
+          presetId?: string
+          presetName?: string
+          presetVariables?: Record<string, string>
+          presetActiveInis?: string[]
+        }>
+      }
+    >
+  }
+}
+
+/**
+ * 方案导入检查与匹配预览报告
+ */
+export interface RosterSchemeImportInspection {
+  ok: boolean
+  error?: string
+  schemeName?: string
+  sourceGameId?: GameId
+  targetGameId?: GameId
+  totalCharacters: number
+  matchedCharacters: number
+  totalMods: number
+  matchedMods: number
+  missingCharacters: string[]
+  missingMods: Array<{ characterFolder: string; modName: string }>
+  matchedItems: Array<{ characterFolder: string; modName: string; presetName?: string }>
+  rawExport?: RosterPresetExportFile
+}
+
+export interface ExportPresetResult {
+  ok: boolean
+  error?: string
+  filePath?: string
+  count?: number
+}
+
+export interface ImportPresetsResult {
+  ok: boolean
+  error?: string
+  count?: number
+  names?: string[]
+}
+
+export interface ImportRosterResult {
+  ok: boolean
+  error?: string
+  schemeId?: string
+  schemeName?: string
+}
+
+/**
  * 判断是否为非独立角色的功能/工具/UI/世界等系统级分类目录
  */
 export function isUtilityCategory(char: { displayName?: string; folder?: string; kind?: string }): boolean {

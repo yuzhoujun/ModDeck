@@ -1,12 +1,19 @@
 import path from 'node:path'
 import fs from 'node:fs/promises'
 import type {
+  CharacterModAssignment,
   GameId,
   ModVariantPreset,
   RosterPreset,
   SaveRosterPresetInput,
   ModAssignmentItem,
   ToggleResult,
+  ExportPresetResult,
+  ImportPresetsResult,
+  ImportRosterResult,
+  ModPresetExportFile,
+  RosterPresetExportFile,
+  RosterSchemeImportInspection
 } from '../../shared/types'
 import { getAssignmentModItems } from '../../shared/types'
 import { ensureDir, pathExists, readJsonSafe, writeJsonAtomic } from '../core/fsx'
@@ -1247,4 +1254,426 @@ export async function applyRosterPreset(
   await syncBridgeFileFromQueue(modsPath, gameId)
 
   return { ok: true }
+}
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '_').trim()
+}
+
+/**
+ * 构造单 Mod 变体预设导出数据
+ */
+export async function buildModPresetExportData(
+  baseDir: string,
+  gameId: GameId,
+  characterFolder: string,
+  modFolder: string,
+  presetId?: string
+): Promise<{ ok: boolean; error?: string; data?: ModPresetExportFile; defaultFileName?: string }> {
+  const cleanModName = modFolder.replace(/^DISABLED_/i, '')
+  const filePath = await getModPresetFilePath(baseDir, gameId, characterFolder, modFolder)
+  const list = (await readJsonSafe<ModVariantPreset[] | null>(filePath, null)) ?? []
+
+  let presetsToExport: ModVariantPreset[] = []
+  let defaultFileName = ''
+
+  if (presetId && presetId !== 'all') {
+    const target = list.find((p) => p.id === presetId)
+    if (!target) return { ok: false, error: '未找到指定预设' }
+    if (target.id === '__default__') {
+      return { ok: false, error: '出厂默认预设为系统基线，无需单独导出' }
+    }
+    presetsToExport = [target]
+    defaultFileName = sanitizeFilename(`${cleanModName}_${target.name}.moddeck-preset.json`)
+  } else {
+    presetsToExport = list.filter((p) => p.id !== '__default__')
+    if (presetsToExport.length === 0) {
+      return { ok: false, error: '当前 Mod 暂无可导出的自定义预设' }
+    }
+    defaultFileName = sanitizeFilename(`${cleanModName}_presets.moddeck-preset.json`)
+  }
+
+  const exportData: ModPresetExportFile = {
+    moddeckFileType: 'mod-preset',
+    version: 1,
+    gameId,
+    characterFolder,
+    modName: cleanModName,
+    exportedAt: Date.now(),
+    presets: presetsToExport.map((p) => ({
+      name: p.name,
+      activeIniFiles: p.activeIniFiles || [],
+      variables: p.variables || {}
+    }))
+  }
+
+  return { ok: true, data: exportData, defaultFileName }
+}
+
+/**
+ * 从文件导入预设并合并入当前 Mod
+ */
+export async function importModPresetsFromFile(
+  baseDir: string,
+  gameId: GameId,
+  characterFolder: string,
+  modFolder: string,
+  sourceFilePath: string
+): Promise<ImportPresetsResult> {
+  const cleanModName = modFolder.replace(/^DISABLED_/i, '')
+  let rawContent = ''
+  try {
+    rawContent = await fs.readFile(sourceFilePath, 'utf8')
+  } catch {
+    return { ok: false, error: '无法读取所选预设文件' }
+  }
+
+  let parsed: any = null
+  try {
+    parsed = JSON.parse(rawContent)
+  } catch {
+    return { ok: false, error: '预设文件不是合法的 JSON 格式' }
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return { ok: false, error: '预设文件内容格式不正确' }
+  }
+
+  const incomingPresets: Array<{ name: string; activeIniFiles?: string[]; variables?: Record<string, string> }> = []
+
+  if (parsed.moddeckFileType === 'mod-preset' && Array.isArray(parsed.presets)) {
+    incomingPresets.push(...parsed.presets)
+  } else if (Array.isArray(parsed)) {
+    incomingPresets.push(...parsed)
+  } else if (parsed.name && (parsed.variables || parsed.activeIniFiles)) {
+    incomingPresets.push(parsed)
+  } else {
+    return { ok: false, error: '未在文件中检测到兼容的 ModDeck 预设数据' }
+  }
+
+  if (incomingPresets.length === 0) {
+    return { ok: false, error: '预设文件中未包含有效的预设项目' }
+  }
+
+  const filePath = await getModPresetFilePath(baseDir, gameId, characterFolder, modFolder)
+  const list = (await readJsonSafe<ModVariantPreset[] | null>(filePath, null)) ?? []
+
+  const importedNames: string[] = []
+
+  for (const item of incomingPresets) {
+    const rawName = String(item.name || '').trim()
+    if (!rawName || rawName === '默认') continue
+
+    // 冲突重命名
+    let finalName = rawName
+    let counter = 1
+    while (list.some((p) => p.name.toLowerCase() === finalName.toLowerCase())) {
+      finalName = `${rawName} (${counter++})`
+    }
+
+    const newPreset: ModVariantPreset = {
+      id: `preset_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name: finalName,
+      modName: cleanModName,
+      characterFolder,
+      activeIniFiles: Array.isArray(item.activeIniFiles) ? item.activeIniFiles : [],
+      variables: item.variables && typeof item.variables === 'object' ? item.variables : {},
+      updatedAt: Date.now()
+    }
+
+    list.push(newPreset)
+    importedNames.push(finalName)
+  }
+
+  if (importedNames.length === 0) {
+    return { ok: false, error: '未导入任何有效预设（可能由于预设名称为空或重复过滤）' }
+  }
+
+  await writeJsonAtomic(filePath, list)
+  return { ok: true, count: importedNames.length, names: importedNames }
+}
+
+/**
+ * 构造全角色池方案导出数据（包含各 Mod 的预设名称与变量快照）
+ */
+export async function buildRosterPresetExportData(
+  baseDir: string,
+  gameId: GameId,
+  presetId: string
+): Promise<{ ok: boolean; error?: string; data?: RosterPresetExportFile; defaultFileName?: string }> {
+  const store = await loadRosterPresetsStore(baseDir)
+  const list = store.presets[gameId] ?? []
+  const preset = list.find((p) => p.id === presetId)
+  if (!preset) return { ok: false, error: '未找到指定方案' }
+
+  const enhancedAssignments: RosterPresetExportFile['scheme']['assignments'] = {}
+
+  for (const [charFolder, assignment] of Object.entries(preset.assignments)) {
+    const items = getAssignmentModItems(assignment)
+    const enhancedMods: Array<{
+      modName: string
+      presetId?: string
+      presetName?: string
+      presetVariables?: Record<string, string>
+      presetActiveInis?: string[]
+    }> = []
+
+    for (const it of items) {
+      const cleanModName = it.modName.replace(/^DISABLED_/i, '')
+      let presetName = ''
+      let presetVariables: Record<string, string> | undefined
+      let presetActiveInis: string[] | undefined
+
+      if (it.presetId === '__default__' || it.presetId === 'default') {
+        presetName = '默认'
+      } else if (it.presetId) {
+        // 读取该 Mod 的预设列表查找名称与变量
+        const modPresetFile = await getModPresetFilePath(baseDir, gameId, charFolder, cleanModName)
+        const modPresetList = (await readJsonSafe<ModVariantPreset[] | null>(modPresetFile, null)) ?? []
+        const targetP = modPresetList.find((p) => p.id === it.presetId)
+        if (targetP) {
+          presetName = targetP.name
+          presetVariables = targetP.variables
+          presetActiveInis = targetP.activeIniFiles
+        }
+      }
+
+      enhancedMods.push({
+        modName: cleanModName,
+        presetId: it.presetId,
+        presetName: presetName || undefined,
+        presetVariables,
+        presetActiveInis
+      })
+    }
+
+    enhancedAssignments[charFolder] = { mods: enhancedMods }
+  }
+
+  const exportData: RosterPresetExportFile = {
+    moddeckFileType: 'roster-scheme',
+    version: 1,
+    gameId,
+    exportedAt: Date.now(),
+    scheme: {
+      name: preset.name,
+      gameId,
+      assignments: enhancedAssignments
+    }
+  }
+
+  const defaultFileName = sanitizeFilename(`${preset.name}.moddeck-scheme.json`)
+  return { ok: true, data: exportData, defaultFileName }
+}
+
+/**
+ * 校验方案文件内容并与本地已配置 Mod 进行全量匹配分析
+ */
+export async function inspectRosterPresetFileContent(
+  gameId: GameId,
+  modsPath: string,
+  sourceFilePath: string,
+  resolveCharDir: (root: string, folder: string) => Promise<string>
+): Promise<RosterSchemeImportInspection> {
+  const emptyResult: RosterSchemeImportInspection = {
+    ok: false,
+    totalCharacters: 0,
+    matchedCharacters: 0,
+    totalMods: 0,
+    matchedMods: 0,
+    missingCharacters: [],
+    missingMods: [],
+    matchedItems: []
+  }
+
+  let rawContent = ''
+  try {
+    rawContent = await fs.readFile(sourceFilePath, 'utf8')
+  } catch {
+    return { ...emptyResult, error: '无法读取所选方案文件' }
+  }
+
+  let parsed: any = null
+  try {
+    parsed = JSON.parse(rawContent)
+  } catch {
+    return { ...emptyResult, error: '方案文件不是合法的 JSON 格式' }
+  }
+
+  const schemeData = parsed?.scheme ?? parsed
+  if (!schemeData || typeof schemeData !== 'object' || !schemeData.assignments) {
+    return { ...emptyResult, error: '方案文件中未包含有效的阵容与 Mod 分配数据' }
+  }
+
+  const sourceGameId: GameId = parsed?.gameId ?? schemeData?.gameId ?? gameId
+  const schemeName = String(schemeData.name || path.basename(sourceFilePath, path.extname(sourceFilePath))).trim()
+
+  const missingCharacters: string[] = []
+  const missingMods: Array<{ characterFolder: string; modName: string }> = []
+  const matchedItems: Array<{ characterFolder: string; modName: string; presetName?: string }> = []
+
+  let totalCharacters = 0
+  let matchedCharacters = 0
+  let totalMods = 0
+  let matchedMods = 0
+
+  for (const [charFolder, assignment] of Object.entries(schemeData.assignments as Record<string, any>)) {
+    if (!isSafeSegment(charFolder)) continue
+    totalCharacters++
+
+    let charDir = ''
+    try {
+      charDir = await resolveCharDir(modsPath, charFolder)
+    } catch {
+      charDir = ''
+    }
+
+    const items = getAssignmentModItems(assignment)
+    const charExists = charDir && (await pathExists(charDir))
+
+    if (!charExists) {
+      missingCharacters.push(charFolder)
+      for (const item of items) {
+        totalMods++
+        missingMods.push({ characterFolder: charFolder, modName: item.modName })
+      }
+      continue
+    }
+
+    matchedCharacters++
+    const diskEntries = await fs.readdir(charDir, { withFileTypes: true }).catch(() => [])
+    const diskCleanMods = new Set(
+      diskEntries
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name.replace(/^DISABLED_/i, '').toLowerCase())
+    )
+
+    for (const item of items) {
+      totalMods++
+      const cleanMod = item.modName.replace(/^DISABLED_/i, '')
+      if (diskCleanMods.has(cleanMod.toLowerCase())) {
+        matchedMods++
+        matchedItems.push({
+          characterFolder: charFolder,
+          modName: cleanMod,
+          presetName: (item as any).presetName
+        })
+      } else {
+        missingMods.push({ characterFolder: charFolder, modName: cleanMod })
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    schemeName,
+    sourceGameId,
+    targetGameId: gameId,
+    totalCharacters,
+    matchedCharacters,
+    totalMods,
+    matchedMods,
+    missingCharacters,
+    missingMods,
+    matchedItems,
+    rawExport: parsed
+  }
+}
+
+/**
+ * 确认导入方案至本地方案库（支持自动迁移附加的变体预设）
+ */
+export async function confirmImportRosterPreset(
+  baseDir: string,
+  gameId: GameId,
+  rawExport: RosterPresetExportFile,
+  customName?: string
+): Promise<ImportRosterResult> {
+  const schemeData = rawExport?.scheme ?? (rawExport as any)
+  if (!schemeData || !schemeData.assignments) {
+    return { ok: false, error: '导入数据不完整' }
+  }
+
+  const baseName = (customName || schemeData.name || '导入方案').trim()
+  const store = await loadRosterPresetsStore(baseDir)
+  const list = store.presets[gameId] ?? []
+
+  // 冲突重命名
+  let finalName = baseName
+  let counter = 1
+  while (list.some((p) => p.name.toLowerCase() === finalName.toLowerCase())) {
+    finalName = `${baseName} (${counter++})`
+  }
+
+  const finalAssignments: Record<string, CharacterModAssignment> = {}
+
+  for (const [charFolder, assignment] of Object.entries(schemeData.assignments as Record<string, any>)) {
+    const rawItems = getAssignmentModItems(assignment)
+    const processedItems: ModAssignmentItem[] = []
+
+    for (const it of rawItems) {
+      const cleanMod = it.modName.replace(/^DISABLED_/i, '')
+      let assignedPresetId = it.presetId
+
+      const anyItem = it as any
+      // 若携带了自定义变体预设参数，自动尝试检查或注入到本地 Mod 的预设文件中
+      if (
+        anyItem.presetName &&
+        anyItem.presetName !== '默认' &&
+        anyItem.presetVariables &&
+        Object.keys(anyItem.presetVariables).length > 0
+      ) {
+        try {
+          const modPresetFile = await getModPresetFilePath(baseDir, gameId, charFolder, cleanMod)
+          const localPresets = (await readJsonSafe<ModVariantPreset[] | null>(modPresetFile, null)) ?? []
+          const existing = localPresets.find((p) => p.name.toLowerCase() === anyItem.presetName.toLowerCase())
+
+          if (existing) {
+            assignedPresetId = existing.id
+          } else {
+            // 自动为该 Mod 建立对应变体预设
+            const newPresetId = `preset_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+            localPresets.push({
+              id: newPresetId,
+              name: anyItem.presetName,
+              modName: cleanMod,
+              characterFolder: charFolder,
+              activeIniFiles: anyItem.presetActiveInis || [],
+              variables: anyItem.presetVariables,
+              updatedAt: Date.now()
+            })
+            await writeJsonAtomic(modPresetFile, localPresets)
+            assignedPresetId = newPresetId
+          }
+        } catch {
+          // ignore auto-inject error
+        }
+      }
+
+      processedItems.push({
+        modName: cleanMod,
+        presetId: assignedPresetId
+      })
+    }
+
+    finalAssignments[charFolder] = {
+      mods: processedItems,
+      modName: processedItems[0]?.modName,
+      presetId: processedItems[0]?.presetId
+    }
+  }
+
+  const newPreset: RosterPreset = {
+    id: `roster_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    name: finalName,
+    gameId,
+    updatedAt: Date.now(),
+    assignments: finalAssignments
+  }
+
+  list.push(newPreset)
+  store.presets[gameId] = list
+  await saveRosterPresetsStore(baseDir, store)
+
+  return { ok: true, schemeId: newPreset.id, schemeName: finalName }
 }

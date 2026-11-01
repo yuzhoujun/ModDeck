@@ -62,6 +62,20 @@ const api: ModDeckApi = {
   saveRosterPreset: (gameId, input) => ipcRenderer.invoke(IPC.saveRosterPreset, gameId, input),
   applyRosterPreset: (gameId, presetId) => ipcRenderer.invoke(IPC.applyRosterPreset, gameId, presetId),
   deleteRosterPreset: (gameId, presetId) => ipcRenderer.invoke(IPC.deleteRosterPreset, gameId, presetId),
+  exportModPresets: (gameId, characterFolder, modFolder, presetId) =>
+    ipcRenderer.invoke(IPC.exportModPresets, gameId, characterFolder, modFolder, presetId),
+  importModPresets: (gameId, characterFolder, modFolder) =>
+    ipcRenderer.invoke(IPC.importModPresets, gameId, characterFolder, modFolder),
+  importModPresetsFromPath: (gameId, characterFolder, modFolder, filePath) =>
+    ipcRenderer.invoke(IPC.importModPresetsFromPath, gameId, characterFolder, modFolder, filePath),
+  exportRosterPreset: (gameId, presetId) =>
+    ipcRenderer.invoke(IPC.exportRosterPreset, gameId, presetId),
+  inspectRosterPresetFile: (gameId) =>
+    ipcRenderer.invoke(IPC.inspectRosterPresetFile, gameId),
+  inspectRosterPresetFileFromPath: (gameId, filePath) =>
+    ipcRenderer.invoke(IPC.inspectRosterPresetFileFromPath, gameId, filePath),
+  confirmImportRosterPreset: (gameId, rawExport, customName) =>
+    ipcRenderer.invoke(IPC.confirmImportRosterPreset, gameId, rawExport, customName),
   getD3dxAutoSaveInterval: (gameId) => ipcRenderer.invoke(IPC.getD3dxAutoSaveInterval, gameId),
   setD3dxAutoSaveInterval: (gameId, interval) => ipcRenderer.invoke(IPC.setD3dxAutoSaveInterval, gameId, interval),
   getModDetails: (gameId, characterFolder, modFolder) =>
