@@ -169,13 +169,18 @@ Because hardware specs and mod sizes vary drastically, 3DMigoto F10 reload times
 
 ## 4. Game Compatibility & Integration Status
 
+> [!IMPORTANT]
+> **Live Testing Notice**:
+> Currently, **only Arknights: Endfield (EFMI) has undergone extensive live experimental testing and deep adaptation in real game sessions** (including variant parsing, `[Present]` one-frame bridge switching, pending reload queues, benchmark delay calibration, and dual-pool roster schemes).  
+> Other titles (Wuthering Waves WWMI, Honkai: Star Rail SRMI, Zenless Zone Zero ZZMI, Neverness to Everness NEMI, etc.) currently share the same 3DMigoto directory conventions (`DISABLED_`) and `.ini` logic via **code migration and theoretical compatibility, but have NOT yet undergone extensive live verification**. Feedback from players on other titles is very welcome.
+
 | Game Platform | Recommended MI Branch | Compatibility Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **Arknights: Endfield** | **EFMI** | **Fully Verified & Integrated** | Full support for variant engine, `[Present]` bridge, pending queue, benchmark & dual-pool schemes |
-| **Wuthering Waves** | **WWMI** | Rule Compatible (Testing Pending) | Standard 3DMigoto tree structure and `DISABLED_` convention |
-| **Honkai: Star Rail** | **SRMI** | Rule Compatible (Testing Pending) | Standard 3DMigoto specification |
-| **Zenless Zone Zero** | **ZZMI** | Rule Compatible (Testing Pending) | Standard 3DMigoto specification |
-| **Neverness to Everness** | **NEMI** | Rule Compatible (Testing Pending) | Standard 3DMigoto specification |
+| **Arknights: Endfield** | **EFMI** | **✅ Deeply Verified (Extensive Live Testing)** | Author's primary testing environment; full feature pipeline thoroughly verified |
+| **Wuthering Waves** | **WWMI** | ⚠️ Logic Migrated (Unverified in game) | Migrated based on common 3DMigoto rules; pending live experimental tests |
+| **Honkai: Star Rail** | **SRMI** | ⚠️ Logic Migrated (Unverified in game) | Migrated based on common 3DMigoto rules; pending live experimental tests |
+| **Zenless Zone Zero** | **ZZMI** | ⚠️ Logic Migrated (Unverified in game) | Migrated based on common 3DMigoto rules; pending live experimental tests |
+| **Neverness to Everness** | **NEMI** | ⚠️ Logic Migrated (Unverified in game) | Migrated based on common 3DMigoto rules; pending live experimental tests |
 
 ---
 
@@ -291,9 +296,9 @@ A complete modding setup consists of **Game Client + 3DMigoto/XXMI Hooking Layer
 - **Closed Pull Request Policy**: To guard against supply chain vulnerabilities, protect architectural stability, and account for limited personal review bandwidth, **this project does not accept external code Pull Requests (PRs)**. Unsolicited code PRs will be politely closed.
 - **Fork Freedom & Zero Endorsement**: Under the terms of the MIT License, anyone is free to fork, inspect, or modify the codebase. However, **any third-party forks, repackaged binaries, or derivative works are strictly independent actions. Neither this repository nor the original author assumes any liability or provides any endorsement for third-party forks**. Users should obtain official builds exclusively from this repository's Releases.
 
-### 4. Copyright, License & Acknowledgments
+### 4. Origin, License & Acknowledgments
 
+- **Origin & Creator's Statement**: Initiated and maintained by **yuzhoujun**. ModDeck was born out of personal need and developer curiosity: finding that existing, actively-maintained mod managers didn't quite align with personal workflow habits or felt unintuitive for specific in-game variant switching workflows, the author set out during spare time to craft a modern, responsive, and truly tailored tool from scratch.
 - **Copyright**: All game titles, character assets, and trademarks belong to their respective copyright holders.
 - **License**: Licensed under the **[MIT License](LICENSE)**.
-- **Project Creator & Maintainer**: Initiated and maintained by **yuzhoujun**.
-- **Acknowledgments**: Built with development and architectural assistance from **DeepSeek (大肥鱼)** and **Gemini (哈基米)**.
+- **Acknowledgments**: Special thanks to **DeepSeek (大肥鱼)** and **Gemini (哈基米)** for technical and pair-programming assistance in architectural design, complex asynchronous state machine flow control, legacy charset decoding, i18n automation, and cross-platform build pipelines.
