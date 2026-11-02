@@ -72,10 +72,10 @@ Modern 3DMigoto mods often feature extensive color variations, toggleable access
 Many 3DMigoto mods feature hotkeys to switch colorways, hairstyles, or accessories in-game. To capture and lock your custom look into a permanent ModDeck preset, follow this streamlined workflow:
 
 ```mermaid
-flowchart TD
-    A["<b>Step 1 · Tweak Look In-Game</b><br/>Use mod author's hotkeys to adjust outfits and accessories"] --> B["<b>Step 2 · Flush Variables to Disk</b><br/>Press F10 in-game / wait for auto-save / exit game"]
-    B --> C["<b>Step 3 · ModDeck Auto-Samples</b><br/>Watcher detects physical d3dx_user.ini update"]
-    C --> D["<b>Step 4 · Save as New Preset</b><br/>Press Alt+Shift+M to summon overlay and save"]
+flowchart LR
+    A["1. Tweak In-Game"] --> B["2. Flush to Disk (F10)"]
+    B --> C["3. Auto-Sample"]
+    C --> D["4. Save as Preset"]
 ```
 
 1. **Tweak In-Game**: Use the mod author's designated hotkeys in-game to adjust colorways, outfits, and accessories to your liking;

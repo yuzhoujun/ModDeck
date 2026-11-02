@@ -185,26 +185,25 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    subgraph Main["Electron 主进程 (Main Process)"]
-        direction TB
-        M1["路径安全严格校验 (safe-path.ts / 边界拦截)"]
-        M2["原生文件 I/O · 原子写盘 · 系统回收站交互"]
-        M3["全局快捷键注册与多窗口生命周期调度"]
-        M4["ModDeckKeyHelper-v2 原生硬件级扫描码驱动"]
+    subgraph Main["Electron 主进程"]
+        M1["路径安全校验 (safe-path)"]
+        M2["原生文件 I/O 与原子写盘"]
+        M3["全局快捷键与多窗口调度"]
+        M4["ModDeckKeyHelper 按键驱动"]
     end
 
-    subgraph Preload["Preload 隔离安全层 (Context Isolation)"]
-        P1["contextIsolation: true · nodeIntegration: false<br/>通过 contextBridge 向渲染层暴露受控的 window.moddeck 白名单 API"]
+    subgraph Preload["Preload 隔离安全层"]
+        P1["进程上下文隔离 (contextIsolation)"]
+        P2["受控白名单 API (contextBridge)"]
     end
 
-    subgraph Renderers["渲染层多窗口 (Renderer Process)"]
-        direction LR
-        R1["<b>主界面窗口 (App.tsx)</b><br/>• React 19 UI 状态机<br/>• 方案工作台 / 导入解析<br/>• 多语言上下文 (i18n)"]
-        R2["<b>快捷悬浮台 (OverlayApp)</b><br/>• 沉浸式轻量紧凑工作台<br/>• 现场变体切换与按键直发<br/>• 浮动实机秒表测速校准"]
+    subgraph Renderers["渲染层多窗口"]
+        R1["主界面窗口 (App.tsx)"]
+        R2["快捷悬浮台 (OverlayApp)"]
     end
 
-    Main <-->|"IPC 双向通信 (白名单机制)"| Preload
-    Preload <-->|"受控 API 调用"| Renderers
+    Main -->|"IPC 双向通信"| Preload
+    Preload -->|"受控安全调用"| Renderers
 ```
 
 1. **严格的路径边界防御**：
