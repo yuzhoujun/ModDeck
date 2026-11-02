@@ -67,6 +67,25 @@ Modern 3DMigoto mods often feature extensive color variations, toggleable access
 - **Structured Variables Inspector**: Double-click or click the info icon to inspect active `.ini` files and persistent variables;
 - **Transient Variable Filtering**: Automatically ignores non-cosmetic variables (such as menu toggles `$ui_menu`, page numbers, cursor coordinates) so only true outfit parameters are compared and applied.
 
+#### 💡 Recommended Workflow: Capturing & Saving In-Game Presets
+
+Many 3DMigoto mods feature hotkeys to switch colorways, hairstyles, or accessories in-game. To capture and lock your custom look into a permanent ModDeck preset, follow this streamlined workflow:
+
+```mermaid
+flowchart LR
+    A["1. Tweak Look In-Game<br/>(Use mod hotkeys)"] --> B["2. Flush Variables to Disk<br/>(Press F10 / wait auto-save / exit)"]
+    B --> C["3. ModDeck Auto-Samples<br/>(Detects d3dx_user.ini change)"]
+    C --> D["4. Save as Preset<br/>(Alt+Shift+M -> Save as New)"]
+```
+
+1. **Tweak In-Game**: Use the mod author's designated hotkeys in-game to adjust colorways, outfits, and accessories to your liking;
+2. **Flush Variables to Disk**: 3DMigoto tracks runtime variables in GPU/process memory. Trigger a physical write to `d3dx_user.ini` via any of the following:
+   - **Option A (Recommended & Instant)**: Press **`F10`** in-game. 3DMigoto immediately flushes active variables from memory to `d3dx_user.ini`;
+   - **Option B**: Wait for 3DMigoto's Runtime Variable Auto-Save Interval timer to trigger (configurable under Settings → Advanced);
+   - **Option C**: Exit the game (3DMigoto flushes variables automatically upon graceful shutdown).
+3. **ModDeck Auto-Samples**: ModDeck's background watcher detects the updated `d3dx_user.ini` on disk;
+4. **Save with One Click**: Press **`Alt+Shift+M`** to summon the floating overlay (or return to the ModDeck window), click **`+ Save as New Preset`**, enter a name, and confirm. Your outfit is now permanently saved and can be restored or shared anytime!
+
 ![Mod Details & Variant Presets](docs/ModDeck.ModDetials.en.png)
 
 ### 4. Roster Scheme Workspace
