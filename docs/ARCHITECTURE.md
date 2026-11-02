@@ -185,25 +185,25 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    subgraph Main["Electron 主进程"]
-        M1["路径安全校验 (safe-path)"]
-        M2["原生文件 I/O 与原子写盘"]
-        M3["全局快捷键与多窗口调度"]
-        M4["ModDeckKeyHelper 按键驱动"]
+    subgraph Main["  Electron 主进程  "]
+        M1["  路径安全校验 (safe-path)  "]
+        M2["  原生文件 I/O 与原子写盘  "]
+        M3["  全局快捷键与多窗口调度  "]
+        M4["  ModDeckKeyHelper 按键驱动  "]
     end
 
-    subgraph Preload["Preload 隔离安全层"]
-        P1["进程上下文隔离 (contextIsolation)"]
-        P2["受控白名单 API (contextBridge)"]
+    subgraph Preload["  Preload 隔离安全层  "]
+        P1["  进程上下文隔离 (contextIsolation)  "]
+        P2["  受控白名单 API (contextBridge)  "]
     end
 
-    subgraph Renderers["渲染层多窗口"]
-        R1["主界面窗口 (App.tsx)"]
-        R2["快捷悬浮台 (OverlayApp)"]
+    subgraph Renderers["  渲染层多窗口  "]
+        R1["  主界面窗口 (App.tsx)  "]
+        R2["  快捷悬浮台 (OverlayApp)  "]
     end
 
-    Main -->|"IPC 双向通信"| Preload
-    Preload -->|"受控安全调用"| Renderers
+    Main -->|"  IPC 双向通信  "| Preload
+    Preload -->|"  受控安全调用  "| Renderers
 ```
 
 1. **严格的路径边界防御**：

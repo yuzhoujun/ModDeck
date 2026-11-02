@@ -73,9 +73,9 @@ Many 3DMigoto mods feature hotkeys to switch colorways, hairstyles, or accessori
 
 ```mermaid
 flowchart LR
-    A["1. Tweak In-Game"] --> B["2. Flush to Disk (F10)"]
-    B --> C["3. Auto-Sample"]
-    C --> D["4. Save as Preset"]
+    A["  1. Tweak In-Game  "] --> B["  2. Flush to Disk (F10)  "]
+    B --> C["  3. Auto-Sample  "]
+    C --> D["  4. Save as Preset  "]
 ```
 
 1. **Tweak In-Game**: Use the mod author's designated hotkeys in-game to adjust colorways, outfits, and accessories to your liking;
