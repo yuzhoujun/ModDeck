@@ -133,15 +133,15 @@ npm run package:portable
 
 ```text
 ModDeck/
-├── ModDeck.exe             # 应用程序主执行文件
-├── ModDeck.cmd             # 兼容启动脚本（附带 --no-sandbox，推荐日常双击使用）
-├── languages/              # 软件界面语言包（支持外部自定义新增与扩展）
-│   ├── zh-CN.json
-│   └── en-US.json
-├── resources/
-│   └── app.asar            # 打包核心业务逻辑
-├── locales/                # 底层 Chromium 系统多语言 pak 库
-├── README.txt              # 便携说明文档
+├── ModDeck.exe                     # [主程序] 应用程序主执行文件
+├── ModDeck.cmd                     # [启动器] 兼容启动脚本（携带 --no-sandbox 参数避免误拦截）
+├── languages/                      # [多语言] 独立语言包目录（支持热加载与外部扩展）
+│   ├── zh-CN.json                  # [基准] 简体中文界面词典
+│   └── en-US.json                  # [镜像] 英文界面词典
+├── resources/                      # [核心] 运行时资源目录
+│   └── app.asar                    # [逻辑] 编译后的核心前端与主进程产物
+├── locales/                        # [底层] Chromium 运行库多语言 pak 资源
+├── README.txt                      # [指南] 便携版双语快速上手与排错指南
 └── ...
 ```
 

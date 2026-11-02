@@ -27,15 +27,15 @@ ModDeck 是面向 3DMigoto / XXMI 系游戏的开源、现代、本地优先（L
 
 ```text
 Mods/
-  角色目录A/
-    某个Mod/
-      mod.ini
-      preview.png
-    DISABLED_另一个Mod/         ← 目录级禁用状态
-  角色目录B/
-  Characters/                   ← 兼容历史嵌套容器
-  _ModDeck_Preset_Bridge/       ← 运行时一次性帧桥接（以 _ 开头在库中隐身）
-    bridge.ini
+├── 角色分类A/                      # [角色] 第一级角色归属目录
+│   ├── 某个Mod/                    # [启用] 正常加载的 Mod 文件夹
+│   │   ├── mod.ini                 # [配置] 3DMigoto 声明与着色器定义
+│   │   └── preview.png             # [封面] Mod 自定义预览图
+│   └── DISABLED_另一个Mod/         # [禁用] 带 DISABLED_ 前缀停用的 Mod
+├── 角色分类B/                      # [角色] 其他角色目录
+├── Characters/                     # [兼容] 兼容历史多层级嵌套容器
+└── _ModDeck_Preset_Bridge/         # [桥接] 运行时一次性帧桥接（以 _ 开头在库中隐身）
+    └── bridge.ini                  # [核心] [Present] 阶段目标变量注入脚本
 ```
 
 - **角色/分类判定**：`Mods/` 下的任意一级子目录（包括 `Characters/` 容器内的子目录均完全兼容）；
@@ -51,6 +51,21 @@ Mods/
 ## 三、本地数据持久化架构
 
 软件所有运行时配置与用户数据均统一保存在 `%APPDATA%/ModDeck/`：
+
+```text
+%APPDATA%/ModDeck/
+├── settings.json                   # [核心] 游戏路径、通用/高级开关、快捷键与 UI 偏好
+├── roster-presets.json             # [核心] 全角色池阵容预设方案存储
+├── presets/                        # [预设] 单 Mod 变体预设树状存储目录
+│   └── {gameId}/{character}/       # [解耦] 按游戏与角色分级寻址的独立 JSON
+├── characters.json                 # [数据] 角色自定义显示名、别名、排序、隐藏与基线时间
+├── roster-cache.json               # [缓存] 角色离线词库增量缓存与云端同步缓存
+├── covers/{game}/                  # [媒体] 角色头像封面用户媒体资产（1:1 方形裁切 png）
+├── languages/                      # [扩展] 用户自定义外挂语言包目录（与便携包根目录互通）
+├── backups/<timestamp>/            # [防护] 覆盖式导入前的旧目录安全快照备份
+└── logs/                           # [诊断] 运行时排错与诊断日志
+    └── startup.log                 # [诊断] 核心启动与执行排错日志
+```
 
 | 文件 / 目录 | 内容与职责 | 存储特性 |
 | :--- | :--- | :--- |
@@ -70,10 +85,10 @@ Mods/
 
 ```text
 presets/
-  endfield/
-    Xaihi/
-      mod_xaihi_swimming.json
-      mod_xaihi_dress.json
+└── endfield/                       # [游戏] 游戏专属预设根目录
+    └── Xaihi/                      # [角色] 角色专属目录
+        ├── mod_xaihi_swimming.json # [预设] 泳装变体外观快照
+        └── mod_xaihi_dress.json    # [预设] 礼服变体外观快照
 ```
 
 单文件 JSON 记录该 Mod 包含的激活 ini 集合、出厂原生基线及用户保存的持久化变量快照（`variables`），彻底隔离各 Mod 数据，杜绝因单个 Mod 数据损坏导致全库配置失效。
@@ -168,29 +183,28 @@ sequenceDiagram
 
 ## 五、进程模型与安全隔离边界
 
-```text
-┌────────────────────────────────────────────────────────┐
-│                      Electron 主进程                   │
-│  - 路径严格校验 (safe-path.ts / 边界拦截)              │
-│  - 原生文件 IO、原子写盘、系统回收站交互               │
-│  - 全局快捷键注册与多窗口生命周期管理                  │
-│  - ModDeckKeyHelper-v2 按键驱动调度                    │
-└──────────────────────────┬─────────────────────────────┘
-                           │ IPC 通信 (白名单机制)
-┌──────────────────────────┴─────────────────────────────┐
-│                   Preload 隔离安全层                   │
-│  - contextIsolation: true, nodeIntegration: false      │
-│  - 暴露受控的 window.moddeck API                       │
-└──────────────────────────┬─────────────────────────────┘
-                           │
-       ┌───────────────────┴───────────────────┐
-       ▼                                       ▼
-┌─────────────────────────────┐ ┌─────────────────────────────┐
-│      主界面 (App.tsx)       │ │   快捷悬浮台 (OverlayApp)   │
-│  - React 19 UI 状态机       │ │  - 沉浸式轻量紧凑工作台     │
-│  - 方案工作台 / 导入解析    │ │  - 现场变体切换与按键直发   │
-│  - 多语言上下文 (i18n)      │ │  - 浮动实机秒表测速校准     │
-└─────────────────────────────┘ └─────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Main["Electron 主进程 (Main Process)"]
+        direction TB
+        M1["路径安全严格校验 (safe-path.ts / 边界拦截)"]
+        M2["原生文件 I/O · 原子写盘 · 系统回收站交互"]
+        M3["全局快捷键注册与多窗口生命周期调度"]
+        M4["ModDeckKeyHelper-v2 原生硬件级扫描码驱动"]
+    end
+
+    subgraph Preload["Preload 隔离安全层 (Context Isolation)"]
+        P1["contextIsolation: true · nodeIntegration: false<br/>通过 contextBridge 向渲染层暴露受控的 window.moddeck 白名单 API"]
+    end
+
+    subgraph Renderers["渲染层多窗口 (Renderer Process)"]
+        direction LR
+        R1["<b>主界面窗口 (App.tsx)</b><br/>• React 19 UI 状态机<br/>• 方案工作台 / 导入解析<br/>• 多语言上下文 (i18n)"]
+        R2["<b>快捷悬浮台 (OverlayApp)</b><br/>• 沉浸式轻量紧凑工作台<br/>• 现场变体切换与按键直发<br/>• 浮动实机秒表测速校准"]
+    end
+
+    Main <-->|"IPC 双向通信 (白名单机制)"| Preload
+    Preload <-->|"受控 API 调用"| Renderers
 ```
 
 1. **严格的路径边界防御**：

@@ -72,10 +72,10 @@ Modern 3DMigoto mods often feature extensive color variations, toggleable access
 Many 3DMigoto mods feature hotkeys to switch colorways, hairstyles, or accessories in-game. To capture and lock your custom look into a permanent ModDeck preset, follow this streamlined workflow:
 
 ```mermaid
-flowchart LR
-    A["1. Tweak Look In-Game<br/>(Use mod hotkeys)"] --> B["2. Flush Variables to Disk<br/>(Press F10 / wait auto-save / exit)"]
-    B --> C["3. ModDeck Auto-Samples<br/>(Detects d3dx_user.ini change)"]
-    C --> D["4. Save as Preset<br/>(Alt+Shift+M -> Save as New)"]
+flowchart TD
+    A["<b>Step 1 · Tweak Look In-Game</b><br/>Use mod author's hotkeys to adjust outfits and accessories"] --> B["<b>Step 2 · Flush Variables to Disk</b><br/>Press F10 in-game / wait for auto-save / exit game"]
+    B --> C["<b>Step 3 · ModDeck Auto-Samples</b><br/>Watcher detects physical d3dx_user.ini update"]
+    C --> D["<b>Step 4 · Save as New Preset</b><br/>Press Alt+Shift+M to summon overlay and save"]
 ```
 
 1. **Tweak In-Game**: Use the mod author's designated hotkeys in-game to adjust colorways, outfits, and accessories to your liking;
@@ -219,7 +219,22 @@ Because hardware specs and mod sizes vary drastically, 3DMigoto F10 reload times
 
 ## 6. Local Data Directory Structure
 
-Data is stored in `%APPDATA%/ModDeck/` (openable via Settings -> About):
+Data is stored locally in `%APPDATA%/ModDeck/` (openable via Settings -> About):
+
+```text
+%APPDATA%/ModDeck/
+├── settings.json                   # [Core] Base settings, paths, hotkeys, and behavioral switches
+├── roster-presets.json             # [Core] Whole-team roster scheme configuration
+├── presets/                        # [Data] Standalone variant presets directory tree
+│   └── {gameId}/{character}/       # [Decoupled] Independent JSON per mod (presets/{gameId}/{character}/{mod}.json)
+├── characters.json                 # [Data] Custom character aliases, display names, and override configs
+├── roster-cache.json               # [Cache] Bilingual character dictionary incremental cache
+├── covers/                         # [Media] User cropped character portrait covers (1:1 square png)
+├── languages/                      # [i18n] External language pack folder (compatible with portable edition)
+├── tmp/                            # [Temp] Temporary decompression and staging folder (auto-cleaned)
+└── logs/                           # [Diag] Startup and runtime diagnostics logs
+    └── startup.log                 # [Diag] Core diagnostic log file
+```
 
 | File / Folder | Purpose | Nature |
 | :--- | :--- | :--- |

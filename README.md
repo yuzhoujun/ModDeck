@@ -72,10 +72,10 @@ ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入�
 许多 3DMigoto Mod 支持在游戏内通过热键自由切换服装与形态。若想将当前满意的造型永久固化为 ModDeck 预设，建议遵循以下完整闭环流程：
 
 ```mermaid
-flowchart LR
-    A["1. 游戏内热键调造型<br/>(按键切换服装/配件)"] --> B["2. 刷写变量到磁盘<br/>(按 F10 / 倒计时等待 / 退出游戏)"]
-    B --> C["3. ModDeck 自动采样<br/>(捕获 d3dx_user.ini 变更)"]
-    C --> D["4. 呼出快捷窗口保存<br/>(Alt+Shift+M 存为新预设)"]
+flowchart TD
+    A["<b>步骤 1 · 游戏内现场调造型</b><br/>在游戏内通过 Mod 原作者快捷键微调服装与配件形态"] --> B["<b>步骤 2 · 触发 3DMigoto 变量刷盘</b><br/>按 F10 强制写盘 / 静候自动刷盘倒计时 / 退出游戏"]
+    B --> C["<b>步骤 3 · ModDeck 自动感知采样</b><br/>后台监听器实时捕获 d3dx_user.ini 物理快照"]
+    C --> D["<b>步骤 4 · 快捷窗口一键保存预设</b><br/>按 Alt+Shift+M 呼出快捷窗口，点击存为新预设"]
 ```
 
 1. **游戏内现场调造型**：在游戏内通过 Mod 原作者设定的快捷键调好满意的服装配色与配件显隐；
@@ -219,7 +219,22 @@ flowchart LR
 
 ## 六、本地数据目录结构说明
 
-ModDeck 数据存储位于 `%APPDATA%/ModDeck/`（可在「设置 → 关于」中一键打开）：
+ModDeck 运行时数据完全保存在本地 `%APPDATA%/ModDeck/`（可在「设置 → 关于」中一键打开）：
+
+```text
+%APPDATA%/ModDeck/
+├── settings.json                   # [核心] 基础设置、游戏路径、快捷键与行为开关
+├── roster-presets.json             # [核心] 全角色池阵容预设方案存储
+├── presets/                        # [数据] 单 Mod 变体预设树状分级目录
+│   └── {gameId}/{character}/       # [解耦] 单 Mod 独立 JSON (presets/{gameId}/{character}/{mod}.json)
+├── characters.json                 # [数据] 用户自定义角色别名、显示名与覆盖配置
+├── roster-cache.json               # [缓存] 角色中英文词典增量缓存与云端同步镜像
+├── covers/                         # [媒体] 用户自定义裁切的角色头像封面（1:1 方形 png）
+├── languages/                      # [扩展] 外部自定义语言包目录（与便携包根目录互通）
+├── tmp/                            # [临时] 压缩包导入解析时的临时暂存目录（导入后自动清理）
+└── logs/                           # [诊断] 软件启动与运行排错日志
+    └── startup.log                 # [诊断] 核心排错日志文件
+```
 
 | 文件 / 目录 | 用途说明 | 属性 |
 | :--- | :--- | :--- |
