@@ -1,4 +1,4 @@
-ModDeck 2.3.x 免安装便携版 / Portable Edition
+ModDeck 2.4.x 免安装便携版 / Portable Edition
 ===================================================
 
 [中文说明 / Chinese Guide]
