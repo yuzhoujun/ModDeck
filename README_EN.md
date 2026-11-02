@@ -285,9 +285,15 @@ A complete modding setup consists of **Game Client + 3DMigoto/XXMI Hooking Layer
 2. **Hooking Layer & Publisher Policies**: 3DMigoto / XXMI operates by hooking Direct3D API calls at runtime. Game publishers' policies regarding modding vary and may change with game updates.
 3. **Limitation of Liability**: ModDeck is solely responsible for its own codebase and non-invasive operation. Any game crashes, rendering glitches, or account penalties arising from third-party mods, MMD model ports, 3DMigoto runtime hooks, or game anti-cheat updates are the sole responsibility of the user and are unrelated to ModDeck.
 
-### 3. Copyright, License & Acknowledgments
+### 3. Collaboration Model, Fork Policy & Downstream Disclaimer
+
+- **Issues-Only Feedback**: Users are welcome to submit bug reports, questions, feature suggestions, and character dictionary corrections via [GitHub Issues](https://github.com/yuzhoujun/ModDeck/issues).
+- **Closed Pull Request Policy**: To guard against supply chain vulnerabilities, protect architectural stability, and account for limited personal review bandwidth, **this project does not accept external code Pull Requests (PRs)**. Unsolicited code PRs will be politely closed.
+- **Fork Freedom & Zero Endorsement**: Under the terms of the MIT License, anyone is free to fork, inspect, or modify the codebase. However, **any third-party forks, repackaged binaries, or derivative works are strictly independent actions. Neither this repository nor the original author assumes any liability or provides any endorsement for third-party forks**. Users should obtain official builds exclusively from this repository's Releases.
+
+### 4. Copyright, License & Acknowledgments
 
 - **Copyright**: All game titles, character assets, and trademarks belong to their respective copyright holders.
 - **License**: Licensed under the **[MIT License](LICENSE)**.
 - **Project Creator & Maintainer**: Initiated and maintained by **yuzhoujun**.
-- **Acknowledgments**: Built with development and architectural assistance from **DeepSeek-Flash (大肥鱼)** and **Gemini 4 Argon (银弧)**.
+- **Acknowledgments**: Built with development and architectural assistance from **DeepSeek (大肥鱼)** and **Gemini (哈基米)**.
