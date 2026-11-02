@@ -145,13 +145,6 @@ ModDeck/
 └── ...
 ```
 
-### 本地发布归档同步
-
-每次执行 `npm run package:portable` 生成 ZIP 产物后，同步解压复制到本地测试与发布归档目录：
-```text
-D:\Release\ModDeck\
-```
-
 ---
 
 ## 五、版本号与发布规范（SemVer）
@@ -176,6 +169,6 @@ D:\Release\ModDeck\
 - [ ] `npm run i18n:check` 验证多语言词条对齐率 100%；
 - [ ] `npm run build` 验证生产打包无编译错误；
 - [ ] `npm run package:portable` 生成绿色便携包；
-- [ ] 同步解压至 `release\ModDeck\`，双击 `ModDeck.cmd` 验证主界面、快捷窗口、方案工作台正常加载；
+- [ ] 解压生成的绿色便携包，双击 `ModDeck.cmd` 验证主界面、快捷窗口、方案工作台正常加载；
 - [ ] 检查并更新 `CHANGELOG.md` 记录客观务实的改动说明；
 - [ ] 提交代码并同步推送至 GitHub `main` 分支。
