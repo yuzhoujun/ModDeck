@@ -21,7 +21,7 @@ ModDeck exclusively manages game `Mods` directories: sub-second toggling, all-fo
 > **Prerequisites & Scope**:
 > ModDeck is a dedicated mod asset manager and in-game quick overlay; **it does not provide installation packages or basic setup tutorials for XXMI or game-specific MIs**. Please refer to the upstream official project [SpectrumQT/XXMI-Launcher: Modding platform for GI, HSR, WW and ZZZ](https://github.com/SpectrumQT/XXMI-Launcher). Using ModDeck requires foundational experience with 3DMigoto/XXMI.
 
-- **Latest Release**: Go to [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) to download `ModDeck-2.3.0-win-x64.zip` (or your locally built portable release);
+- **Latest Release**: Go to [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) to download the latest portable release archive (e.g. `ModDeck-<x.x.x>-win-x64.zip`, or your locally built portable release);
 - **How to Run**:
   1. Extract the ZIP package to any writable folder (non-system drive recommended; avoid special characters in path);
   2. **Double-click `ModDeck.exe` to launch directly**;

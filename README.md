@@ -21,7 +21,7 @@ ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入�
 > **前置说明与使用要求**：
 > 本软件为 Mod 资源管理与快捷操作台，**不提供 XXMI 及各游戏分管 MI 的安装及基础使用教学**。如需了解或下载安装对应 MI 环境，请参考官方项目 [SpectrumQT/XXMI-Launcher: Modding platform for GI, HSR, WW and ZZZ](https://github.com/SpectrumQT/XXMI-Launcher)，使用本软件需要用户具备一定的 XXMI 使用经验与基础环境配置。
 
-- **最新正式版发布包**：前往 [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) 下载 `ModDeck-2.3.0-win-x64.zip`（或本地构建生成的便携包）；
+- **最新正式版发布包**：前往 [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) 下载最新发布的便携包压缩文件（如 `ModDeck-<x.x.x>-win-x64.zip`，或使用本地构建生成的便携包）；
 - **运行方式**：
   1. 将 ZIP 压缩包完整解压至任意目录（建议非系统只读盘，路径避免特殊符号）；
   2. **双击 `ModDeck.exe` 即可直接启动**；
