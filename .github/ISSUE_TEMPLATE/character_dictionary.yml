@@ -1,0 +1,40 @@
+name: 📖 角色词库补全与纠错 / Character Dictionary
+description: 补充新角色官方名称、别名、拼音或修正中英文译名对应关系
+title: "[Dict]: "
+labels: ["dictionary"]
+body:
+  - type: dropdown
+    id: game
+    attributes:
+      label: 所属游戏 / Game Title
+      options:
+        - 鸣潮 / Wuthering Waves
+        - 绝区零 / Zenless Zone Zero
+        - 崩坏：星穹铁道 / Honkai: Star Rail
+        - 原神 / Genshin Impact
+        - 明日方舟：终末地 / Arknights: Endfield
+        - 异环 / Neverness to Everness
+        - 其他 / Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: entry
+    attributes:
+      label: 词条详细内容 / Dictionary Entry
+      placeholder: |
+        角色中文名: 
+        官方英文名 (canonicalEnName): 
+        拼音全拼与首字母: 
+        常见别名/常用英文简称: 
+        默认分类建议 (例如 角色 / 其他): 
+    validations:
+      required: true
+
+  - type: textarea
+    id: reason
+    attributes:
+      label: 补充或修正依据 / Reason
+      placeholder: 官方前瞻公告链接、立绘文本或游戏内准确名称等依据...
+    validations:
+      required: false

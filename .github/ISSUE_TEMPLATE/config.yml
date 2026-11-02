@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 ModDeck 官方文档与排错指南
+    url: https://github.com/yuzhoujun/ModDeck#readme
+    about: 在提问或反馈前建议先查阅 README 中的快速上手与常见排错 FAQ
+  - name: 🔗 XXMI / 3DMigoto 官方平台
+    url: https://github.com/SpectrumQT/XXMI-Launcher
+    about: 本项目不提供 3DMigoto/XXMI 底层安装教学，如需配置前置环境请前往其官方页面

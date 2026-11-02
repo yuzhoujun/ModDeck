@@ -1,0 +1,39 @@
+name: ❓ 使用疑难与排错咨询 / Question & Support
+description: 咨询软件使用方法、路径配置、快捷键或与 3DMigoto/XXMI 对接疑问
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        在提交问题前，建议先查阅 [README 快速上手与常见排错 FAQ](https://github.com/yuzhoujun/ModDeck#readme)。
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: 问题分类 / Category
+      options:
+        - 游戏 Mods 或 XXMI 路径配置问题 / Path Configuration
+        - 游戏内快捷窗口 (Overlay) 呼出或置顶疑问 / In-Game Overlay
+        - 变体预设 (Presets) 或阵容方案 (Schemes) 使用疑问 / Presets & Schemes
+        - 压缩包智能拖拽导入与识别疑问 / Archive Import
+        - 便携包运行与 Chromium 沙箱兼容疑问 / Portable & Antivirus Sandbox
+        - 其他使用疑难 / Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: 详细疑问内容 / Details
+      placeholder: 请尽可能详细地描述您的使用困惑或排错现象...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息 / Environment Info
+      placeholder: 操作系统版本、游戏名称、XXMI 版本等（可选）
+    validations:
+      required: false

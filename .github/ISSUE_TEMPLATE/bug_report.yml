@@ -1,0 +1,83 @@
+name: 🐛 Bug 反馈 / Bug Report
+description: 报告软件运行异常、闪退、无窗口或换装不生效等问题
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢提交 Bug 报告！为帮助快速定位和排查问题，请尽量提供详细信息与运行日志。
+
+  - type: dropdown
+    id: game
+    attributes:
+      label: 涉及游戏 / Game Title
+      options:
+        - 鸣潮 / Wuthering Waves (WWMI)
+        - 绝区零 / Zenless Zone Zero (ZZMI)
+        - 崩坏：星穹铁道 / Honkai: Star Rail (SRMI)
+        - 原神 / Genshin Impact (GIMI)
+        - 明日方舟：终末地 / Arknights: Endfield (EFMI)
+        - 异环 / Neverness to Everness (NEMI)
+        - 软件自身运行问题（与具体游戏无关）/ General Software Issue
+        - 其他 / Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: ModDeck 软件版本 / Software Version
+      placeholder: 例如 v2.3.3、v2.3.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统 / Operating System
+      options:
+        - Windows 11 x64
+        - Windows 10 x64
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述 / Bug Description
+      placeholder: 请清晰描述您遇到的异常现象，发生了什么、预期应该是什么...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤 / Reproduction Steps
+      placeholder: |
+        1. 打开 ModDeck
+        2. 点击 ...
+        3. 出现 ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 软件启动与运行日志 / Runtime & Startup Logs (重要排错信息)
+      description: |
+        请优先提取并粘贴日志文本：
+        - 优先路径：%APPDATA%\ModDeck\logs\startup.log
+        - 便携包路径：解压目录下的 ModDeck-data\logs\startup.log
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图或录屏 / Screenshots
+      placeholder: 可直接将图片拖拽或粘贴到此处
+    validations:
+      required: false
