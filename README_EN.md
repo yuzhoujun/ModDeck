@@ -56,6 +56,11 @@ ModDeck exclusively manages game `Mods` directories: sub-second toggling, all-fo
 
 Modern 3DMigoto mods often feature extensive color variations, toggleable accessories, and morph sliders.
 
+> [!NOTE]
+> **Variant Engine Scope & Known Limitations (Future Roadmap)**:  
+> ModDeck's Variant Presets Engine is specifically designed and optimized for **standard discrete cosmetic toggle variables with `persist` declarations** (such as colorway swaps, hairstyle choices, and accessory toggles with discrete integer/boolean states).  
+> For advanced or non-standard mods that rely on **continuous float sliders (e.g. dynamic height/morph sliders), multi-variable coupled mutual exclusions and conditional clamping (e.g. complex math/clamp logic evaluated inside 3DMigoto `[CommandList]` scripts), or non-persisted cycle keys**, ModDeck may currently not reliably capture in-game snapshots or could experience switching conflicts. Full AST evaluation and support for these complex dynamic mechanics are reserved as an **exploratory direction for future releases**.
+
 - **Factory Default Baseline Protection**: Automatically parses author's native `.ini` persistent variables, permanently embedding a "Default" baseline snapshot to restore anytime;
 - **Decoupled Tree Storage**: Stored as standalone JSON files under `%APPDATA%/ModDeck/presets/{gameId}/{character}/{modName}.json`, ensuring microsecond lookup and full isolation;
 - **Live In-Game Snapshot**: Fine-tune your outfit in-game or in the overlay, enter a name, and save as a standalone preset with one click;
