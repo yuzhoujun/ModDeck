@@ -11,7 +11,7 @@
 
 An open-source, modern, Local-First Windows mod manager and immersive in-game overlay designed for 3DMigoto and XXMI based games.
 
-ModDeck exclusively manages game `Mods` directories: sub-second toggling, all-format intelligent archive imports, a standalone Mod Variant Presets Engine, whole-team Roster Scheme management, zero-lag `[Present]` one-frame bridge switching, reload flow control, and an immersive in-game floating overlay. Direct3D rendering and shader compilation are handled natively by 3DMigoto / XXMI. ModDeck **never injects code into game processes and never alters game executables**, ensuring total safety and zero ban risk.
+ModDeck exclusively manages game `Mods` directories: sub-second toggling, all-format intelligent archive imports, a standalone Mod Variant Presets Engine, whole-team Roster Scheme management, zero-lag `[Present]` one-frame bridge switching, reload flow control, and an immersive in-game floating overlay. Direct3D rendering and shader compilation are handled natively by 3DMigoto / XXMI. ModDeck **operates strictly at the file and configuration level, never injects code into game processes, and never alters game executables**.
 
 ---
 
@@ -270,9 +270,24 @@ For detailed release notes and change logs:
 
 ---
 
-## 9. Disclaimer, License & Acknowledgments
+## 9. Security, Risk Boundaries & Disclaimer
 
-- **Disclaimer**: ModDeck is an open-source local mod file management tool that operates solely on local user storage. It provides no hacking, memory injection, or anti-cheat bypassing capabilities. All game titles, character assets, and trademarks belong to their respective copyright holders.
+### 1. Functional Scope & Non-Invasive Architecture
+
+- **Strictly External File Management**: ModDeck is a Local-First desktop utility for physical disk file and text configuration management. Mod activation behaves identically to manually renaming directories with the `DISABLED_` prefix in Windows Explorer; variant preset switching is achieved purely by writing parameter text to `d3dx_user.ini` and `bridge.ini`.
+- **Independent Process & Zero Memory Interference**: ModDeck runs as a completely decoupled user-mode application. It **never injects DLLs into the game, never opens or hooks game process handles, never reads or writes game memory, and never modifies game binary executables or package files**, nor does it provide anti-cheat bypass capabilities.
+
+### 2. Modding Ecosystem Risks & Liability Disclaimer
+
+A complete modding setup consists of **Game Client + 3DMigoto/XXMI Hooking Layer + Third-Party Mod Assets + ModDeck Manager**. Users should understand the following inherent risks:
+
+1. **Third-Party Mod Asset Risks**: ModDeck cannot verify, supervise, or endorse the quality or compliance of third-party mod files. Utilizing unverified third-party mods, unoptimized high-polygon MMD ports (which may cause VRAM overflow or rendering crashes), malformed shaders, or assets that trigger anti-cheat heuristics carries inherent risks of game crashes or account penalties.
+2. **Hooking Layer & Publisher Policies**: 3DMigoto / XXMI operates by hooking Direct3D API calls at runtime. Game publishers' policies regarding modding vary and may change with game updates.
+3. **Limitation of Liability**: ModDeck is solely responsible for its own codebase and non-invasive operation. Any game crashes, rendering glitches, or account penalties arising from third-party mods, MMD model ports, 3DMigoto runtime hooks, or game anti-cheat updates are the sole responsibility of the user and are unrelated to ModDeck.
+
+### 3. Copyright, License & Acknowledgments
+
+- **Copyright**: All game titles, character assets, and trademarks belong to their respective copyright holders.
 - **License**: Licensed under the **[MIT License](LICENSE)**.
 - **Project Creator & Maintainer**: Initiated and maintained by **yuzhoujun**.
 - **Acknowledgments**: Built with development and architectural assistance from **DeepSeek-Flash (大肥鱼)** and **Gemini 4 Argon (银弧)**.
