@@ -198,7 +198,8 @@
     "unknownGame": "未知游戏",
     "unknownPathType": "未知路径类型",
     "unsupportedImageFormat": "仅支持 .png / .jpg / .jpeg / .webp / .gif / .avif 格式的图片",
-    "xxmiNotFound": "未找到 XXMI 启动器，请在「设置 → 配置」顶部填写 XXMI 安装根目录或点击一键检测"
+    "xxmiNotFound": "未找到 XXMI 启动器，请在「设置 → 配置」顶部填写 XXMI 安装根目录或点击一键检测",
+    "other": "其他"
   },
   "cover": {
     "apply": "应用封面",
@@ -736,5 +737,26 @@
     "open": "打开 ModDeck",
     "overlay": "快捷窗口",
     "quit": "退出 ModDeck"
+  },
+  "importModal": {
+    "titleTarget": "导入 Mod 到「{character}」",
+    "titleGame": "导入解析 · {game}",
+    "selectedCount": "已选 {selected} / {total} 个 Mod",
+    "selectAll": "全选",
+    "batchSetTo": "批量设为：",
+    "selectTargetCharacter": "选择目标角色…",
+    "existingFoldersGroup": "已有角色目录",
+    "newFoldersGroup": "自动新建角色目录",
+    "newFolderSuffix": "{name}（新建目录）",
+    "emptyCandidates": "没有解析出可导入的 Mod",
+    "noIni": "无 INI",
+    "noIniTooltip": "未检测到 .ini 文件",
+    "sourcePrefix": "来源：",
+    "selectCharTooltip": "选择要导入到的角色目录",
+    "importing": "正在导入…",
+    "importButton": "导入 ({count})",
+    "matchCurrentPage": "当前角色页",
+    "matchUnmatched": "未匹配（默认其他）",
+    "matchMatched": "匹配「{name}」"
   }
 }

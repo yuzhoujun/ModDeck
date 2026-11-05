@@ -198,7 +198,8 @@
     "unknownGame": "Unknown game",
     "unknownPathType": "Unknown path type",
     "unsupportedImageFormat": "Only .png, .jpg, .jpeg, .webp, .gif, and .avif images are supported",
-    "xxmiNotFound": "XXMI Launcher not configured or found. Please set XXMI Root Directory in Settings."
+    "xxmiNotFound": "XXMI Launcher not configured or found. Please set XXMI Root Directory in Settings.",
+    "other": "Other"
   },
   "cover": {
     "apply": "Apply Cover",
@@ -736,5 +737,26 @@
     "open": "Open ModDeck",
     "overlay": "Quick Overlay",
     "quit": "Quit ModDeck"
+  },
+  "importModal": {
+    "titleTarget": "Import Mods to \"{character}\"",
+    "titleGame": "Import Parse · {game}",
+    "selectedCount": "{selected} / {total} Mods selected",
+    "selectAll": "Select All",
+    "batchSetTo": "Batch set to:",
+    "selectTargetCharacter": "Select target character…",
+    "existingFoldersGroup": "Existing Character Folders",
+    "newFoldersGroup": "New Character Folders",
+    "newFolderSuffix": "{name} (New folder)",
+    "emptyCandidates": "No importable mods found",
+    "noIni": "No INI",
+    "noIniTooltip": "No .ini file detected",
+    "sourcePrefix": "Source: ",
+    "selectCharTooltip": "Select target character folder",
+    "importing": "Importing…",
+    "importButton": "Import ({count})",
+    "matchCurrentPage": "Current character page",
+    "matchUnmatched": "Unmatched (Default to Other)",
+    "matchMatched": "Matched \"{name}\""
   }
 }
