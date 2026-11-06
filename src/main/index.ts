@@ -2327,7 +2327,8 @@ function registerIpc(): void {
         loader: (gameDef.loader || '3DMigoto').trim(),
         exeHint: gameDef.exeHint?.trim() || undefined,
         accent: (gameDef.accent || '#10b981').trim(),
-        isCustom: true
+        isCustom: true,
+        locales: typeof gameDef.locales === 'object' && gameDef.locales !== null ? gameDef.locales : undefined
       }
 
       const existingCustom = settings.customGames || []

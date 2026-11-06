@@ -18,6 +18,7 @@ export interface GameDef {
   exeHint?: string
   accent?: string
   isCustom?: boolean
+  locales?: Record<string, { name?: string; shortName?: string }>
 }
 
 export interface GameSettings {

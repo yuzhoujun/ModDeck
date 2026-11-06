@@ -167,10 +167,13 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
           ...g,
           id: g.id.trim().toLowerCase(),
           name: g.name.trim(),
+          nameEn: g.nameEn?.trim() || undefined,
           shortName: (g.shortName || g.name).trim(),
+          shortNameEn: g.shortNameEn?.trim() || undefined,
           loader: (g.loader || '3DMigoto').trim(),
           accent: (g.accent || '#10b981').trim(),
-          isCustom: true
+          isCustom: true,
+          locales: typeof g.locales === 'object' && g.locales !== null ? g.locales : undefined
         }))
     : []
 

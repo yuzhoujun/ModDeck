@@ -165,11 +165,20 @@ export function getLocaleCharacterName(char: CharacterInfo, effectiveLocale: str
 }
 
 export function getLocaleGameName(game: GameDef, effectiveLocale: string): string {
+  if (game.locales?.[effectiveLocale]?.name) {
+    return game.locales[effectiveLocale].name!
+  }
   if (effectiveLocale === 'zh-CN') return game.name
   return game.nameEn || game.name
 }
 
 export function getLocaleGameShortName(game: GameDef, effectiveLocale: string): string {
+  if (game.locales?.[effectiveLocale]?.shortName) {
+    return game.locales[effectiveLocale].shortName!
+  }
+  if (game.locales?.[effectiveLocale]?.name) {
+    return game.locales[effectiveLocale].name!
+  }
   if (effectiveLocale === 'zh-CN') return game.shortName || game.name
   return game.shortNameEn || game.nameEn || game.shortName || game.name
 }
