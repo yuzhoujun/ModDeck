@@ -928,6 +928,8 @@ export default function App() {
             onReorderCharacters={reorderCharacters}
             onAdd={() => setCreating(true)}
             onOpenRosterPresets={() => setShowRosterPresets(true)}
+            isConfiguredFilterActive={boot.settings.onlyShowConfiguredGames}
+            onDisableConfiguredFilter={() => void toggleOnlyShowConfigured()}
           />
         )}
       </main>

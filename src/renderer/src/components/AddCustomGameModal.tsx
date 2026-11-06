@@ -40,12 +40,23 @@ export function AddCustomGameModal({
   onSuccess: (snapshot: GameSnapshot) => void
   onDelete?: (gameId: string) => Promise<void>
 }) {
-  const { t } = useI18n()
+  const { t, effectiveLocale } = useI18n()
+  const isZh = effectiveLocale === 'zh-CN'
   const isEditing = Boolean(initialGame)
 
-  const [name, setName] = useState(initialGame?.name ?? '')
-  const [nameEn, setNameEn] = useState(initialGame?.nameEn ?? '')
-  const [shortName, setShortName] = useState(initialGame?.shortName ?? '')
+  // Smart initial field population
+  const initZhName = initialGame?.name ?? ''
+  const initZhShort = initialGame?.shortName ?? ''
+  const initEnName =
+    initialGame?.nameEn ?? (!/[\u4e00-\u9fa5]/.test(initZhName) ? initZhName : '')
+  const initEnShort =
+    initialGame?.shortNameEn ?? (!/[\u4e00-\u9fa5]/.test(initZhShort) ? initZhShort : '')
+
+  const [nameZh, setNameZh] = useState(initZhName)
+  const [shortNameZh, setShortNameZh] = useState(initZhShort)
+  const [nameEn, setNameEn] = useState(initEnName)
+  const [shortNameEn, setShortNameEn] = useState(initEnShort)
+
   const [id, setId] = useState(initialGame?.id ?? '')
   const [idTouched, setIdTouched] = useState(isEditing)
   const [loader, setLoader] = useState(initialGame?.loader ?? '3DMigoto')
@@ -58,11 +69,20 @@ export function AddCustomGameModal({
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function handleNameChange(value: string) {
-    setName(value)
+  function handleNameEnChange(val: string) {
+    setNameEn(val)
     if (!idTouched && !isEditing) {
-      const generated = slugify(value)
-      setId(generated || `game_${Date.now() % 100000}`)
+      const generated = slugify(val)
+      if (generated) setId(generated)
+    }
+  }
+
+  function handleNameZhChange(val: string) {
+    setNameZh(val)
+    if (!idTouched && !isEditing && !nameEn) {
+      const generated = slugify(val)
+      if (generated) setId(generated)
+      else if (!id) setId(`game_${Date.now() % 100000}`)
     }
   }
 
@@ -85,15 +105,32 @@ export function AddCustomGameModal({
   }
 
   async function handleSave() {
-    const finalName = name.trim()
-    if (!finalName) {
-      setError(t('customGame.errNameRequired'))
-      return
+    const cleanZhName = nameZh.trim()
+    const cleanEnName = nameEn.trim()
+    const cleanZhShort = shortNameZh.trim()
+    const cleanEnShort = shortNameEn.trim()
+
+    // Validate that the primary name for current locale is present
+    if (isZh) {
+      if (!cleanZhName && !cleanEnName) {
+        setError(t('customGame.errNameRequired'))
+        return
+      }
+    } else {
+      if (!cleanEnName && !cleanZhName) {
+        setError(t('customGame.errNameRequired'))
+        return
+      }
     }
+
+    const finalZhName = cleanZhName || cleanEnName
+    const finalEnName = cleanEnName || cleanZhName
+    const finalZhShort = cleanZhShort || (cleanZhName ? cleanZhName : cleanEnShort || finalZhName)
+    const finalEnShort = cleanEnShort || (cleanEnName ? cleanEnName : cleanZhShort || finalEnName)
 
     let finalId = (id || '').trim().toLowerCase()
     if (!finalId) {
-      finalId = slugify(finalName) || `game_${Date.now()}`
+      finalId = slugify(cleanEnName) || slugify(cleanZhName) || `game_${Date.now()}`
     }
 
     if (!/^[a-z0-9_-]+$/.test(finalId)) {
@@ -112,9 +149,10 @@ export function AddCustomGameModal({
     try {
       const gameDef: GameDef = {
         id: finalId,
-        name: finalName,
-        nameEn: nameEn.trim() || undefined,
-        shortName: (shortName || finalName).trim(),
+        name: finalZhName,
+        nameEn: cleanEnName ? cleanEnName : (!isZh ? finalEnName : undefined),
+        shortName: finalZhShort,
+        shortNameEn: cleanEnShort ? cleanEnShort : (!isZh ? finalEnShort : (cleanEnName ? finalEnShort : undefined)),
         loader: loader.trim() || '3DMigoto',
         accent,
         isCustom: true
@@ -141,8 +179,11 @@ export function AddCustomGameModal({
 
   async function handleDelete() {
     if (!initialGame || !onDelete) return
+    const gameDisplayName = isZh
+      ? (initialGame.name || initialGame.nameEn || initialGame.id)
+      : (initialGame.nameEn || initialGame.name || initialGame.id)
     const confirmed = window.confirm(
-      t('customGame.confirmDelete', { name: initialGame.name })
+      t('customGame.confirmDelete', { name: gameDisplayName })
     )
     if (!confirmed) return
 
@@ -189,7 +230,7 @@ export function AddCustomGameModal({
             type="button"
             className="btn primary"
             onClick={() => void handleSave()}
-            disabled={saving || deleting || !name.trim()}
+            disabled={saving || deleting || (isZh ? !nameZh.trim() && !nameEn.trim() : !nameEn.trim() && !nameZh.trim())}
           >
             <Icon name="check" size={15} />
             {saving ? t('customGame.saving') : t('common.save')}
@@ -200,42 +241,112 @@ export function AddCustomGameModal({
       <div className="stack" style={{ gap: '14px' }}>
         {error ? <div className="error-text">{error}</div> : null}
 
-        <div className="row" style={{ gap: '12px' }}>
-          <label className="field grow">
-            <span>{t('customGame.nameLabel')} *</span>
-            <input
-              className="input"
-              value={name}
-              placeholder={t('customGame.namePlaceholder')}
-              onChange={(e) => handleNameChange(e.target.value)}
-              disabled={saving}
-              autoFocus
-            />
-          </label>
-          <label className="field" style={{ width: '140px' }}>
-            <span>{t('customGame.shortNameLabel')}</span>
-            <input
-              className="input"
-              value={shortName}
-              placeholder={name || t('customGame.shortNamePlaceholder')}
-              onChange={(e) => setShortName(e.target.value)}
-              disabled={saving}
-            />
-          </label>
-        </div>
+        {isZh ? (
+          <>
+            {/* Primary Row: Chinese */}
+            <div className="row" style={{ gap: '12px' }}>
+              <label className="field grow">
+                <span>{t('customGame.nameZhLabel')} *</span>
+                <input
+                  className="input"
+                  value={nameZh}
+                  placeholder={t('customGame.nameZhPlaceholder')}
+                  onChange={(e) => handleNameZhChange(e.target.value)}
+                  disabled={saving}
+                  autoFocus
+                />
+              </label>
+              <label className="field" style={{ width: '160px' }}>
+                <span>{t('customGame.shortNameZhLabel')}</span>
+                <input
+                  className="input"
+                  value={shortNameZh}
+                  placeholder={nameZh || t('customGame.shortNameZhPlaceholder')}
+                  onChange={(e) => setShortNameZh(e.target.value)}
+                  disabled={saving}
+                />
+              </label>
+            </div>
 
-        <div className="row" style={{ gap: '12px' }}>
+            {/* Secondary Row: English */}
+            <div className="row" style={{ gap: '12px' }}>
+              <label className="field grow">
+                <span>{t('customGame.nameEnLabel')}</span>
+                <input
+                  className="input"
+                  value={nameEn}
+                  placeholder={t('customGame.nameEnPlaceholder')}
+                  onChange={(e) => handleNameEnChange(e.target.value)}
+                  disabled={saving}
+                />
+              </label>
+              <label className="field" style={{ width: '160px' }}>
+                <span>{t('customGame.shortNameEnLabel')}</span>
+                <input
+                  className="input"
+                  value={shortNameEn}
+                  placeholder={nameEn || t('customGame.shortNameEnPlaceholder')}
+                  onChange={(e) => setShortNameEn(e.target.value)}
+                  disabled={saving}
+                />
+              </label>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Primary Row: English */}
+            <div className="row" style={{ gap: '12px' }}>
+              <label className="field grow">
+                <span>{t('customGame.nameEnLabel')} *</span>
+                <input
+                  className="input"
+                  value={nameEn}
+                  placeholder={t('customGame.nameEnPlaceholder')}
+                  onChange={(e) => handleNameEnChange(e.target.value)}
+                  disabled={saving}
+                  autoFocus
+                />
+              </label>
+              <label className="field" style={{ width: '160px' }}>
+                <span>{t('customGame.shortNameEnLabel')}</span>
+                <input
+                  className="input"
+                  value={shortNameEn}
+                  placeholder={nameEn || t('customGame.shortNameEnPlaceholder')}
+                  onChange={(e) => setShortNameEn(e.target.value)}
+                  disabled={saving}
+                />
+              </label>
+            </div>
+
+            {/* Secondary Row: Chinese */}
+            <div className="row" style={{ gap: '12px' }}>
+              <label className="field grow">
+                <span>{t('customGame.nameZhLabel')}</span>
+                <input
+                  className="input"
+                  value={nameZh}
+                  placeholder={t('customGame.nameZhPlaceholder')}
+                  onChange={(e) => handleNameZhChange(e.target.value)}
+                  disabled={saving}
+                />
+              </label>
+              <label className="field" style={{ width: '160px' }}>
+                <span>{t('customGame.shortNameZhLabel')}</span>
+                <input
+                  className="input"
+                  value={shortNameZh}
+                  placeholder={nameZh || t('customGame.shortNameZhPlaceholder')}
+                  onChange={(e) => setShortNameZh(e.target.value)}
+                  disabled={saving}
+                />
+              </label>
+            </div>
+          </>
+        )}
+
+        <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
           <label className="field grow">
-            <span>{t('customGame.nameEnLabel')}</span>
-            <input
-              className="input"
-              value={nameEn}
-              placeholder={t('customGame.nameEnPlaceholder')}
-              onChange={(e) => setNameEn(e.target.value)}
-              disabled={saving}
-            />
-          </label>
-          <label className="field" style={{ width: '180px' }}>
             <span>{t('customGame.idLabel')} *</span>
             <input
               className="input"
@@ -249,66 +360,63 @@ export function AddCustomGameModal({
               title={isEditing ? t('customGame.idLockedTip') : undefined}
             />
           </label>
-        </div>
-
-        <div className="row" style={{ gap: '12px', alignItems: 'flex-start' }}>
-          <label className="field" style={{ width: '180px' }}>
+          <label className="field" style={{ width: '150px' }}>
             <span>{t('customGame.loaderLabel')}</span>
             <input
               className="input"
-              list="loader-presets"
               value={loader}
-              placeholder="3DMigoto / XXMI"
+              placeholder="3DMigoto"
               onChange={(e) => setLoader(e.target.value)}
               disabled={saving}
+              list="loader-presets"
             />
             <datalist id="loader-presets">
-              {COMMON_LOADERS.map((ldr) => (
-                <option key={ldr} value={ldr} />
+              {COMMON_LOADERS.map((item) => (
+                <option key={item} value={item} />
               ))}
             </datalist>
           </label>
+        </div>
 
-          <div className="field grow">
-            <span>{t('customGame.accentColorLabel')}</span>
-            <div className="row" style={{ gap: '8px', alignItems: 'center', marginTop: '4px' }}>
-              {PRESET_ACCENTS.map((color) => {
-                const selected = accent.toLowerCase() === color.toLowerCase()
-                return (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setAccent(color)}
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '50%',
-                      background: color,
-                      border: selected ? '2px solid #fff' : '2px solid transparent',
-                      boxShadow: selected ? `0 0 0 2px ${color}` : undefined,
-                      cursor: 'pointer',
-                      padding: 0
-                    }}
-                    title={color}
-                  />
-                )
-              })}
-              <input
-                type="color"
-                value={accent}
-                onChange={(e) => setAccent(e.target.value)}
-                style={{
-                  width: '26px',
-                  height: '26px',
-                  padding: 0,
-                  border: 'none',
-                  borderRadius: '4px',
-                  background: 'none',
-                  cursor: 'pointer'
-                }}
-                title={t('customGame.customColorTip')}
-              />
-            </div>
+        <div className="field">
+          <span>{t('customGame.accentColorLabel')}</span>
+          <div className="row" style={{ gap: '8px', alignItems: 'center' }}>
+            {PRESET_ACCENTS.map((color) => {
+              const active = accent.toLowerCase() === color.toLowerCase()
+              return (
+                <button
+                  key={color}
+                  type="button"
+                  style={{
+                    width: '26px',
+                    height: '26px',
+                    borderRadius: '50%',
+                    background: color,
+                    border: active ? '2px solid #fff' : '2px solid transparent',
+                    boxShadow: active ? `0 0 0 2px ${color}` : 'none',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    transition: 'transform 0.1s ease',
+                    transform: active ? 'scale(1.1)' : 'scale(1)'
+                  }}
+                  onClick={() => setAccent(color)}
+                />
+              )
+            })}
+            <input
+              type="color"
+              value={accent.startsWith('#') ? accent : '#10b981'}
+              onChange={(e) => setAccent(e.target.value)}
+              style={{
+                width: '32px',
+                height: '26px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                borderRadius: '4px'
+              }}
+              title={t('customGame.customColorTip')}
+            />
           </div>
         </div>
 
@@ -332,7 +440,7 @@ export function AddCustomGameModal({
               <Icon name="folder" size={17} />
             </button>
           </div>
-          <span className="muted small" style={{ marginTop: '2px' }}>
+          <span className="muted" style={{ fontSize: '11px', marginTop: '4px' }}>
             {t('customGame.modsPathHint')}
           </span>
         </label>

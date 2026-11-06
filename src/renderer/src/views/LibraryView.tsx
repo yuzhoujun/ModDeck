@@ -29,7 +29,9 @@ export function LibraryView({
   onLaunchLoader,
   onReorderCharacters,
   onAdd,
-  onOpenRosterPresets
+  onOpenRosterPresets,
+  isConfiguredFilterActive,
+  onDisableConfiguredFilter
 }: {
   game: GameDef
   snapshot: GameSnapshot
@@ -49,6 +51,8 @@ export function LibraryView({
   onReorderCharacters: (folders: string[]) => void
   onAdd: () => void
   onOpenRosterPresets?: () => void
+  isConfiguredFilterActive?: boolean
+  onDisableConfiguredFilter?: () => void
 }) {
   const { t, effectiveLocale } = useI18n()
   const [dragFolder, setDragFolder] = useState<string | null>(null)
@@ -164,11 +168,21 @@ export function LibraryView({
               ? shortPath(snapshot.settings.modsPath)
               : t('library.modsDirDesc', { game: getLocaleGameName(game, effectiveLocale) })}
           </p>
-          <div className="actions center">
+          <div className="actions center" style={{ gap: '10px' }}>
             <button className="btn primary" onClick={() => onOpenSettings('games')}>
               <Icon name="folder" size={16} />
               {t('sidebar.settings')}
             </button>
+            {isConfiguredFilterActive && onDisableConfiguredFilter ? (
+              <button
+                className="btn ghost"
+                onClick={onDisableConfiguredFilter}
+                title={t('sidebar.showAllGames')}
+              >
+                <Icon name="filter" size={15} />
+                {t('sidebar.showAllGames')}
+              </button>
+            ) : null}
           </div>
         </div>
       ) : (

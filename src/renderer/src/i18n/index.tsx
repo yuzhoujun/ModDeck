@@ -170,6 +170,6 @@ export function getLocaleGameName(game: GameDef, effectiveLocale: string): strin
 }
 
 export function getLocaleGameShortName(game: GameDef, effectiveLocale: string): string {
-  if (effectiveLocale === 'zh-CN') return game.shortName
-  return game.shortNameEn || game.shortName
+  if (effectiveLocale === 'zh-CN') return game.shortName || game.name
+  return game.shortNameEn || game.nameEn || game.shortName || game.name
 }
