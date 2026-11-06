@@ -8,6 +8,14 @@ const api: ModDeckApi = {
   saveSettings: (patch) => ipcRenderer.invoke(IPC.saveSettings, patch),
   switchGame: (gameId) => ipcRenderer.invoke(IPC.switchGame, gameId),
   scanGame: (gameId) => ipcRenderer.invoke(IPC.scanGame, gameId),
+  saveCustomGame: (gameDef, gameSettings) =>
+    ipcRenderer.invoke(IPC.saveCustomGame, gameDef, gameSettings),
+  deleteCustomGame: (gameId) =>
+    ipcRenderer.invoke(IPC.deleteCustomGame, gameId),
+  toggleGameVisibility: (gameId, visible) =>
+    ipcRenderer.invoke(IPC.toggleGameVisibility, gameId, visible),
+  setOnlyShowConfiguredGames: (enabled) =>
+    ipcRenderer.invoke(IPC.setOnlyShowConfiguredGames, enabled),
   getMods: (gameId, characterFolder) =>
     ipcRenderer.invoke(IPC.getMods, gameId, characterFolder),
   toggleMod: (gameId, characterFolder, modFolder, enable, exclusive) =>

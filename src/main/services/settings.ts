@@ -1,25 +1,29 @@
 import fsSync from 'node:fs'
 import path from 'node:path'
 import type {
+  GameDef,
   GameId,
   GameSettings,
   RecentMod,
   Settings,
   SettingsPatch
 } from '../../shared/types'
-import { GAMES, isGameId } from '../core/games'
+import { BUILTIN_GAMES, getAllGames, isGameId, setCustomGames } from '../core/games'
 import { readJsonSafe, writeJsonAtomic } from '../core/fsx'
 
 export const SETTINGS_FILE = 'settings.json'
 
 export function defaultSettings(): Settings {
   const games: Record<string, GameSettings> = {}
-  for (const game of GAMES) games[game.id] = { modsPath: '' }
+  for (const game of BUILTIN_GAMES) games[game.id] = { modsPath: '' }
   return {
     schemaVersion: 1,
-    activeGameId: GAMES[0].id,
+    activeGameId: BUILTIN_GAMES[0].id,
     xxmiRoot: '',
     games,
+    customGames: [],
+    hiddenGameIds: [],
+    onlyShowConfiguredGames: false,
     ui: {
       language: 'auto',
       sortCharacters: 'custom',
@@ -146,10 +150,46 @@ function normalizeRecentMods(raw: unknown, limit: number): RecentMod[] {
 export function normalizeSettings(raw: Partial<Settings> | null | undefined): Settings {
   const defaults = defaultSettings()
   const source = raw ?? {}
+
+  const customGames = Array.isArray(source.customGames)
+    ? source.customGames
+        .filter(
+          (g): g is GameDef =>
+            Boolean(
+              g &&
+                typeof g.id === 'string' &&
+                g.id.trim() &&
+                typeof g.name === 'string' &&
+                g.name.trim()
+            )
+        )
+        .map((g) => ({
+          ...g,
+          id: g.id.trim().toLowerCase(),
+          name: g.name.trim(),
+          shortName: (g.shortName || g.name).trim(),
+          loader: (g.loader || '3DMigoto').trim(),
+          accent: (g.accent || '#10b981').trim(),
+          isCustom: true
+        }))
+    : []
+
+  setCustomGames(customGames)
+
+  const allGames = getAllGames()
   const games: Record<string, GameSettings> = {}
-  for (const game of GAMES) {
+  for (const game of allGames) {
     games[game.id] = normalizeGameSettings(source.games?.[game.id])
   }
+
+  const hiddenGameIds = Array.isArray(source.hiddenGameIds)
+    ? source.hiddenGameIds.filter(
+        (id): id is string => typeof id === 'string' && Boolean(id.trim())
+      )
+    : []
+
+  const onlyShowConfiguredGames = source.onlyShowConfiguredGames === true
+
   const activeGameId: GameId = isGameId(source.activeGameId)
     ? source.activeGameId
     : defaults.activeGameId
@@ -178,6 +218,9 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
     activeGameId,
     xxmiRoot,
     games,
+    customGames,
+    hiddenGameIds,
+    onlyShowConfiguredGames,
     ui: {
       language: source.ui?.language || 'auto',
       sortCharacters:
@@ -256,11 +299,24 @@ export function mergeSettings(current: Settings, patch: SettingsPatch): Settings
   const next: Settings = {
     ...current,
     games: { ...current.games },
+    customGames: current.customGames ? [...current.customGames] : [],
+    hiddenGameIds: current.hiddenGameIds ? [...current.hiddenGameIds] : [],
+    onlyShowConfiguredGames: current.onlyShowConfiguredGames ?? false,
     ui: { ...current.ui },
     import: { ...current.import },
     characterOrders: { ...current.characterOrders },
     modOrders: { ...current.modOrders },
     recentMods: [...current.recentMods]
+  }
+
+  if (Array.isArray(patch.customGames)) {
+    next.customGames = patch.customGames
+  }
+  if (Array.isArray(patch.hiddenGameIds)) {
+    next.hiddenGameIds = patch.hiddenGameIds
+  }
+  if (typeof patch.onlyShowConfiguredGames === 'boolean') {
+    next.onlyShowConfiguredGames = patch.onlyShowConfiguredGames
   }
 
   if (isGameId(patch.activeGameId)) next.activeGameId = patch.activeGameId

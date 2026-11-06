@@ -5,7 +5,7 @@ import { useI18n, getLocaleCharacterName } from '../i18n'
 
 export function CharacterCard({
   character,
-  accent,
+  accent = '#10b981',
   onOpen,
   draggable = false,
   dragging = false,
@@ -15,7 +15,7 @@ export function CharacterCard({
   onDragEnd
 }: {
   character: CharacterInfo
-  accent: string
+  accent?: string
   onOpen: () => void
   draggable?: boolean
   dragging?: boolean

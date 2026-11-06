@@ -3,6 +3,7 @@ import type {
   Bootstrap,
   CharacterInfo,
   EnvironmentCheck,
+  GameDef,
   GameId,
   GameSnapshot,
   ImportCommitItem,
@@ -12,6 +13,7 @@ import type {
   UiSettings
 } from '../../shared/types'
 import { CreateCharacterModal } from './components/CreateCharacterModal'
+import { AddCustomGameModal } from './components/AddCustomGameModal'
 import { EditCharacterModal } from './components/EditCharacterModal'
 import { Icon } from './components/Icon'
 import { ImportPreviewModal } from './components/ImportPreviewModal'
@@ -47,6 +49,8 @@ export default function App() {
   const [modQuery, setModQuery] = useState('')
   const [editing, setEditing] = useState<CharacterInfo | null>(null)
   const [creating, setCreating] = useState(false)
+  const [customGameModalOpen, setCustomGameModalOpen] = useState(false)
+  const [editingCustomGame, setEditingCustomGame] = useState<GameDef | null>(null)
   const [showRosterPresets, setShowRosterPresets] = useState(false)
   const [envWarning, setEnvWarning] = useState<EnvironmentCheck | null>(null)
   const [parsedImport, setParsedImport] = useState<{
@@ -177,6 +181,60 @@ export default function App() {
     if (!snap) throw new Error(t('common.scanFailed'))
     setSnapshot(snap)
     return snap
+  }
+
+  async function toggleOnlyShowConfigured() {
+    if (!boot) return
+    const nextVal = !boot.settings.onlyShowConfiguredGames
+    try {
+      const res = await window.moddeck.setOnlyShowConfiguredGames(nextVal)
+      if (res.ok) {
+        setBoot((prev) =>
+          prev
+            ? {
+                ...prev,
+                settings: {
+                  ...prev.settings,
+                  onlyShowConfiguredGames: res.onlyShowConfiguredGames
+                }
+              }
+            : prev
+        )
+      }
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    }
+  }
+
+  async function handleCustomGameSuccess(snap: GameSnapshot) {
+    setCustomGameModalOpen(false)
+    setEditingCustomGame(null)
+    const nextBoot = await window.moddeck.bootstrap()
+    setBoot(nextBoot)
+    setSnapshot(snap)
+    setView('library')
+    setSelected(null)
+    setMods([])
+    setCharQuery('')
+    notify(t('customGame.saveSuccess', { name: getLocaleGameName(snap.game, effectiveLocale) }))
+  }
+
+  async function handleDeleteCustomGame(gameId: string) {
+    const res = await window.moddeck.deleteCustomGame(gameId)
+    if (!res.ok) {
+      throw new Error(res.error || 'Failed to delete game')
+    }
+    setCustomGameModalOpen(false)
+    setEditingCustomGame(null)
+    const nextBoot = await window.moddeck.bootstrap()
+    setBoot(nextBoot)
+    if (res.snapshot) {
+      setSnapshot(res.snapshot)
+      setView('library')
+      setSelected(null)
+      setMods([])
+    }
+    notify(t('customGame.deleteSuccess'))
   }
 
   async function syncSelected(snap: GameSnapshot) {
@@ -669,30 +727,68 @@ export default function App() {
           </div>
         </div>
 
-        <div className="side-label">{t('sidebar.games')}</div>
+        <div className="side-label">
+          <span>{t('sidebar.games')}</span>
+          <div className="side-label-actions">
+            <button
+              type="button"
+              className={`side-tiny-btn${boot.settings.onlyShowConfiguredGames ? ' active' : ''}`}
+              title={boot.settings.onlyShowConfiguredGames ? t('sidebar.showAllGames') : t('sidebar.showConfiguredOnly')}
+              onClick={() => void toggleOnlyShowConfigured()}
+            >
+              <Icon name="filter" size={13} />
+            </button>
+            <button
+              type="button"
+              className="side-tiny-btn"
+              title={t('sidebar.addCustomGame')}
+              onClick={() => {
+                setEditingCustomGame(null)
+                setCustomGameModalOpen(true)
+              }}
+            >
+              <Icon name="plus" size={13} />
+            </button>
+          </div>
+        </div>
         <nav className="game-nav">
-          {boot.games.map((game) => {
-            const active = snapshot.game.id === game.id
-            return (
-              <button
-                key={game.id}
-                className={`game-nav-item${active ? ' active' : ''}`}
-                onClick={() => void switchGame(game.id)}
-                style={active ? { borderColor: `${game.accent}55` } : undefined}
-                role="radio"
-                aria-checked={active}
-                title={active ? t('sidebar.currentGame') : t('sidebar.switchToGame', { game: getLocaleGameName(game, effectiveLocale) })}
-              >
-                <span className="dot" style={{ background: game.accent }} />
-                <span className="grow">{getLocaleGameShortName(game, effectiveLocale)}</span>
-                {active ? (
-                  <span className="game-count">
-                    {snapshot.totalMods}
-                  </span>
-                ) : null}
-              </button>
-            )
-          })}
+          {boot.games
+            .filter((game) => {
+              if (snapshot.game.id === game.id) return true
+              if (boot.settings.hiddenGameIds?.includes(game.id)) return false
+              if (boot.settings.onlyShowConfiguredGames) {
+                const gameSetting = boot.settings.games[game.id]
+                return Boolean(gameSetting?.modsPath?.trim())
+              }
+              return true
+            })
+            .map((game) => {
+              const active = snapshot.game.id === game.id
+              return (
+                <button
+                  key={game.id}
+                  className={`game-nav-item${active ? ' active' : ''}`}
+                  onClick={() => void switchGame(game.id)}
+                  style={active ? { borderColor: `${game.accent}55` } : undefined}
+                  role="radio"
+                  aria-checked={active}
+                  title={active ? t('sidebar.currentGame') : t('sidebar.switchToGame', { game: getLocaleGameName(game, effectiveLocale) })}
+                >
+                  <span className="dot" style={{ background: game.accent }} />
+                  <span className="grow">{getLocaleGameShortName(game, effectiveLocale)}</span>
+                  {game.isCustom ? (
+                    <span className="game-badge-custom" title={t('customGame.customBadge')}>
+                      {t('customGame.customTag')}
+                    </span>
+                  ) : null}
+                  {active ? (
+                    <span className="game-count">
+                      {snapshot.totalMods}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
         </nav>
 
         <div className="sidebar-foot">
@@ -771,6 +867,15 @@ export default function App() {
             initialTab={settingsTab}
             onSave={saveSettings}
             onNotify={notify}
+            onAddCustomGame={() => {
+              setEditingCustomGame(null)
+              setCustomGameModalOpen(true)
+            }}
+            onEditCustomGame={(game) => {
+              setEditingCustomGame(game)
+              setCustomGameModalOpen(true)
+            }}
+            onDeleteCustomGame={handleDeleteCustomGame}
           />
         ) : view === 'character' && selected ? (
           <CharacterView
@@ -826,6 +931,20 @@ export default function App() {
           />
         )}
       </main>
+
+      {customGameModalOpen && boot ? (
+        <AddCustomGameModal
+          initialGame={editingCustomGame}
+          initialSettings={editingCustomGame ? boot.settings.games[editingCustomGame.id] : null}
+          existingGameIds={boot.games.map((g) => g.id)}
+          onClose={() => {
+            setCustomGameModalOpen(false)
+            setEditingCustomGame(null)
+          }}
+          onSuccess={handleCustomGameSuccess}
+          onDelete={editingCustomGame?.isCustom ? handleDeleteCustomGame : undefined}
+        />
+      ) : null}
 
       {showRosterPresets && snapshot ? (
         <RosterPresetModal

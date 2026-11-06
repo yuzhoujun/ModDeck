@@ -591,7 +591,14 @@
       "title": "Game & Directory Paths",
       "xxmiRootHint": "Auto-reads XXMI Launcher Config.json and launches with --nogui --xxmi",
       "xxmiRootLabel": "XXMI Root Directory (Global Unified Launch)",
-      "xxmiRootPlaceholder": "e.g. C:/Games/XXMI Launcher (directory containing XXMI Launcher Config.json)"
+      "xxmiRootPlaceholder": "e.g. C:/Games/XXMI Launcher (directory containing XXMI Launcher Config.json)",
+      "onlyShowConfiguredLabel": "Only show configured games in sidebar",
+      "onlyShowConfiguredDesc": "When enabled, games without a configured Mods directory will be hidden from the left sidebar to keep the workspace clean (except for the currently active game).",
+      "addGameBtn": "Add Generic Game",
+      "showInSidebar": "Show in sidebar",
+      "hideInSidebar": "Hide in sidebar",
+      "editCustomGame": "Edit Custom Game",
+      "deleteCustomGame": "Delete Custom Game"
     },
     "general": {
       "allowHotkeySend": "Allow clicking hotkeys to send to game",
@@ -731,7 +738,10 @@
     "games": "Games",
     "localModManager": "local mod manager",
     "settings": "Settings",
-    "switchToGame": "Switch to {game}"
+    "switchToGame": "Switch to {game}",
+    "addCustomGame": "Add Generic Game",
+    "showAllGames": "Show All Games",
+    "showConfiguredOnly": "Show Configured Only"
   },
   "tray": {
     "open": "Open ModDeck",
@@ -758,5 +768,38 @@
     "matchCurrentPage": "Current character page",
     "matchUnmatched": "Unmatched (Default to Other)",
     "matchMatched": "Matched \"{name}\""
+  },
+  "customGame": {
+    "modalTitleAdd": "Add Generic Game",
+    "modalTitleEdit": "Edit Game Profile",
+    "nameLabel": "Game Name",
+    "namePlaceholder": "e.g. Genshin Impact, Wuthering Waves",
+    "shortNameLabel": "Short Name",
+    "shortNamePlaceholder": "Used in sidebar",
+    "nameEnLabel": "English Name (Optional)",
+    "nameEnPlaceholder": "Displayed in English mode",
+    "idLabel": "Game ID",
+    "idLockedTip": "ID cannot be changed after creation",
+    "loaderLabel": "Loader Type",
+    "accentColorLabel": "Theme Color",
+    "customColorTip": "Custom HEX Color",
+    "modsPathLabel": "Mods Physical Directory",
+    "modsPathPlaceholder": "e.g. D:\\Games\\Genshin\\Mods",
+    "modsPathHint": "3DMigoto/XXMI physical folder where mods are located, used for character discovery and mod toggling.",
+    "gamePathLabel": "Game Executable (Optional)",
+    "gamePathPlaceholder": "e.g. GenshinImpact.exe",
+    "launchArgsLabel": "Launch Arguments (Optional)",
+    "errNameRequired": "Please enter a game name",
+    "errInvalidIdChars": "Game ID only supports lowercase letters, digits, underscores, and hyphens",
+    "errIdExists": "Game ID \"{id}\" already exists, please choose another",
+    "saveFailed": "Failed to save game configuration",
+    "saveSuccess": "Successfully saved game \"{name}\"",
+    "deleteGame": "Delete Game",
+    "confirmDelete": "Are you sure you want to delete custom game \"{name}\"? Configurations will be removed (local mod files remain untouched).",
+    "deleting": "Deleting…",
+    "deleteSuccess": "Successfully deleted custom game",
+    "saving": "Saving…",
+    "customTag": "Custom",
+    "customBadge": "User-added custom generic game"
   }
 }

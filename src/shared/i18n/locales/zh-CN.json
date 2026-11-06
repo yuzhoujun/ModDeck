@@ -591,7 +591,14 @@
       "title": "游戏与目录路径",
       "xxmiRootHint": "自动读取 XXMI Launcher Config.json 并使用 --nogui --xxmi 启动对应模块",
       "xxmiRootLabel": "XXMI 安装根目录（全局统一启动配置）",
-      "xxmiRootPlaceholder": "例如 C:/Games/XXMI Launcher（含 XXMI Launcher Config.json 的目录）"
+      "xxmiRootPlaceholder": "例如 C:/Games/XXMI Launcher（含 XXMI Launcher Config.json 的目录）",
+      "onlyShowConfiguredLabel": "侧边栏仅显示已配置游戏",
+      "onlyShowConfiguredDesc": "启用后，未设置 Mods 物理目录的游戏将不会在左侧侧边栏中展示，使工作台更清爽（当前选中游戏除外）。",
+      "addGameBtn": "添加通用游戏",
+      "showInSidebar": "在侧边栏显示",
+      "hideInSidebar": "在侧边栏隐藏",
+      "editCustomGame": "编辑自定义游戏",
+      "deleteCustomGame": "删除自定义游戏"
     },
     "general": {
       "allowHotkeySend": "允许点击热键发送到游戏",
@@ -731,7 +738,10 @@
     "games": "游戏",
     "localModManager": "本地Mod管理器",
     "settings": "设置",
-    "switchToGame": "切换到 {game}"
+    "switchToGame": "切换到 {game}",
+    "addCustomGame": "添加通用游戏",
+    "showAllGames": "显示全部游戏",
+    "showConfiguredOnly": "仅显示已配置游戏"
   },
   "tray": {
     "open": "打开 ModDeck",
@@ -758,5 +768,38 @@
     "matchCurrentPage": "当前角色页",
     "matchUnmatched": "未匹配（默认其他）",
     "matchMatched": "匹配「{name}」"
+  },
+  "customGame": {
+    "modalTitleAdd": "添加通用游戏",
+    "modalTitleEdit": "编辑游戏配置",
+    "nameLabel": "游戏名称",
+    "namePlaceholder": "例如 原神、鸣潮国际服",
+    "shortNameLabel": "简称",
+    "shortNamePlaceholder": "用于侧栏",
+    "nameEnLabel": "英文名称 (选填)",
+    "nameEnPlaceholder": "用于英文模式显示",
+    "idLabel": "游戏唯一ID",
+    "idLockedTip": "ID在创建后不可修改",
+    "loaderLabel": "加载器类型",
+    "accentColorLabel": "主题色彩",
+    "customColorTip": "自定义十六进制颜色",
+    "modsPathLabel": "Mods 物理目录",
+    "modsPathPlaceholder": "例如 D:\\Games\\Genshin\\Mods",
+    "modsPathHint": "3DMigoto/XXMI 游戏放置 Mod 的物理文件夹，用于识别角色与启停 Mod。",
+    "gamePathLabel": "游戏可执行文件 (选填)",
+    "gamePathPlaceholder": "例如 GenshinImpact.exe",
+    "launchArgsLabel": "启动参数 (选填)",
+    "errNameRequired": "请输入游戏名称",
+    "errInvalidIdChars": "游戏ID仅支持小写字母、数字、下划线及连字符",
+    "errIdExists": "游戏ID \"{id}\" 已存在，请更换",
+    "saveFailed": "保存游戏配置失败",
+    "saveSuccess": "已成功保存游戏「{name}」",
+    "deleteGame": "删除游戏",
+    "confirmDelete": "确定要删除自定义游戏「{name}」吗？相关配置将被清除（本地 Mods 物理文件不受影响）。",
+    "deleting": "正在删除…",
+    "deleteSuccess": "已成功删除自定义游戏",
+    "saving": "正在保存…",
+    "customTag": "自定义",
+    "customBadge": "用户添加的自定义通用游戏"
   }
 }

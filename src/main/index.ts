@@ -23,7 +23,9 @@ import type {
   CharacterMeta,
   CreateCharacterInput,
   EnvironmentCheck,
+  GameDef,
   GameId,
+  GameSettings,
   ImportCommitRequest,
   ImportParseRequest,
   ImportRequest,
@@ -35,7 +37,7 @@ import type {
   ToggleResult
 } from '../shared/types'
 import { IPC, type StateChangedEvent } from '../shared/ipc'
-import { GAMES, requireGame } from './core/games'
+import { BUILTIN_GAMES, getAllGames, isBuiltinGame, isGameId, requireGame, setCustomGames } from './core/games'
 import { ensureDir, pathExists } from './core/fsx'
 import { isInside, isSafeSegment } from './core/safe-path'
 import {
@@ -488,7 +490,7 @@ async function makeSnapshot(gameId: GameId) {
 
 async function writeScanReport(): Promise<void> {
   const games: Array<Record<string, unknown>> = []
-  for (const game of GAMES) {
+  for (const game of getAllGames()) {
     const gameSettings = settings.games[game.id] ?? { modsPath: '' }
     await ensureRosterInitialized(game.id, gameSettings.modsPath)
     const startedAt = Date.now()
@@ -891,7 +893,7 @@ async function detectXxmiAndGamePaths(manualXxmiRoot?: string): Promise<AutoDete
   const nextGames: Record<string, Partial<Settings['games'][string]>> = {}
   const detectedGames: GameId[] = []
 
-  for (const game of GAMES) {
+  for (const game of getAllGames()) {
     const currentGame = settings.games[game.id] ?? { modsPath: '' }
     const patch: Partial<Settings['games'][string]> = {}
     const imp = xxmiConfig?.Importers?.[game.loader]?.Importer
@@ -929,7 +931,7 @@ async function detectXxmiAndGamePaths(manualXxmiRoot?: string): Promise<AutoDete
 
     // 2. Detect Official Launcher or Game Executable
     let detectedGamePath = ''
-    const launcherExeNames = ['Launcher.exe', 'launcher.exe', 'NTELauncher.exe', game.exeHint]
+    const launcherExeNames = ['Launcher.exe', 'launcher.exe', 'NTELauncher.exe', ...(game.exeHint ? [game.exeHint] : [])]
 
     // Priority A: Importer.launcher_folder from XXMI Launcher Config.json
     if (!detectedGamePath && imp?.launcher_folder && typeof imp.launcher_folder === 'string') {
@@ -1086,12 +1088,9 @@ async function launchConfigured(
   }
 
   // If user configured a directory (e.g. Hypergryph Launcher folder), find Launcher.exe inside
-  const resolvedFile = await findExeInDir(target, [
-    'Launcher.exe',
-    'launcher.exe',
-    'NTELauncher.exe',
-    game.exeHint
-  ])
+  const candidates = ['Launcher.exe', 'launcher.exe', 'NTELauncher.exe']
+  if (game.exeHint) candidates.push(game.exeHint)
+  const resolvedFile = await findExeInDir(target, candidates)
   if (!resolvedFile) {
     return {
       ok: false,
@@ -1116,7 +1115,7 @@ async function syncMissingRosterFoldersToDisk(): Promise<number> {
   const preferEn = isNonZhEffectiveLocale()
   let createdCount = 0
   let metadataChanged = false
-  for (const game of GAMES) {
+  for (const game of getAllGames()) {
     const modsPath = settings.games[game.id]?.modsPath
     if (!modsPath || !(await pathExists(modsPath))) continue
     try {
@@ -1976,7 +1975,7 @@ async function recordRecentMod(
 }
 
 async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
-  const targets = gameId ? [gameId] : GAMES.map((game) => game.id)
+  const targets = gameId ? [gameId] : getAllGames().map((game: GameDef) => game.id)
   const result: EnvironmentCheck[] = []
   for (const target of targets) {
     const gameSettings = settings.games[target]
@@ -2261,7 +2260,7 @@ function loadCustomLocales(): Record<string, Record<string, any>> {
 function registerIpc(): void {
   register(IPC.bootstrap, async () => ({
     settings,
-    games: GAMES,
+    games: getAllGames(),
     snapshot: await makeSnapshot(settings.activeGameId),
     appVersion: app.getVersion(),
     rosterMap: getRosterMap(isNonZhEffectiveLocale()),
@@ -2300,6 +2299,121 @@ function registerIpc(): void {
   register(IPC.scanGame, async (gameId: GameId) => {
     requireGame(gameId)
     return makeSnapshot(gameId)
+  })
+
+  register(
+    IPC.saveCustomGame,
+    async (gameDef: GameDef, gameSettings?: GameSettings) => {
+      if (!gameDef || typeof gameDef.name !== 'string' || !gameDef.name.trim()) {
+        return { ok: false, error: '游戏名称不能为空' }
+      }
+      let id = (gameDef.id || '').trim().toLowerCase()
+      if (!id) {
+        id = `game_${Date.now()}`
+      }
+      if (!/^[a-z0-9_-]+$/.test(id)) {
+        return { ok: false, error: '游戏ID仅支持小写字母、数字、下划线及连字符' }
+      }
+      if (isBuiltinGame(id)) {
+        return { ok: false, error: '不能使用内置核心游戏的保留ID' }
+      }
+
+      const cleanDef: GameDef = {
+        id,
+        name: gameDef.name.trim(),
+        nameEn: gameDef.nameEn?.trim() || undefined,
+        shortName: (gameDef.shortName || gameDef.name).trim(),
+        shortNameEn: gameDef.shortNameEn?.trim() || undefined,
+        loader: (gameDef.loader || '3DMigoto').trim(),
+        exeHint: gameDef.exeHint?.trim() || undefined,
+        accent: (gameDef.accent || '#10b981').trim(),
+        isCustom: true
+      }
+
+      const existingCustom = settings.customGames || []
+      const index = existingCustom.findIndex((g) => g.id === id)
+      let nextCustom: GameDef[]
+      if (index >= 0) {
+        nextCustom = [...existingCustom]
+        nextCustom[index] = cleanDef
+      } else {
+        nextCustom = [...existingCustom, cleanDef]
+      }
+
+      settings.customGames = nextCustom
+      setCustomGames(nextCustom)
+
+      if (gameSettings) {
+        settings.games[id] = {
+          ...settings.games[id],
+          modsPath: (gameSettings.modsPath || '').trim(),
+          gamePath: (gameSettings.gamePath || '').trim(),
+          loaderPath: (gameSettings.loaderPath || '').trim(),
+          launchArgs: (gameSettings.launchArgs || '').trim()
+        }
+      } else if (!settings.games[id]) {
+        settings.games[id] = { modsPath: '' }
+      }
+
+      if (settings.hiddenGameIds?.includes(id)) {
+        settings.hiddenGameIds = settings.hiddenGameIds.filter((gId) => gId !== id)
+      }
+
+      settings.activeGameId = id
+      await saveSettings(baseDir(), settings)
+      refreshModsWatcher()
+      const snapshot = await makeSnapshot(id)
+      broadcastStateChanged({ gameId: id })
+      return { ok: true, snapshot }
+    }
+  )
+
+  register(IPC.deleteCustomGame, async (gameId: string) => {
+    if (!gameId || isBuiltinGame(gameId)) {
+      return { ok: false, error: '不能删除内置核心游戏' }
+    }
+    const existingCustom = settings.customGames || []
+    const nextCustom = existingCustom.filter((g) => g.id !== gameId)
+    settings.customGames = nextCustom
+    setCustomGames(nextCustom)
+    delete settings.games[gameId]
+    if (settings.hiddenGameIds?.includes(gameId)) {
+      settings.hiddenGameIds = settings.hiddenGameIds.filter((id) => id !== gameId)
+    }
+
+    let nextActiveId = settings.activeGameId
+    if (settings.activeGameId === gameId) {
+      nextActiveId = BUILTIN_GAMES[0].id
+      settings.activeGameId = nextActiveId
+    }
+
+    await saveSettings(baseDir(), settings)
+    refreshModsWatcher()
+    const snapshot = await makeSnapshot(nextActiveId)
+    broadcastStateChanged({ gameId: nextActiveId })
+    return { ok: true, snapshot }
+  })
+
+  register(IPC.toggleGameVisibility, async (gameId: string, visible?: boolean) => {
+    if (!isGameId(gameId)) return { ok: false, hiddenGameIds: settings.hiddenGameIds || [] }
+    const currentHidden = new Set(settings.hiddenGameIds || [])
+    const willHide = visible !== undefined ? !visible : !currentHidden.has(gameId)
+    if (willHide) {
+      currentHidden.add(gameId)
+    } else {
+      currentHidden.delete(gameId)
+    }
+    settings.hiddenGameIds = Array.from(currentHidden)
+    await saveSettings(baseDir(), settings)
+    broadcastStateChanged({})
+    return { ok: true, hiddenGameIds: settings.hiddenGameIds }
+  })
+
+  register(IPC.setOnlyShowConfiguredGames, async (enabled: boolean) => {
+    settings.onlyShowConfiguredGames = Boolean(enabled)
+    await saveSettings(baseDir(), settings)
+    broadcastStateChanged({})
+    return { ok: true, onlyShowConfiguredGames: settings.onlyShowConfiguredGames }
   })
 
   register(IPC.getMods, async (gameId: GameId, characterFolder: string) => {

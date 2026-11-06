@@ -9,7 +9,9 @@ import type {
   CreateCharacterInput,
   EnvironmentCheck,
   ExportPresetResult,
+  GameDef,
   GameId,
+  GameSettings,
   GameSnapshot,
   ImportCommitRequest,
   ImportParseRequest,
@@ -37,6 +39,10 @@ export const IPC = {
   saveSettings: 'settings:save',
   switchGame: 'game:switch',
   scanGame: 'game:scan',
+  saveCustomGame: 'game:save-custom',
+  deleteCustomGame: 'game:delete-custom',
+  toggleGameVisibility: 'game:toggle-visibility',
+  setOnlyShowConfiguredGames: 'game:set-only-configured',
   getMods: 'mods:list',
   toggleMod: 'mods:toggle',
   deleteMod: 'mods:delete',
@@ -117,6 +123,20 @@ export interface ModDeckApi {
   saveSettings(patch: SettingsPatch): Promise<Settings>
   switchGame(gameId: GameId): Promise<GameSnapshot | null>
   scanGame(gameId: GameId): Promise<GameSnapshot | null>
+  saveCustomGame(
+    gameDef: GameDef,
+    gameSettings?: GameSettings
+  ): Promise<{ ok: boolean; error?: string; snapshot?: GameSnapshot }>
+  deleteCustomGame(
+    gameId: string
+  ): Promise<{ ok: boolean; error?: string; snapshot?: GameSnapshot }>
+  toggleGameVisibility(
+    gameId: string,
+    visible?: boolean
+  ): Promise<{ ok: boolean; hiddenGameIds: string[] }>
+  setOnlyShowConfiguredGames(
+    enabled: boolean
+  ): Promise<{ ok: boolean; onlyShowConfiguredGames: boolean }>
   getMods(gameId: GameId, characterFolder: string): Promise<ModInfo[]>
   toggleMod(
     gameId: GameId,

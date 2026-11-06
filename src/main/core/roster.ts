@@ -5,7 +5,7 @@ import type {
   RosterSyncResult,
   RosterSyncStatus
 } from '../../shared/types'
-import { GAMES, isGameId } from './games'
+import { BUILTIN_GAMES, getAllGames, isGameId } from './games'
 import { readJsonSafe, writeJsonAtomic } from './fsx'
 import path from 'node:path'
 
@@ -394,7 +394,7 @@ export function getMergedRoster(gameId: GameId): RosterEntry[] {
 
 export function getRosterMap(preferEn = false): Record<GameId, string[]> {
   const map = {} as Record<GameId, string[]>
-  for (const game of GAMES) {
+  for (const game of getAllGames()) {
     const merged = getMergedRoster(game.id)
     const names = [preferEn ? 'Others' : '其他', ...merged.filter((item) => item.zh !== '其他').map((item) => (preferEn ? item.en || item.zh : item.zh))]
     map[game.id] = Array.from(new Set(names))
@@ -420,7 +420,7 @@ export async function loadRosterCache(baseDir: string): Promise<void> {
 
 export function getRosterStatus(remoteUrl?: string): RosterSyncStatus {
   const gameCounts = {} as Record<GameId, number>
-  for (const game of GAMES) {
+  for (const game of getAllGames()) {
     gameCounts[game.id] = getMergedRoster(game.id).length
   }
   return {
@@ -459,7 +459,7 @@ export async function syncRemoteRoster(
 
     const parsedGames: Partial<Record<GameId, RosterEntry[]>> = {}
     let totalEntries = 0
-    for (const game of GAMES) {
+    for (const game of getAllGames()) {
       const arr = rawGames[game.id]
       if (!Array.isArray(arr)) continue
       const clean = arr.map(sanitizeRosterEntry).filter((x): x is RosterEntry => Boolean(x))

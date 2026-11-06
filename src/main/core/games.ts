@@ -1,6 +1,6 @@
 import type { GameDef, GameId } from '../../shared/types'
 
-export const GAMES: GameDef[] = [
+export const BUILTIN_GAMES: GameDef[] = [
   {
     id: 'wuthering-waves',
     name: '鸣潮',
@@ -53,14 +53,34 @@ export const GAMES: GameDef[] = [
   }
 ]
 
-const GAME_MAP = new Map<string, GameDef>(GAMES.map((game) => [game.id, game]))
+let customGamesList: GameDef[] = []
+
+export function setCustomGames(games: GameDef[]): void {
+  customGamesList = Array.isArray(games) ? games : []
+}
+
+export function getCustomGames(): GameDef[] {
+  return customGamesList
+}
+
+export function getAllGames(): GameDef[] {
+  return [...BUILTIN_GAMES, ...customGamesList]
+}
+
+export const GAMES: GameDef[] = BUILTIN_GAMES
+
+export function isBuiltinGame(id: string): boolean {
+  return BUILTIN_GAMES.some((game) => game.id === id)
+}
 
 export function isGameId(value: unknown): value is GameId {
-  return typeof value === 'string' && GAME_MAP.has(value)
+  if (typeof value !== 'string' || !value.trim()) return false
+  return getAllGames().some((game) => game.id === value.trim())
 }
 
 export function getGame(id: string): GameDef | null {
-  return GAME_MAP.get(id) ?? null
+  if (typeof id !== 'string' || !id.trim()) return null
+  return getAllGames().find((game) => game.id === id.trim()) ?? null
 }
 
 export function requireGame(id: string): GameDef {

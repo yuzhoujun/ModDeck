@@ -21,6 +21,9 @@ export type IconName =
   | 'userPlus'
   | 'info'
   | 'sliders'
+  | 'filter'
+  | 'eye'
+  | 'eyeOff'
 
 const PATHS: Record<IconName, ReactNode> = {
   search: (
@@ -114,6 +117,18 @@ const PATHS: Record<IconName, ReactNode> = {
   sliders: (
     <>
       <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
+    </>
+  ),
+  filter: <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />,
+  eye: (
+    <>
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  eyeOff: (
+    <>
+      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61M2 2l20 20" />
     </>
   ),
   info: (

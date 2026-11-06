@@ -20,13 +20,19 @@ export function SettingsView({
   settings,
   initialTab = 'general',
   onSave,
-  onNotify
+  onNotify,
+  onAddCustomGame,
+  onEditCustomGame,
+  onDeleteCustomGame
 }: {
   games: GameDef[]
   settings: Settings
   initialTab?: SettingsTab
   onSave: (patch: SettingsPatch) => Promise<void>
   onNotify: (text: string, kind?: 'ok' | 'err' | 'info') => void
+  onAddCustomGame?: () => void
+  onEditCustomGame?: (game: GameDef) => void
+  onDeleteCustomGame?: (gameId: string) => Promise<void>
 }) {
   const { t, setLocale, effectiveLocale, availableLocales } = useI18n()
   const [tab, setTab] = useState<SettingsTab>(initialTab)
@@ -798,6 +804,25 @@ export function SettingsView({
               <p className="muted">{t('settings.games.desc')}</p>
             </div>
           </div>
+
+          <label className="check-row-card" style={{ marginBottom: '16px' }}>
+            <input
+              type="checkbox"
+              checked={draft.onlyShowConfiguredGames ?? false}
+              onChange={async (event) => {
+                const checked = event.target.checked
+                setDraft((prev) => ({ ...prev, onlyShowConfiguredGames: checked }))
+                await persistPatch({ onlyShowConfiguredGames: checked })
+              }}
+            />
+            <div>
+              <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{t('settings.games.onlyShowConfiguredLabel')}</div>
+              <div className="muted small" style={{ marginTop: '2px' }}>
+                {t('settings.games.onlyShowConfiguredDesc')}
+              </div>
+            </div>
+          </label>
+
           <div className="setting-group-box" style={{ marginBottom: '16px' }}>
             <div className="setting-group-header">
               <span className="setting-group-title">{t('settings.games.xxmiRootLabel')}</span>
@@ -831,15 +856,86 @@ export function SettingsView({
             </div>
           </div>
 
+          <div className="row" style={{ marginBottom: '14px', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 600, fontSize: '13px', color: '#94a3b8' }}>{t('sidebar.games')} ({games.length})</span>
+            {onAddCustomGame ? (
+              <button
+                type="button"
+                className="btn ghost small-btn"
+                onClick={onAddCustomGame}
+              >
+                <Icon name="plus" size={14} />
+                {t('settings.games.addGameBtn')}
+              </button>
+            ) : null}
+          </div>
+
           <div className="game-settings">
             {games.map((game) => {
               const value = draft.games[game.id]
+              const isHidden = (draft.hiddenGameIds ?? []).includes(game.id)
               return (
                 <div className="game-setting" key={game.id}>
                   <div className="game-setting-head">
                     <span className="dot" style={{ background: game.accent }} />
                     <strong>{getLocaleGameName(game, effectiveLocale)}</strong>
-                    <span className="muted">{game.loader}</span>
+                    {game.isCustom ? (
+                      <span className="game-badge-custom" title={t('customGame.customBadge')}>
+                        {t('customGame.customTag')}
+                      </span>
+                    ) : null}
+                    <span className="muted">({game.loader})</span>
+
+                    <div className="grow" />
+
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      style={isHidden ? { opacity: 0.5 } : undefined}
+                      title={isHidden ? t('settings.games.showInSidebar') : t('settings.games.hideInSidebar')}
+                      onClick={async () => {
+                        const currentHidden = draft.hiddenGameIds ?? []
+                        const nextHidden = isHidden
+                          ? currentHidden.filter((id) => id !== game.id)
+                          : [...currentHidden, game.id]
+                        setDraft((prev) => ({ ...prev, hiddenGameIds: nextHidden }))
+                        await window.moddeck.toggleGameVisibility(game.id)
+                      }}
+                    >
+                      <Icon name={isHidden ? 'eyeOff' : 'eye'} size={15} />
+                    </button>
+
+                    {game.isCustom && onEditCustomGame ? (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        title={t('settings.games.editCustomGame')}
+                        onClick={() => onEditCustomGame(game)}
+                      >
+                        <Icon name="edit" size={14} />
+                      </button>
+                    ) : null}
+
+                    {game.isCustom && onDeleteCustomGame ? (
+                      <button
+                        type="button"
+                        className="icon-btn danger-hover"
+                        title={t('settings.games.deleteCustomGame')}
+                        onClick={async () => {
+                          const confirmed = window.confirm(
+                            t('customGame.confirmDelete', { name: game.name })
+                          )
+                          if (!confirmed) return
+                          try {
+                            await onDeleteCustomGame(game.id)
+                          } catch (err) {
+                            onNotify(errorMessage(err), 'err')
+                          }
+                        }}
+                      >
+                        <Icon name="trash" size={14} />
+                      </button>
+                    ) : null}
                   </div>
 
                   <label className="field">
@@ -871,7 +967,7 @@ export function SettingsView({
                       <input
                         className="input"
                         value={value?.gamePath ?? ''}
-                        placeholder={t('settings.games.gamePathPlaceholder', { exe: game.exeHint })}
+                        placeholder={t('settings.games.gamePathPlaceholder', { exe: game.exeHint || 'Game.exe' })}
                         onChange={(event) =>
                           updateGame(game.id, { gamePath: event.target.value }, true)
                         }

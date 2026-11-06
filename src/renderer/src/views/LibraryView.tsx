@@ -239,7 +239,7 @@ export function LibraryView({
                 <CharacterCard
                   key={character.folder}
                   character={character}
-                  accent={game.accent}
+                  accent={game.accent || '#10b981'}
                   onOpen={() => onOpenCharacter(character)}
                   draggable={sort === 'custom'}
                   dragging={dragFolder === character.folder}

@@ -4,6 +4,7 @@ export type GameId =
   | 'zzz'
   | 'endfield'
   | 'neverness-to-everness'
+  | (string & {})
 
 export type CharacterKind = 'character' | 'utility'
 
@@ -14,8 +15,9 @@ export interface GameDef {
   shortName: string
   shortNameEn?: string
   loader: string
-  exeHint: string
-  accent: string
+  exeHint?: string
+  accent?: string
+  isCustom?: boolean
 }
 
 export interface GameSettings {
@@ -82,6 +84,9 @@ export interface Settings {
   activeGameId: GameId
   xxmiRoot?: string
   games: Record<string, GameSettings>
+  customGames?: GameDef[]
+  hiddenGameIds?: string[]
+  onlyShowConfiguredGames?: boolean
   ui: UiSettings
   import: ImportSettings
   characterOrders: Record<string, string[]>
@@ -261,6 +266,9 @@ export interface SettingsPatch {
   activeGameId?: GameId
   xxmiRoot?: string
   games?: Record<string, Partial<GameSettings>>
+  customGames?: GameDef[]
+  hiddenGameIds?: string[]
+  onlyShowConfiguredGames?: boolean
   ui?: Partial<UiSettings>
   import?: Partial<ImportSettings>
 }
