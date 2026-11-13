@@ -334,8 +334,26 @@ export function ModDetailsPanel({
     }
   }
 
+  function handlePanelDragOver(event: DragEvent<HTMLElement>) {
+    if (!Array.from(event.dataTransfer.types).includes('Files')) return
+    event.preventDefault()
+    event.stopPropagation()
+    event.dataTransfer.dropEffect = 'none'
+  }
+
+  function handlePanelDrop(event: DragEvent<HTMLElement>) {
+    if (!Array.from(event.dataTransfer.types).includes('Files')) return
+    event.preventDefault()
+    event.stopPropagation()
+    setPreviewDrag(false)
+  }
+
   return (
-    <aside className="detail-panel">
+    <aside
+      className="detail-panel"
+      onDragOver={handlePanelDragOver}
+      onDrop={handlePanelDrop}
+    >
       <div className="detail-head">
         <strong>{t('mod.detailsTitle')}</strong>
         <button className="icon-btn" onClick={onClose} title={t('common.close')}>
@@ -424,8 +442,9 @@ export function ModDetailsPanel({
               e.preventDefault()
               e.stopPropagation()
               const file = e.dataTransfer.files[0]
-              if (file && (file as any).path) {
-                void handleDropImportPreset((file as any).path)
+              const filePath = file ? window.moddeck.getPathForFile(file) : null
+              if (filePath) {
+                void handleDropImportPreset(filePath)
               }
             }}
           >

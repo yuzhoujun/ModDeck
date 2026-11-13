@@ -639,8 +639,9 @@ export function RosterPresetModal({
           e.preventDefault()
           e.stopPropagation()
           const file = e.dataTransfer.files[0]
-          if (file && (file as any).path) {
-            void handleDropImportFile((file as any).path)
+          const filePath = file ? window.moddeck.getPathForFile(file) : null
+          if (filePath) {
+            void handleDropImportFile(filePath)
           }
         }}
       >

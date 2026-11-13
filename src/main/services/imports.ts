@@ -83,7 +83,13 @@ async function unwrapBase(root: string): Promise<string> {
   let current = root
   for (let index = 0; index < 4; index += 1) {
     const entries = await readdirSafe(current)
-    const files = entries.filter((entry) => entry.isFile() && !entry.name.startsWith('.'))
+    const files = entries.filter(
+      (entry) =>
+        entry.isFile() &&
+        (!entry.name.startsWith('.') ||
+          (!entry.name.startsWith('._') &&
+            /\.(png|jpe?g|webp|gif|avif)$/i.test(entry.name)))
+    )
     const dirs = entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
     if (dirs.length === 0) break
     const modsChild = dirs.find((entry) => entry.name.toLowerCase() === 'mods')

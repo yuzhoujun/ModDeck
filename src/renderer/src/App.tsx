@@ -85,6 +85,18 @@ export default function App() {
   }, [toast])
 
   useEffect(() => {
+    const resetDropActive = () => setDropActive(false)
+    window.addEventListener('drop', resetDropActive, true)
+    window.addEventListener('dragend', resetDropActive, true)
+    window.addEventListener('blur', resetDropActive)
+    return () => {
+      window.removeEventListener('drop', resetDropActive, true)
+      window.removeEventListener('dragend', resetDropActive, true)
+      window.removeEventListener('blur', resetDropActive)
+    }
+  }, [])
+
+  useEffect(() => {
     if (booting) return
     let active = true
     const unsubscribe = window.moddeck.onStateChanged(() => {
@@ -434,8 +446,33 @@ export default function App() {
     return Array.from(event.dataTransfer.types).includes('Files')
   }
 
+  function isDetailPanelTarget(target: EventTarget | null): boolean {
+    return target instanceof Element && Boolean(target.closest('.detail-panel'))
+  }
+
+  function isMainImportBlocked(target: EventTarget | null): boolean {
+    return Boolean(
+      view === 'settings' ||
+        editing ||
+        creating ||
+        customGameModalOpen ||
+        showRosterPresets ||
+        parsedImport ||
+        isDetailPanelTarget(target)
+    )
+  }
+
+  function handleMainDragOverCapture(event: DragEvent<HTMLElement>) {
+    if (dropActive && isMainImportBlocked(event.target)) {
+      setDropActive(false)
+    }
+  }
+
   function handleMainDragOver(event: DragEvent<HTMLElement>) {
-    if (view === 'settings' || editing || creating || parsedImport) return
+    if (isMainImportBlocked(event.target)) {
+      if (dropActive) setDropActive(false)
+      return
+    }
     if (!isExternalFileDrag(event)) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'copy'
@@ -445,12 +482,19 @@ export default function App() {
   function handleMainDragLeave(event: DragEvent<HTMLElement>) {
     if (!dropActive) return
     const related = event.relatedTarget as Node | null
+    if (related && isDetailPanelTarget(related)) {
+      setDropActive(false)
+      return
+    }
     if (related && event.currentTarget.contains(related)) return
     setDropActive(false)
   }
 
   function handleMainDrop(event: DragEvent<HTMLElement>) {
-    if (view === 'settings' || editing || creating || parsedImport) return
+    if (isMainImportBlocked(event.target)) {
+      if (dropActive) setDropActive(false)
+      return
+    }
     if (!isExternalFileDrag(event)) return
     event.preventDefault()
     setDropActive(false)
@@ -805,6 +849,7 @@ export default function App() {
 
       <main
         className={`main${dropActive ? ' is-drop-active' : ''}`}
+        onDragOverCapture={handleMainDragOverCapture}
         onDragOver={handleMainDragOver}
         onDragLeave={handleMainDragLeave}
         onDrop={handleMainDrop}

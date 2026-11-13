@@ -170,6 +170,30 @@ async function findCharacterCoverFile(dir: string): Promise<string | null> {
   return null
 }
 
+const DOT_PREVIEW_PATTERN = /(preview|cover|thumbnail|thumb|screen|screenshot|showcase)/i
+
+function isSupportedPreviewImage(name: string): boolean {
+  // 排除 macOS AppleDouble 元数据文件（如 ._preview.png），同时兼容 .JASM_Cover.jpeg 等点号前缀预览图
+  if (name.startsWith('._')) return false
+  return IMAGE_EXT.has(path.extname(name).toLowerCase())
+}
+
+function pickPreferredImage(names: string[], allowFallbackAny: boolean): string | null {
+  const regular = names.filter((name) => !name.startsWith('.'))
+  const dotted = names.filter((name) => name.startsWith('.'))
+
+  const regularPreferred = regular.find((name) => PREVIEW_PATTERN.test(name))
+  if (regularPreferred) return regularPreferred
+
+  const dottedPreferred = dotted.find((name) => DOT_PREVIEW_PATTERN.test(name))
+  if (dottedPreferred) return dottedPreferred
+
+  if (!allowFallbackAny) return null
+  if (regular.length > 0) return regular[0]
+  if (dotted.length > 0) return dotted[0]
+  return null
+}
+
 async function findPreview(dir: string): Promise<string | null> {
   const stamp = await dirStamp(dir)
   const cached = previewCache.get(dir)
@@ -190,24 +214,14 @@ async function findPreview(dir: string): Promise<string | null> {
     }
   }
 
-  // 2. 次优先级：Mod 根目录下的 preview/cover/thumb 等标准预览图或普通图片
+  // 2. 次优先级：Mod 根目录下的 preview/cover/thumb 等标准预览图、点号前缀预览图或普通图片
   const images = entries
-    .filter(
-      (entry) =>
-        entry.isFile() &&
-        !entry.name.startsWith('.') &&
-        IMAGE_EXT.has(path.extname(entry.name).toLowerCase())
-    )
+    .filter((entry) => entry.isFile() && isSupportedPreviewImage(entry.name))
     .map((entry) => entry.name)
 
-  const preferred = images.find((name) => PREVIEW_PATTERN.test(name))
-  if (preferred) {
-    const value = path.join(dir, preferred)
-    previewCache.set(dir, { stamp, value })
-    return value
-  }
-  if (images.length > 0) {
-    const value = path.join(dir, images[0])
+  const rootMatch = pickPreferredImage(images, true)
+  if (rootMatch) {
+    const value = path.join(dir, rootMatch)
     previewCache.set(dir, { stamp, value })
     return value
   }
@@ -219,14 +233,9 @@ async function findPreview(dir: string): Promise<string | null> {
     const subDir = path.join(dir, entry.name)
     const subEntries = await readdirSafe(subDir)
     const subImages = subEntries
-      .filter(
-        (sub) =>
-          sub.isFile() &&
-          !sub.name.startsWith('.') &&
-          IMAGE_EXT.has(path.extname(sub.name).toLowerCase())
-      )
+      .filter((sub) => sub.isFile() && isSupportedPreviewImage(sub.name))
       .map((sub) => sub.name)
-    const subPreferred = subImages.find((name) => PREVIEW_PATTERN.test(name))
+    const subPreferred = pickPreferredImage(subImages, false)
     if (subPreferred) {
       const value = path.join(subDir, subPreferred)
       previewCache.set(dir, { stamp, value })
