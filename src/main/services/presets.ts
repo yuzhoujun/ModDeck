@@ -18,6 +18,11 @@ import type {
 import { getAssignmentModItems } from '../../shared/types'
 import { ensureDir, pathExists, readJsonSafe, writeJsonAtomic } from '../core/fsx'
 import { isSafeSegment } from '../core/safe-path'
+import {
+  BUILTIN_TRANSIENT_VAR_PATTERNS,
+  classifyVariableFilter,
+  readLocalIgnoreRules
+} from './ini-analysis'
 
 const ROSTER_PRESETS_FILE = 'roster-presets.json'
 const BRIDGE_FOLDER_NAME = '_ModDeck_Preset_Bridge'
@@ -25,16 +30,8 @@ const BRIDGE_FILE_NAME = 'bridge.ini'
 
 /**
  * 临时/UI/交互/帧动画类瞬态变量过滤规则
- * 这类变量在游戏中是频繁临时变动或由帧动画重算的（例如打开的菜单/页码/拖拽坐标/动画振荡器/形态键），
- * 不应参与外观预设的活性比对与切换覆盖。
  */
-export const TRANSIENT_VAR_PATTERNS = [
-  /(?:\\|_)(?:menu|elem|drag|seen|info|page|sub|lang|ref_w|ref_h|off_x|off_y|offset_x|offset_y|offset_x_px|offset_y_px|slider|cursor|screen|click|hover|active_elem|buttons)(?:_|\b)/i,
-  /\\ssmtdrag_efmi_/i,
-  /\\tg_gui_anim_/i,
-  /\\(?:tg_)?shapekey_\d+\b/i,
-  /\\(?:show_time|inited|finished|begin_time|delta|ui4_finished|ww|wh|mod_in_use)\b/i
-]
+export const TRANSIENT_VAR_PATTERNS = BUILTIN_TRANSIENT_VAR_PATTERNS
 
 export function isTransientVariable(key: string): boolean {
   return TRANSIENT_VAR_PATTERNS.some((rx) => rx.test(key))
@@ -714,18 +711,30 @@ export async function clearPresetBridgeIni(modsPath: string): Promise<void> {
   }
 }
 
+export async function hasActivePresetBridge(modsPath: string): Promise<boolean> {
+  if (!modsPath) return false
+  try {
+    const bridgeFile = path.join(modsPath, BRIDGE_FOLDER_NAME, BRIDGE_FILE_NAME)
+    if (!(await pathExists(bridgeFile))) return false
+    const raw = await fs.readFile(bridgeFile, 'utf8')
+    return raw
+      .split(/\r?\n/)
+      .some((line) => line.trim() !== '' && !line.trim().startsWith(';'))
+  } catch {
+    return false
+  }
+}
+
 /**
- * 比较预设与当前环境的激活状态（自动忽略 transient 交互临时变量）
- */
-/**
- * 比较两组外观变量是否数值等价（支持浮点精度容差 0.0005，过滤瞬态变量）
+ * 比较两组外观变量是否数值等价（支持浮点精度容差 0.0005，过滤瞬态与忽略变量）
  */
 export function areVariablesEqual(
   varsA: Record<string, string> = {},
-  varsB: Record<string, string> = {}
+  varsB: Record<string, string> = {},
+  isIgnored: (key: string) => boolean = isTransientVariable
 ): boolean {
-  const keysA = Object.keys(varsA).filter((k) => !isTransientVariable(k))
-  const keysB = Object.keys(varsB).filter((k) => !isTransientVariable(k))
+  const keysA = Object.keys(varsA).filter((k) => !isIgnored(k))
+  const keysB = Object.keys(varsB).filter((k) => !isIgnored(k))
   const allKeys = new Set([...keysA.map((k) => k.toLowerCase()), ...keysB.map((k) => k.toLowerCase())])
 
   const mapA = new Map<string, string>()
@@ -757,7 +766,8 @@ export function areVariablesEqual(
 export function isPresetContentIdentical(
   preset: ModVariantPreset,
   activeInis: string[],
-  variables: Record<string, string>
+  variables: Record<string, string>,
+  isIgnored: (key: string) => boolean = isTransientVariable
 ): boolean {
   const inisA = new Set((preset.activeIniFiles || []).map((f) => f.replace(/\\/g, '/').toLowerCase()))
   const inisB = new Set((activeInis || []).map((f) => f.replace(/\\/g, '/').toLowerCase()))
@@ -765,13 +775,14 @@ export function isPresetContentIdentical(
   for (const item of inisA) {
     if (!inisB.has(item)) return false
   }
-  return areVariablesEqual(preset.variables || {}, variables || {})
+  return areVariablesEqual(preset.variables || {}, variables || {}, isIgnored)
 }
 
 function evaluatePresetActive(
   preset: ModVariantPreset,
   currentActiveInis: string[],
-  currentEffectiveVars: Record<string, string>
+  currentEffectiveVars: Record<string, string>,
+  isIgnored: (key: string) => boolean = isTransientVariable
 ): boolean {
   // 1. 比对 ini 列表
   const desiredInis = new Set(preset.activeIniFiles.map((f) => f.replace(/\\/g, '/').toLowerCase()))
@@ -780,10 +791,10 @@ function evaluatePresetActive(
     if (!desiredInis.has(item)) return false
   }
 
-  // 2. 比对外观相关变量（过滤 transient 临时变量）
+  // 2. 比对外观相关变量（过滤 transient 与自定义忽略变量）
   if (preset.variables && Object.keys(preset.variables).length > 0) {
     for (const [k, v] of Object.entries(preset.variables)) {
-      if (isTransientVariable(k)) continue
+      if (isIgnored(k)) continue
 
       const lowerKey = k.toLowerCase()
       const effectiveVal = currentEffectiveVars[lowerKey]
@@ -812,7 +823,8 @@ export async function getModPresets(
   characterFolder: string,
   modFolder: string,
   modPath?: string,
-  modsPath?: string
+  modsPath?: string,
+  globalIgnoreRules: string[] = []
 ): Promise<ModVariantPreset[]> {
   const cleanModName = modFolder.replace(/^DISABLED_/i, '')
   const filePath = await getModPresetFilePath(baseDir, gameId, characterFolder, modFolder)
@@ -825,6 +837,7 @@ export async function getModPresets(
   // 获取当前 Mod 实际运行环境信息
   let currentActiveInis: string[] = []
   let defaultVars: Record<string, string> = {}
+  let localIgnoreRules: string[] = []
 
   if (modPath && (await pathExists(modPath))) {
     const iniStatus = await inspectModIniFiles(modPath)
@@ -834,7 +847,10 @@ export async function getModPresets(
       return parts.join('/').toLowerCase()
     })
     defaultVars = await inspectModDefaultVariables(modPath)
+    localIgnoreRules = (await readLocalIgnoreRules(modPath)).rules
   }
+  const isIgnored = (key: string) =>
+    classifyVariableFilter(key, globalIgnoreRules, localIgnoreRules).ignored
 
   // 获取当前生效的变量（d3dx_user.ini 运行时值覆盖出厂默认值）
   const knownKeys = Object.keys(defaultVars)
@@ -903,7 +919,7 @@ export async function getModPresets(
 
   // 计算每一个预设的 isActive 与 isPending 状态
   for (const p of list) {
-    p.isActive = evaluatePresetActive(p, currentActiveInis, currentEffectiveVars)
+    p.isActive = evaluatePresetActive(p, currentActiveInis, currentEffectiveVars, isIgnored)
     p.isPending = Boolean(pendingEntry && pendingEntry.status !== 'reloading' && pendingEntry.presetId === p.id)
   }
 
@@ -920,8 +936,9 @@ export async function saveModPreset(
   modFolder: string,
   modPath: string,
   modsPath: string,
-  presetName: string
-): Promise<ToggleResult> {
+  presetName: string,
+  globalIgnoreRules: string[] = []
+): Promise<ToggleResult & { duplicatePresetName?: string }> {
   const name = presetName.trim()
   if (!name) return { ok: false, error: '预设名称不能为空' }
   if (!(await pathExists(modPath))) return { ok: false, error: 'Mod 目录不存在' }
@@ -942,16 +959,20 @@ export async function saveModPreset(
 
   // 2. 识别出该 Mod 关联的已知 persist 变量键列表，并从 d3dx_user.ini 中提取当前实机运行值
   const defaultVars = await inspectModDefaultVariables(modPath)
+  const localIgnoreRules = (await readLocalIgnoreRules(modPath)).rules
+  const isIgnored = (key: string) =>
+    classifyVariableFilter(key, globalIgnoreRules, localIgnoreRules).ignored
+
   const knownKeys = Object.keys(defaultVars)
   const activeVars = await readActiveD3dxUserVariables(modsPath, knownKeys, characterFolder, modFolder)
 
-  // 合并：如果 d3dx_user.ini 里有变动取运行时值，若无则取作者默认出厂值（同时剔除瞬态变量）
+  // 合并：如果 d3dx_user.ini 里有变动取运行时值，若无则取作者默认出厂值（同时剔除瞬态与自定义忽略变量）
   const currentSnapshotVars: Record<string, string> = {}
   for (const [k, v] of Object.entries(defaultVars)) {
-    if (!isTransientVariable(k)) currentSnapshotVars[k] = v
+    if (!isIgnored(k)) currentSnapshotVars[k] = v
   }
   for (const [k, v] of Object.entries(activeVars)) {
-    if (!isTransientVariable(k)) currentSnapshotVars[k] = v
+    if (!isIgnored(k)) currentSnapshotVars[k] = v
   }
 
   const filePath = await getModPresetFilePath(baseDir, gameId, characterFolder, modFolder)
@@ -962,11 +983,12 @@ export async function saveModPreset(
   // 检查是否与已有的某个预设内容完全一致（防止因浮点数误差或重复保存产生同质废案）
   const duplicatePreset = list.find((p) => {
     if (existingIndex >= 0 && p.id === list[existingIndex].id) return false
-    return isPresetContentIdentical(p, cleanActiveInis, currentSnapshotVars)
+    return isPresetContentIdentical(p, cleanActiveInis, currentSnapshotVars, isIgnored)
   })
   if (duplicatePreset) {
     return {
       ok: false,
+      duplicatePresetName: duplicatePreset.name,
       error: `当前造型配置与已有预设「${duplicatePreset.name}」完全一致，无需重复保存`
     }
   }
@@ -1002,13 +1024,14 @@ export async function applyModPreset(
   modPath: string,
   modsPath: string,
   presetId: string,
-  skipBridge = false
+  skipBridge = false,
+  globalIgnoreRules: string[] = []
 ): Promise<ToggleResult> {
   const filePath = await getModPresetFilePath(baseDir, gameId, characterFolder, modFolder)
   let list = (await readJsonSafe<ModVariantPreset[] | null>(filePath, null)) ?? []
   let targetPreset = list.find((p) => p.id === presetId || (presetId === 'default' && p.id === '__default__'))
   if (!targetPreset) {
-    list = await getModPresets(baseDir, gameId, characterFolder, modFolder, modPath, modsPath)
+    list = await getModPresets(baseDir, gameId, characterFolder, modFolder, modPath, modsPath, globalIgnoreRules)
     targetPreset = list.find((p) => p.id === presetId || (presetId === 'default' && p.id === '__default__'))
   }
   if (!targetPreset) return { ok: false, error: '未找到指定预设' }
@@ -1051,9 +1074,16 @@ export async function applyModPreset(
   }
   await walk(modPath, '')
 
-  // 2. 合并该 Mod 的默认 persist 变量与预设变量（确保切回默认或旧预设时所有 persist 变量完整覆盖）
+  // 2. 合并该 Mod 的默认 persist 变量与预设变量（同时剔除瞬态与自定义忽略变量）
   const defaultVars = await inspectModDefaultVariables(modPath)
-  const mergedVars: Record<string, string> = { ...defaultVars, ...(targetPreset.variables ?? {}) }
+  const localIgnoreRules = (await readLocalIgnoreRules(modPath)).rules
+  const isIgnored = (key: string) =>
+    classifyVariableFilter(key, globalIgnoreRules, localIgnoreRules).ignored
+  const rawMergedVars: Record<string, string> = { ...defaultVars, ...(targetPreset.variables ?? {}) }
+  const mergedVars: Record<string, string> = {}
+  for (const [k, v] of Object.entries(rawMergedVars)) {
+    if (!isIgnored(k)) mergedVars[k] = v
+  }
 
   if (Object.keys(mergedVars).length > 0) {
     // 写入 d3dx_user.ini（离线/冷态直接持久化）
@@ -1187,7 +1217,8 @@ export async function applyRosterPreset(
   gameId: GameId,
   modsPath: string,
   presetId: string,
-  resolveCharDir: (root: string, folder: string) => Promise<string>
+  resolveCharDir: (root: string, folder: string) => Promise<string>,
+  globalIgnoreRules: string[] = []
 ): Promise<ToggleResult> {
   const store = await loadRosterPresetsStore(baseDir)
   const list = store.presets[gameId] ?? []
@@ -1244,7 +1275,8 @@ export async function applyRosterPreset(
           activePath,
           modsPath,
           targetItem.presetId,
-          true
+          true,
+          globalIgnoreRules
         ).catch(() => undefined)
       }
     }

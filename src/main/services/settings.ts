@@ -41,6 +41,8 @@ export function defaultSettings(): Settings {
       autoReloadModToggle: false,
       autoReloadModPreset: true,
       autoReloadRosterPreset: true,
+      autoSyncBeforeSavePreset: false,
+      variableIgnoreRules: [],
       postReloadSyncDelay: 6,
       recentModCount: 8,
       closeBehavior: 'quit'
@@ -261,6 +263,16 @@ export function normalizeSettings(raw: Partial<Settings> | null | undefined): Se
       autoReloadModToggle: source.ui?.autoReloadModToggle === true,
       autoReloadModPreset: source.ui?.autoReloadModPreset !== false,
       autoReloadRosterPreset: source.ui?.autoReloadRosterPreset !== false,
+      autoSyncBeforeSavePreset: source.ui?.autoSyncBeforeSavePreset === true,
+      variableIgnoreRules: Array.isArray(source.ui?.variableIgnoreRules)
+        ? Array.from(
+            new Set(
+              source.ui.variableIgnoreRules
+                .map((rule) => String(rule || '').trim())
+                .filter(Boolean)
+            )
+          )
+        : [],
       postReloadSyncDelay:
         typeof source.ui?.postReloadSyncDelay === 'number' && source.ui.postReloadSyncDelay > 0
           ? source.ui.postReloadSyncDelay

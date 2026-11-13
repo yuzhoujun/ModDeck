@@ -1,8 +1,13 @@
 import type {
   AppInfo,
   AutoDetectPathsResult,
+  CharacterHashConflict,
+  D3dxSyncStatus,
   ModVariantPreset,
+  ModStaticAnalysis,
   RosterPreset,
+  SaveModPresetOptions,
+  SaveModPresetResult,
   SaveRosterPresetInput,
   Bootstrap,
   CharacterMeta,
@@ -86,6 +91,10 @@ export const IPC = {
   confirmImportRosterPreset: 'presets:confirm-import-roster-preset',
   getD3dxAutoSaveInterval: 'd3dx:get-auto-save-interval',
   setD3dxAutoSaveInterval: 'd3dx:set-auto-save-interval',
+  getD3dxSyncStatus: 'd3dx:get-sync-status',
+  analyzeModIni: 'mods:analyze-ini',
+  scanCharacterHashConflicts: 'character:scan-hash-conflicts',
+  addVariableIgnoreRule: 'presets:add-variable-ignore-rule',
   setModPreview: 'mods:set-preview',
   setModsEnabled: 'mods:set-enabled',
   reorderCharacters: 'character:reorder',
@@ -196,6 +205,21 @@ export interface ModDeckApi {
   deleteRosterPreset(gameId: GameId, presetId: string): Promise<ToggleResult>
   getD3dxAutoSaveInterval(gameId: GameId): Promise<number>
   setD3dxAutoSaveInterval(gameId: GameId, interval: number): Promise<ToggleResult>
+  getD3dxSyncStatus(gameId: GameId): Promise<D3dxSyncStatus>
+  analyzeModIni(
+    gameId: GameId,
+    characterFolder: string,
+    modFolder: string
+  ): Promise<ModStaticAnalysis>
+  scanCharacterHashConflicts(
+    gameId: GameId,
+    characterFolder: string
+  ): Promise<CharacterHashConflict[]>
+  addVariableIgnoreRule(
+    rule: string,
+    scope: 'global' | 'local',
+    target?: { gameId: GameId; characterFolder: string; modFolder: string }
+  ): Promise<ToggleResult>
   getModPresets(
     gameId: GameId,
     characterFolder: string,
@@ -205,8 +229,9 @@ export interface ModDeckApi {
     gameId: GameId,
     characterFolder: string,
     modFolder: string,
-    presetName: string
-  ): Promise<ToggleResult>
+    presetName: string,
+    options?: SaveModPresetOptions
+  ): Promise<SaveModPresetResult>
   applyModPreset(
     gameId: GameId,
     characterFolder: string,

@@ -7,7 +7,6 @@ import { ScrollTitle } from './ScrollTitle'
 
 export function ModRow({
   mod,
-
   onToggle,
   onOpen,
   onDelete,
@@ -15,6 +14,7 @@ export function ModRow({
   selected = false,
   selectable = false,
   checked = false,
+  hasHashConflict = false,
   onCheck,
   draggable = false,
   dragging = false,
@@ -23,7 +23,6 @@ export function ModRow({
   onDrop,
   onDragEnd
 }: {
-
   mod: ModInfo
   onToggle: () => void
   onOpen: () => void
@@ -32,6 +31,7 @@ export function ModRow({
   selected?: boolean
   selectable?: boolean
   checked?: boolean
+  hasHashConflict?: boolean
   onCheck?: () => void
   draggable?: boolean
   dragging?: boolean
@@ -40,7 +40,7 @@ export function ModRow({
   onDrop?: (event: DragEvent<HTMLDivElement>) => void
   onDragEnd?: () => void
 }) {
-  const { t, effectiveLocale } = useI18n()
+  const { t } = useI18n()
   return (
     <div
       className={`mod-row${mod.enabled ? '' : ' is-disabled'}${selected ? ' is-selected' : ''}${
@@ -78,6 +78,7 @@ export function ModRow({
         <div className="mod-name" title={mod.folderName}>
           <ScrollTitle text={mod.name} className="mod-name-text" title={mod.folderName} />
           {!mod.hasIni ? <span className="tag warn">{t('character.noIniTag')}</span> : null}
+          {hasHashConflict ? <span className="tag warn">{t('character.hashConflictTag')}</span> : null}
         </div>
         <div className="mod-sub">
           {mod.enabled ? t('common.enabled') : t('common.disabled')} · {formatDate(mod.updatedAt)}

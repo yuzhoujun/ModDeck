@@ -46,6 +46,8 @@ export interface UiSettings {
   autoReloadModToggle: boolean
   autoReloadModPreset: boolean
   autoReloadRosterPreset: boolean
+  autoSyncBeforeSavePreset?: boolean
+  variableIgnoreRules?: string[]
   postReloadSyncDelay?: number
   recentModCount: number
   closeBehavior: 'quit' | 'minimize'
@@ -294,6 +296,72 @@ export interface AppInfo {
 export interface ToggleResult {
   ok: boolean
   error?: string
+}
+
+export interface SaveModPresetOptions {
+  syncF10?: boolean
+}
+
+export interface SaveModPresetResult extends ToggleResult {
+  syncedF10?: boolean
+  possibleStale?: boolean
+  staleReason?: 'unsynced-game-running' | 'pending-queue' | 'f10-timeout'
+}
+
+export interface D3dxSyncStatus {
+  exists: boolean
+  filePath?: string
+  mtimeMs: number
+  autoSaveInterval: number
+  gameRunning: boolean
+  pendingCount: number
+}
+
+export interface IniVariableInfo {
+  key: string
+  name: string
+  defaultValue: string
+  persist: boolean
+  ignored: boolean
+  ignoreSource?: 'builtin' | 'global' | 'local'
+  sourceFile: string
+  drivenByKeys: string[]
+  usedInSections: string[]
+  linkedVars: string[]
+}
+
+export interface IniCommandDependency {
+  triggerSection: string
+  targetSection: string
+  relation: 'run' | 'condition' | 'write'
+  variables: string[]
+}
+
+export interface IniHashDeclaration {
+  hash: string
+  kind: 'texture' | 'shader' | 'other'
+  section: string
+  file: string
+}
+
+export interface ModStaticAnalysis {
+  variables: IniVariableInfo[]
+  dependencies: IniCommandDependency[]
+  hashes: IniHashDeclaration[]
+  nonPersistControlVars: string[]
+  localIgnoreRules: string[]
+  hasLocalIgnoreFile: boolean
+}
+
+export interface CharacterHashConflict {
+  hash: string
+  kind: 'texture' | 'shader' | 'other'
+  mods: Array<{
+    folderName: string
+    name: string
+    sections: string[]
+    files: string[]
+  }>
 }
 
 export interface SimpleResult {

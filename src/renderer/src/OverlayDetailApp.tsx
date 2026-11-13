@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { GameId, ModDetails, ModVariantPreset } from '../../shared/types'
+import type { D3dxSyncStatus, GameId, ModDetails, ModVariantPreset } from '../../shared/types'
+import { D3dxSyncBanner } from './components/D3dxSyncBanner'
 import { Icon } from './components/Icon'
 import { Modal } from './components/Modal'
 import { ScrollTitle } from './components/ScrollTitle'
@@ -23,6 +24,18 @@ export function OverlayDetailApp() {
   const [newPresetName, setNewPresetName] = useState('')
   const [savingPreset, setSavingPreset] = useState(false)
   const [confirmPreset, setConfirmPreset] = useState<ModVariantPreset | null>(null)
+  const [syncStatus, setSyncStatus] = useState<D3dxSyncStatus | null>(null)
+  const [, setSyncClockTick] = useState(0)
+
+  const fetchSyncStatus = async () => {
+    if (!gameId) return
+    try {
+      const status = await window.moddeck.getD3dxSyncStatus(gameId)
+      setSyncStatus(status)
+    } catch {
+      // ignore
+    }
+  }
 
   const fetchPresets = async () => {
     if (!gameId || !characterFolder || !modFolder) return
@@ -57,6 +70,7 @@ export function OverlayDetailApp() {
       if (!cancelled) {
         void fetchDetails()
         void fetchPresets()
+        void fetchSyncStatus()
       }
     })
     return () => {
@@ -64,6 +78,13 @@ export function OverlayDetailApp() {
       unsubscribe()
     }
   }, [gameId, characterFolder, modFolder])
+
+  useEffect(() => {
+    if (!showSaveBox) return
+    void fetchSyncStatus()
+    const timer = setInterval(() => setSyncClockTick((tick) => tick + 1), 1000)
+    return () => clearInterval(timer)
+  }, [showSaveBox, gameId])
 
   // 发送热键
   async function send(key: string) {
@@ -135,8 +156,8 @@ export function OverlayDetailApp() {
   }
 
   // 现场保存预设
-  async function handleSavePreset() {
-    if (!gameId || !characterFolder || !modFolder) return
+  async function handleSavePreset(syncF10?: boolean) {
+    if (!gameId || !characterFolder || !modFolder || savingPreset) return
     const name = newPresetName.trim()
     if (!name) return
     try {
@@ -145,16 +166,22 @@ export function OverlayDetailApp() {
         gameId,
         characterFolder,
         modFolder,
-        name
+        name,
+        syncF10 !== undefined ? { syncF10 } : undefined
       )
       if (res.ok) {
-        setSent(`当前状态已存为预设「${name}」`)
+        setSent(
+          res.syncedF10
+            ? t('preset.presetSyncedAndSaved', { name })
+            : t('preset.presetSaved', { name })
+        )
         setNewPresetName('')
         setShowSaveBox(false)
         void fetchPresets()
       } else {
         setError(res.error || t('overlay.savePresetFailed'))
       }
+      void fetchSyncStatus()
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -210,22 +237,35 @@ export function OverlayDetailApp() {
               </div>
 
               {showSaveBox ? (
-                <div className="overlay-preset-save-box">
-                  <input
-                    className="input small-input"
-                    placeholder={t('overlay.presetNameInputPlaceholder')}
-                    value={newPresetName}
-                    onChange={(e) => setNewPresetName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') void handleSavePreset()
-                    }}
-                    autoFocus
-                  />
-                  <button
-                    className="btn primary small-btn"
-                    disabled={savingPreset}
-                    onClick={() => void handleSavePreset()}
-                  >{t('common.save')}</button>
+                <div className="preset-save-wrap" style={{ marginBottom: '8px' }}>
+                  <D3dxSyncBanner status={syncStatus} compact />
+                  <div className="overlay-preset-save-box">
+                    <input
+                      className="input small-input"
+                      placeholder={t('overlay.presetNameInputPlaceholder')}
+                      value={newPresetName}
+                      onChange={(e) => setNewPresetName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void handleSavePreset()
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      className="btn primary small-btn"
+                      disabled={savingPreset}
+                      onClick={() => void handleSavePreset()}
+                    >
+                      {savingPreset ? t('preset.syncAndSaveSaving') : t('common.save')}
+                    </button>
+                    <button
+                      className="btn ghost small-btn"
+                      disabled={savingPreset || !syncStatus?.gameRunning || (syncStatus?.pendingCount ?? 0) > 0}
+                      onClick={() => void handleSavePreset(true)}
+                      title={t('preset.syncAndSaveTooltip')}
+                    >
+                      {t('preset.syncAndSaveBtn')}
+                    </button>
+                  </div>
                 </div>
               ) : null}
 

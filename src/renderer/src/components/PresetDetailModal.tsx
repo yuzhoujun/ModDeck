@@ -5,10 +5,12 @@ import { useI18n } from '../i18n'
 
 export function PresetDetailModal({
   preset,
-  onClose
+  onClose,
+  onAddIgnoreRule
 }: {
   preset: ModVariantPreset
   onClose: () => void
+  onAddIgnoreRule?: (varName: string, scope: 'global' | 'local') => Promise<void> | void
 }) {
   const { t } = useI18n()
   const vars = preset.variables ? Object.entries(preset.variables) : []
@@ -17,7 +19,7 @@ export function PresetDetailModal({
     <Modal
       title={t('preset.detailTitle', { name: preset.name })}
       onClose={onClose}
-      width={520}
+      width={540}
       footer={
         <div className="actions right">
           <button className="btn primary" onClick={onClose}>{t('common.close')}</button>
@@ -51,7 +53,6 @@ export function PresetDetailModal({
                 <span>{t('preset.varValLabel')}</span>
               </div>
               {vars.map(([k, v]) => {
-                // 美化展示：提取末级变量名
                 const parts = k.split('\\')
                 const shortName = parts[parts.length - 1] || k
                 return (
@@ -62,6 +63,17 @@ export function PresetDetailModal({
                     </div>
                     <div className="var-col-val">
                       <span className="chip">{v}</span>
+                      {onAddIgnoreRule ? (
+                        <button
+                          type="button"
+                          className="btn ghost tiny-btn"
+                          style={{ marginLeft: '6px' }}
+                          onClick={() => void onAddIgnoreRule(shortName, 'global')}
+                          title={t('mod.diagIgnoreGlobal')}
+                        >
+                          {t('mod.diagIgnoreGlobal')}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 )

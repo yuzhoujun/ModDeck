@@ -22,6 +22,7 @@ import type {
   AutoDetectPathsResult,
   CharacterMeta,
   CreateCharacterInput,
+  D3dxSyncStatus,
   EnvironmentCheck,
   GameDef,
   GameId,
@@ -31,6 +32,8 @@ import type {
   ImportRequest,
   OverlayDetailRequest,
   RosterPresetExportFile,
+  SaveModPresetOptions,
+  SaveModPresetResult,
   Settings,
   SaveRosterPresetInput,
   SettingsPatch,
@@ -81,12 +84,18 @@ import {
   recordPendingRosterScheme,
   clearPendingRosterSchemes,
   clearPendingForMod,
+  hasActivePresetBridge,
   buildModPresetExportData,
   importModPresetsFromFile,
   buildRosterPresetExportData,
   inspectRosterPresetFileContent,
   confirmImportRosterPreset
 } from './services/presets'
+import {
+  analyzeModIni,
+  appendLocalIgnoreRule,
+  scanCharacterHashConflicts
+} from './services/ini-analysis'
 import {
   buildSnapshot,
   getModDetails,
@@ -298,8 +307,10 @@ let autoReloadTimer: NodeJS.Timeout | null = null
 let postReloadBridgeTimer: NodeJS.Timeout | null = null
 let modsWatcher: fsSync.FSWatcher | null = null
 let d3dxWatcher: fsSync.FSWatcher | null = null
+let d3dxParentWatcher: fsSync.FSWatcher | null = null
 let watchedModsPath = ''
 let watchedD3dxPath = ''
+let watchedD3dxParentDir = ''
 let watchDebounceTimer: NodeJS.Timeout | null = null
 let suppressWatcherUntil = 0
 let tray: Tray | null = null
@@ -415,6 +426,44 @@ function refreshModsWatcher(): void {
       } catch {
         d3dxWatcher = null
         watchedD3dxPath = ''
+      }
+    }
+  }
+
+  // 若尚未生成 d3dx_user.ini，监听父目录以在其首次创建时自动接入实时监听
+  const parentWatchTarget = !targetD3dxPath && modsPath && fsSync.existsSync(path.dirname(modsPath)) ? path.dirname(modsPath) : ''
+  if (parentWatchTarget !== watchedD3dxParentDir || (!parentWatchTarget && d3dxParentWatcher)) {
+    if (d3dxParentWatcher) {
+      try {
+        d3dxParentWatcher.close()
+      } catch {
+        // ignore
+      }
+      d3dxParentWatcher = null
+    }
+    watchedD3dxParentDir = ''
+
+    if (parentWatchTarget) {
+      try {
+        d3dxParentWatcher = fsSync.watch(parentWatchTarget, { recursive: false }, (_evt, filename) => {
+          if (String(filename || '').toLowerCase() === 'd3dx_user.ini') {
+            refreshModsWatcher()
+            broadcastStateChanged({ gameId: settings?.activeGameId })
+          }
+        })
+        d3dxParentWatcher.on('error', () => {
+          try {
+            d3dxParentWatcher?.close()
+          } catch {
+            // ignore
+          }
+          d3dxParentWatcher = null
+          watchedD3dxParentDir = ''
+        })
+        watchedD3dxParentDir = parentWatchTarget
+      } catch {
+        d3dxParentWatcher = null
+        watchedD3dxParentDir = ''
       }
     }
   }
@@ -1552,13 +1601,18 @@ function toKeyPlan(value: string): KeyPlan | null {
   return { modifiers: [...modifiers], keys, released: [...released] }
 }
 
-function gameProcessNamesForActiveGame(): string[] {
+function gameProcessNamesForActiveGame(gameId?: GameId): string[] {
   const names = new Set<string>()
-  const activeId = settings?.activeGameId
+  const activeId = gameId ?? settings?.activeGameId
   const gamePath = activeId ? settings?.games?.[activeId]?.gamePath : undefined
   if (gamePath) {
     const base = path.basename(gamePath, path.extname(gamePath)).trim()
     if (base) names.add(base)
+  }
+  const activeDef = activeId ? getAllGames().find((g) => g.id === activeId) : undefined
+  if (activeDef?.exeHint) {
+    const hintBase = path.basename(activeDef.exeHint, path.extname(activeDef.exeHint)).trim()
+    if (hintBase) names.add(hintBase)
   }
   names.add('Endfield')
   names.add('Client-Win64-Shipping')
@@ -1566,11 +1620,13 @@ function gameProcessNamesForActiveGame(): string[] {
   names.add('StarRail')
   names.add('ZenlessZoneZero')
   names.add('NTE')
+  names.add('GenshinImpact')
+  names.add('YuanShen')
   return [...names]
 }
 
-async function isGameRunning(): Promise<boolean> {
-  const targets = new Set(gameProcessNamesForActiveGame().map((n) => `${n.toLowerCase()}.exe`))
+async function isGameRunning(gameId?: GameId): Promise<boolean> {
+  const targets = new Set(gameProcessNamesForActiveGame(gameId).map((n) => `${n.toLowerCase()}.exe`))
   return new Promise<boolean>((resolve) => {
     execFile(
       'tasklist.exe',
@@ -1592,6 +1648,62 @@ async function isGameRunning(): Promise<boolean> {
       }
     )
   })
+}
+
+async function readD3dxSyncStatus(gameId: GameId): Promise<D3dxSyncStatus> {
+  const modsPath = settings.games[gameId]?.modsPath ?? ''
+  const [userIni, autoSaveInterval, gameRunning, bridgeActive] = await Promise.all([
+    modsPath ? findD3dxUserIniPath(modsPath) : Promise.resolve(null),
+    modsPath ? getD3dxAutoSaveInterval(modsPath) : Promise.resolve(60),
+    isGameRunning(gameId),
+    modsPath ? hasActivePresetBridge(modsPath) : Promise.resolve(false)
+  ])
+  let mtimeMs = 0
+  if (userIni) {
+    try {
+      mtimeMs = (await fs.stat(userIni)).mtimeMs
+    } catch {
+      mtimeMs = 0
+    }
+  }
+  const pendingCount = getPendingPresetCount(gameId) + (bridgeActive && getPendingPresetCount(gameId) === 0 ? 1 : 0)
+  return {
+    exists: Boolean(userIni),
+    filePath: userIni ?? undefined,
+    mtimeMs,
+    autoSaveInterval,
+    gameRunning,
+    pendingCount
+  }
+}
+
+async function waitForD3dxUserIniUpdate(
+  modsPath: string,
+  prevMtimeMs: number,
+  prevSize: number,
+  timeoutMs: number
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const iniPath = await findD3dxUserIniPath(modsPath)
+    if (iniPath) {
+      try {
+        const stat = await fs.stat(iniPath)
+        const changed =
+          (prevMtimeMs === 0 && stat.size > 0) ||
+          stat.mtimeMs > prevMtimeMs + 10 ||
+          stat.size !== prevSize
+        if (changed) {
+          await new Promise((resolve) => setTimeout(resolve, 180))
+          return true
+        }
+      } catch {
+        // ignore transient read error while 3DMigoto writes
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 120))
+  }
+  return false
 }
 
 function oldUnused(): string[] { return []; /*
@@ -2831,46 +2943,154 @@ function registerIpc(): void {
     return snapshot
   })
 
+  const resolveModTargetDir = async (
+    modsPath: string,
+    characterFolder: string,
+    modFolder: string
+  ): Promise<string> => {
+    const characterDir = await resolveCharacterDir(modsPath, characterFolder)
+    const baseName = modFolder.replace(/^DISABLED_/i, '')
+    const directDir = path.join(characterDir, modFolder)
+    if (await pathExists(directDir)) return directDir
+    const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
+    return path.join(characterDir, altFolder)
+  }
+
   register(
     IPC.getModPresets,
     async (gameId: GameId, characterFolder: string, modFolder: string) => {
       requireGame(gameId)
       if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return []
-      let modPath: string | undefined
       const gameSettings = settings.games[gameId]
-      if (gameSettings?.modsPath) {
-        const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
-        const baseName = modFolder.replace(/^DISABLED_/i, '')
-        let targetModDir = path.join(characterDir, modFolder)
-        if (!(await pathExists(targetModDir))) {
-          targetModDir = path.join(characterDir, `DISABLED_${baseName}`)
-        }
-        modPath = targetModDir
-      }
-      return getModPresets(baseDir(), gameId, characterFolder, modFolder, modPath, gameSettings?.modsPath)
+      const modPath = gameSettings?.modsPath
+        ? await resolveModTargetDir(gameSettings.modsPath, characterFolder, modFolder)
+        : undefined
+      return getModPresets(
+        baseDir(),
+        gameId,
+        characterFolder,
+        modFolder,
+        modPath,
+        gameSettings?.modsPath,
+        settings.ui.variableIgnoreRules ?? []
+      )
     }
   )
 
   register(
     IPC.saveModPreset,
-    async (gameId: GameId, characterFolder: string, modFolder: string, presetName: string) => {
+    async (
+      gameId: GameId,
+      characterFolder: string,
+      modFolder: string,
+      presetName: string,
+      options?: SaveModPresetOptions
+    ): Promise<SaveModPresetResult> => {
       requireGame(gameId)
       const gameSettings = settings.games[gameId]
       if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
-      if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return { ok: false, error: tMain('common.paramInvalid') }
-      const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
-      const baseName = modFolder.replace(/^DISABLED_/i, '')
-      let targetModDir = path.join(characterDir, modFolder)
-      if (!(await pathExists(targetModDir))) {
-        const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
-        targetModDir = path.join(characterDir, altFolder)
+      if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) {
+        return { ok: false, error: tMain('common.paramInvalid') }
+      }
+      const targetModDir = await resolveModTargetDir(gameSettings.modsPath, characterFolder, modFolder)
+      const ignoreRules = settings.ui.variableIgnoreRules ?? []
+      const shouldSyncF10 = options?.syncF10 ?? (settings.ui.autoSyncBeforeSavePreset === true)
+
+      let syncedF10 = false
+      let d3dxUpdatedAfterF10 = false
+
+      if (shouldSyncF10) {
+        const pendingCount = getPendingPresetCount(gameId)
+        const bridgeActive = await hasActivePresetBridge(gameSettings.modsPath)
+        if (pendingCount > 0 || bridgeActive) {
+          return {
+            ok: false,
+            staleReason: 'pending-queue',
+            error: tMain('preset.saveBlockedPendingQueue')
+          }
+        }
+        const running = await isGameRunning(gameId)
+        if (running) {
+          const prevUserIni = await findD3dxUserIniPath(gameSettings.modsPath)
+          let prevMtimeMs = 0
+          let prevSize = 0
+          if (prevUserIni) {
+            try {
+              const stat = await fs.stat(prevUserIni)
+              prevMtimeMs = stat.mtimeMs
+              prevSize = stat.size
+            } catch {
+              // ignore
+            }
+          }
+          const reloadRes = await reloadF10()
+          if (reloadRes.ok) {
+            syncedF10 = true
+            const configuredSec =
+              typeof settings?.ui?.postReloadSyncDelay === 'number' && settings.ui.postReloadSyncDelay > 0
+                ? settings.ui.postReloadSyncDelay
+                : 6
+            const waitMs = Math.max(3000, Math.min(8000, Math.round(configuredSec * 1000)))
+            d3dxUpdatedAfterF10 = await waitForD3dxUserIniUpdate(
+              gameSettings.modsPath,
+              prevMtimeMs,
+              prevSize,
+              waitMs
+            )
+          }
+        }
       }
 
-      const res = await saveModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, gameSettings.modsPath, presetName)
+      const res = await saveModPreset(
+        baseDir(),
+        gameId,
+        characterFolder,
+        modFolder,
+        targetModDir,
+        gameSettings.modsPath,
+        presetName,
+        ignoreRules
+      )
+
       if (res.ok) {
         broadcastStateChanged({ gameId, characterFolder })
+        return { ok: true, syncedF10 }
       }
-      return res
+
+      if (res.duplicatePresetName) {
+        const running = await isGameRunning(gameId)
+        if (syncedF10 && !d3dxUpdatedAfterF10) {
+          return {
+            ok: false,
+            syncedF10,
+            possibleStale: true,
+            staleReason: 'f10-timeout',
+            error: tMain('preset.duplicateAfterF10Timeout', { name: res.duplicatePresetName })
+          }
+        }
+        if (running && !syncedF10) {
+          const userIni = await findD3dxUserIniPath(gameSettings.modsPath)
+          let mtimeMs = 0
+          if (userIni) {
+            try {
+              mtimeMs = (await fs.stat(userIni)).mtimeMs
+            } catch {
+              mtimeMs = 0
+            }
+          }
+          if (!mtimeMs || Date.now() - mtimeMs > 15000) {
+            return {
+              ok: false,
+              syncedF10: false,
+              possibleStale: true,
+              staleReason: 'unsynced-game-running',
+              error: tMain('preset.duplicatePossibleStale', { name: res.duplicatePresetName })
+            }
+          }
+        }
+      }
+
+      return { ok: false, error: res.error, syncedF10 }
     }
   )
 
@@ -2881,15 +3101,19 @@ function registerIpc(): void {
       const gameSettings = settings.games[gameId]
       if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
       if (!isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) return { ok: false, error: '目录参数不合法' }
-      const characterDir = await resolveCharacterDir(gameSettings.modsPath, characterFolder)
-      const baseName = modFolder.replace(/^DISABLED_/i, '')
-      let targetModDir = path.join(characterDir, modFolder)
-      if (!(await pathExists(targetModDir))) {
-        const altFolder = /^DISABLED_/i.test(modFolder) ? baseName : `DISABLED_${baseName}`
-        targetModDir = path.join(characterDir, altFolder)
-      }
+      const targetModDir = await resolveModTargetDir(gameSettings.modsPath, characterFolder, modFolder)
       markInternalFsMutation()
-      const res = await applyModPreset(baseDir(), gameId, characterFolder, modFolder, targetModDir, gameSettings.modsPath, presetId)
+      const res = await applyModPreset(
+        baseDir(),
+        gameId,
+        characterFolder,
+        modFolder,
+        targetModDir,
+        gameSettings.modsPath,
+        presetId,
+        false,
+        settings.ui.variableIgnoreRules ?? []
+      )
       if (res.ok) {
         broadcastStateChanged({ gameId, characterFolder })
         const autoReload = settings.ui.autoReloadModPreset !== false
@@ -2942,7 +3166,8 @@ function registerIpc(): void {
         gameId,
         gameSettings.modsPath,
         presetId,
-        (root, folder) => resolveCharacterDir(root, folder)
+        (root, folder) => resolveCharacterDir(root, folder),
+        settings.ui.variableIgnoreRules ?? []
       )
       if (res.ok) {
         const autoReload = settings.ui.autoReloadRosterPreset !== false
@@ -2971,6 +3196,89 @@ function registerIpc(): void {
     if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
     return setD3dxAutoSaveInterval(gameSettings.modsPath, interval)
   })
+
+  register(IPC.getD3dxSyncStatus, async (gameId: GameId) => {
+    requireGame(gameId)
+    return readD3dxSyncStatus(gameId)
+  })
+
+  register(
+    IPC.analyzeModIni,
+    async (gameId: GameId, characterFolder: string, modFolder: string) => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath || !isSafeSegment(characterFolder) || !isSafeSegment(modFolder)) {
+        return {
+          variables: [],
+          dependencies: [],
+          hashes: [],
+          nonPersistControlVars: [],
+          localIgnoreRules: [],
+          hasLocalIgnoreFile: false
+        }
+      }
+      const targetModDir = await resolveModTargetDir(gameSettings.modsPath, characterFolder, modFolder)
+      if (!(await pathExists(targetModDir))) {
+        return {
+          variables: [],
+          dependencies: [],
+          hashes: [],
+          nonPersistControlVars: [],
+          localIgnoreRules: [],
+          hasLocalIgnoreFile: false
+        }
+      }
+      return analyzeModIni(targetModDir, settings.ui.variableIgnoreRules ?? [])
+    }
+  )
+
+  register(
+    IPC.scanCharacterHashConflicts,
+    async (gameId: GameId, characterFolder: string) => {
+      requireGame(gameId)
+      const gameSettings = settings.games[gameId]
+      if (!gameSettings?.modsPath || !isSafeSegment(characterFolder)) return []
+      return scanCharacterHashConflicts(gameSettings.modsPath, characterFolder).catch(() => [])
+    }
+  )
+
+  register(
+    IPC.addVariableIgnoreRule,
+    async (
+      rule: string,
+      scope: 'global' | 'local',
+      target?: { gameId: GameId; characterFolder: string; modFolder: string }
+    ): Promise<ToggleResult> => {
+      const cleanRule = String(rule || '').trim()
+      if (!cleanRule) return { ok: false, error: tMain('common.paramInvalid') }
+
+      if (scope === 'local') {
+        if (!target) return { ok: false, error: tMain('common.paramInvalid') }
+        requireGame(target.gameId)
+        const gameSettings = settings.games[target.gameId]
+        if (!gameSettings?.modsPath) return { ok: false, error: tMain('common.modsDirNotConfigured') }
+        const targetModDir = await resolveModTargetDir(
+          gameSettings.modsPath,
+          target.characterFolder,
+          target.modFolder
+        )
+        if (!(await pathExists(targetModDir))) return { ok: false, error: 'Mod directory not found' }
+        await appendLocalIgnoreRule(targetModDir, cleanRule)
+        broadcastStateChanged({ gameId: target.gameId, characterFolder: target.characterFolder })
+        return { ok: true }
+      }
+
+      const existing = settings.ui.variableIgnoreRules ?? []
+      if (!existing.some((item) => item.toLowerCase() === cleanRule.toLowerCase())) {
+        settings = mergeSettings(settings, {
+          ui: { variableIgnoreRules: [...existing, cleanRule] }
+        })
+        await saveSettings(baseDir(), settings)
+      }
+      broadcastStateChanged({})
+      return { ok: true }
+    }
+  )
 
   register(
     IPC.deleteRosterPreset,

@@ -37,3 +37,14 @@ export function modMatches(mod: ModInfo, query: string): boolean {
     mod.folderName.toLowerCase().includes(value)
   )
 }
+
+export function formatSyncAge(
+  mtimeMs: number,
+  t: (key: string, params?: Record<string, string | number>) => string
+): string {
+  if (!mtimeMs) return ''
+  const sec = Math.max(0, Math.floor((Date.now() - mtimeMs) / 1000))
+  if (sec < 3) return t('preset.syncTimeJustNow')
+  if (sec < 60) return t('preset.syncTimeSeconds', { n: sec })
+  return t('preset.syncTimeMinutes', { n: Math.floor(sec / 60) })
+}

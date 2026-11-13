@@ -60,8 +60,8 @@ const api: ModDeckApi = {
     ipcRenderer.invoke(IPC.clearCharacterCover, gameId, characterFolder),
   getModPresets: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.getModPresets, gameId, characterFolder, modFolder),
-  saveModPreset: (gameId, characterFolder, modFolder, presetName) =>
-    ipcRenderer.invoke(IPC.saveModPreset, gameId, characterFolder, modFolder, presetName),
+  saveModPreset: (gameId, characterFolder, modFolder, presetName, options) =>
+    ipcRenderer.invoke(IPC.saveModPreset, gameId, characterFolder, modFolder, presetName, options),
   applyModPreset: (gameId, characterFolder, modFolder, presetId) =>
     ipcRenderer.invoke(IPC.applyModPreset, gameId, characterFolder, modFolder, presetId),
   deleteModPreset: (gameId, characterFolder, modFolder, presetId) =>
@@ -86,6 +86,13 @@ const api: ModDeckApi = {
     ipcRenderer.invoke(IPC.confirmImportRosterPreset, gameId, rawExport, customName),
   getD3dxAutoSaveInterval: (gameId) => ipcRenderer.invoke(IPC.getD3dxAutoSaveInterval, gameId),
   setD3dxAutoSaveInterval: (gameId, interval) => ipcRenderer.invoke(IPC.setD3dxAutoSaveInterval, gameId, interval),
+  getD3dxSyncStatus: (gameId) => ipcRenderer.invoke(IPC.getD3dxSyncStatus, gameId),
+  analyzeModIni: (gameId, characterFolder, modFolder) =>
+    ipcRenderer.invoke(IPC.analyzeModIni, gameId, characterFolder, modFolder),
+  scanCharacterHashConflicts: (gameId, characterFolder) =>
+    ipcRenderer.invoke(IPC.scanCharacterHashConflicts, gameId, characterFolder),
+  addVariableIgnoreRule: (rule, scope, target) =>
+    ipcRenderer.invoke(IPC.addVariableIgnoreRule, rule, scope, target),
   getModDetails: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.getModDetails, gameId, characterFolder, modFolder),
   setModPreview: (gameId, characterFolder, modFolder, sourcePath) =>

@@ -101,7 +101,7 @@ async function inspectModIniStatus(
   return { hasIni, hasActiveIni, hasDisabledIni }
 }
 
-async function isModFolderEffectivelyEnabled(folderName: string, modPath: string): Promise<boolean> {
+export async function isModFolderEffectivelyEnabled(folderName: string, modPath: string): Promise<boolean> {
   if (/^DISABLED_/i.test(folderName)) return false
   const status = await inspectModIniStatus(modPath, 2)
   if (status.hasDisabledIni && !status.hasActiveIni) return false

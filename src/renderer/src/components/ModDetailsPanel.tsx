@@ -1,6 +1,14 @@
 import { useEffect, useState, type DragEvent } from 'react'
-import type { GameId, ModDetails, ModVariantPreset } from '../../../shared/types'
+import type {
+  CharacterHashConflict,
+  D3dxSyncStatus,
+  GameId,
+  ModDetails,
+  ModStaticAnalysis,
+  ModVariantPreset
+} from '../../../shared/types'
 import { formatDate } from '../utils'
+import { D3dxSyncBanner } from './D3dxSyncBanner'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { PresetDetailModal } from './PresetDetailModal'
@@ -21,6 +29,7 @@ export function ModDetailsPanel({
   details,
   loading,
   error,
+  conflicts = [],
   onClose,
   onToggle,
   onOpen,
@@ -33,6 +42,7 @@ export function ModDetailsPanel({
   details: ModDetails | null
   loading: boolean
   error: string | null
+  conflicts?: CharacterHashConflict[]
   onClose: () => void
   onToggle: () => void
   onOpen: () => void
@@ -47,6 +57,11 @@ export function ModDetailsPanel({
   const [presetsLoading, setPresetsLoading] = useState(false)
   const [newPresetName, setNewPresetName] = useState('')
   const [showSavePreset, setShowSavePreset] = useState(false)
+  const [savingPreset, setSavingPreset] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<D3dxSyncStatus | null>(null)
+  const [, setSyncClockTick] = useState(0)
+  const [staticAnalysis, setStaticAnalysis] = useState<ModStaticAnalysis | null>(null)
+  const [diagExpanded, setDiagExpanded] = useState(false)
 
   const [confirmPreset, setConfirmPreset] = useState<ModVariantPreset | null>(null)
   const [inspectingPreset, setInspectingPreset] = useState<ModVariantPreset | null>(null)
@@ -93,9 +108,33 @@ export function ModDetailsPanel({
     }
   }
 
+  const refreshStaticAnalysis = async () => {
+    if (!details) return
+    try {
+      const analysis = await window.moddeck.analyzeModIni(
+        gameId,
+        details.characterFolder,
+        details.folderName
+      )
+      setStaticAnalysis(analysis)
+    } catch {
+      setStaticAnalysis(null)
+    }
+  }
+
+  const refreshSyncStatus = async () => {
+    try {
+      const status = await window.moddeck.getD3dxSyncStatus(gameId)
+      setSyncStatus(status)
+    } catch {
+      // ignore
+    }
+  }
+
   useEffect(() => {
     if (!details) {
       setPresets([])
+      setStaticAnalysis(null)
       setShowSavePreset(false)
       setNewPresetName('')
       return
@@ -114,6 +153,15 @@ export function ModDetailsPanel({
         if (!cancelled) setPresetsLoading(false)
       })
 
+    window.moddeck
+      .analyzeModIni(gameId, details.characterFolder, details.folderName)
+      .then((res) => {
+        if (!cancelled) setStaticAnalysis(res)
+      })
+      .catch(() => {
+        if (!cancelled) setStaticAnalysis(null)
+      })
+
     const unsubscribe = window.moddeck.onStateChanged((event) => {
       if (cancelled) return
       if (!event.gameId || event.gameId === gameId) {
@@ -123,6 +171,13 @@ export function ModDetailsPanel({
             if (!cancelled) setPresets(res)
           })
           .catch(() => undefined)
+        window.moddeck
+          .analyzeModIni(gameId, details.characterFolder, details.folderName)
+          .then((res) => {
+            if (!cancelled) setStaticAnalysis(res)
+          })
+          .catch(() => undefined)
+        void refreshSyncStatus()
       }
     })
 
@@ -132,22 +187,38 @@ export function ModDetailsPanel({
     }
   }, [gameId, details?.characterFolder, details?.folderName, details?.name])
 
-  async function handleSavePreset() {
-    if (!details) return
+  useEffect(() => {
+    if (!showSavePreset) return
+    void refreshSyncStatus()
+    const timer = setInterval(() => {
+      setSyncClockTick((tick) => tick + 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [showSavePreset, gameId])
+
+  async function handleSavePreset(syncF10?: boolean) {
+    if (!details || savingPreset) return
     const name = newPresetName.trim()
     if (!name) {
       onNotify?.(t('preset.enterPresetNameErr'), 'err')
       return
     }
+    setSavingPreset(true)
     try {
       const res = await window.moddeck.saveModPreset(
         gameId,
         details.characterFolder,
         details.folderName,
-        name
+        name,
+        syncF10 !== undefined ? { syncF10 } : undefined
       )
       if (res.ok) {
-        onNotify?.(t('preset.presetSaved', { name }), 'ok')
+        onNotify?.(
+          res.syncedF10
+            ? t('preset.presetSyncedAndSaved', { name })
+            : t('preset.presetSaved', { name }),
+          'ok'
+        )
         setNewPresetName('')
         setShowSavePreset(false)
         const updated = await window.moddeck.getModPresets(
@@ -158,6 +229,34 @@ export function ModDetailsPanel({
         setPresets(updated)
       } else {
         onNotify?.(res.error || t('preset.presetSaveFailed'), 'err')
+      }
+      void refreshSyncStatus()
+    } catch (err) {
+      onNotify?.(err instanceof Error ? err.message : String(err), 'err')
+    } finally {
+      setSavingPreset(false)
+    }
+  }
+
+  async function handleAddIgnoreRule(varName: string, scope: 'global' | 'local') {
+    if (!details) return
+    try {
+      const res = await window.moddeck.addVariableIgnoreRule(
+        varName,
+        scope,
+        scope === 'local'
+          ? {
+              gameId,
+              characterFolder: details.characterFolder,
+              modFolder: details.folderName
+            }
+          : undefined
+      )
+      if (res.ok) {
+        onNotify?.(t('mod.diagIgnoreRuleAdded', { name: varName }), 'ok')
+        await Promise.all([refreshPresets(), refreshStaticAnalysis()])
+      } else if (res.error) {
+        onNotify?.(res.error, 'err')
       }
     } catch (err) {
       onNotify?.(err instanceof Error ? err.message : String(err), 'err')
@@ -471,20 +570,35 @@ export function ModDetailsPanel({
             </div>
 
             {showSavePreset ? (
-              <div className="preset-save-box">
-                <input
-                  className="input preset-input"
-                  placeholder={t('mod.presetNamePlaceholder')}
-                  value={newPresetName}
-                  onChange={(e) => setNewPresetName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleSavePreset()
-                  }}
-                  autoFocus
-                />
-                <button className="btn primary small-btn" onClick={() => void handleSavePreset()}>
-                  {t('common.save')}
-                </button>
+              <div className="preset-save-wrap">
+                <D3dxSyncBanner status={syncStatus} />
+                <div className="preset-save-box">
+                  <input
+                    className="input preset-input"
+                    placeholder={t('mod.presetNamePlaceholder')}
+                    value={newPresetName}
+                    onChange={(e) => setNewPresetName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleSavePreset()
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    className="btn primary small-btn"
+                    disabled={savingPreset}
+                    onClick={() => void handleSavePreset()}
+                  >
+                    {savingPreset ? t('preset.syncAndSaveSaving') : t('common.save')}
+                  </button>
+                  <button
+                    className="btn ghost small-btn"
+                    disabled={savingPreset || !syncStatus?.gameRunning || (syncStatus?.pendingCount ?? 0) > 0}
+                    onClick={() => void handleSavePreset(true)}
+                    title={t('preset.syncAndSaveTooltip')}
+                  >
+                    {t('preset.syncAndSaveBtn')}
+                  </button>
+                </div>
               </div>
             ) : null}
 
@@ -610,6 +724,164 @@ export function ModDetailsPanel({
             )}
           </div>
 
+          {staticAnalysis ? (
+            <div className="detail-section">
+              <div className="detail-section-head">
+                <span className="detail-section-title">{t('mod.staticDiagTitle')}</span>
+                <button
+                  type="button"
+                  className="btn ghost tiny-btn"
+                  onClick={() => setDiagExpanded(!diagExpanded)}
+                >
+                  {diagExpanded ? t('character.conflictCollapse') : t('character.conflictExpand')}
+                </button>
+              </div>
+              <div className="diag-summary-pills">
+                <span className="chip">{t('mod.diagVarsCount', { count: staticAnalysis.variables.length })}</span>
+                {staticAnalysis.variables.filter((v) => v.ignored).length > 0 ? (
+                  <span className="chip">
+                    {t('mod.diagIgnoredCount', {
+                      count: staticAnalysis.variables.filter((v) => v.ignored).length
+                    })}
+                  </span>
+                ) : null}
+                <span className="chip">{t('mod.diagHashesCount', { count: staticAnalysis.hashes.length })}</span>
+                {(() => {
+                  const modHashSet = new Set(staticAnalysis.hashes.map((h) => h.hash))
+                  const hitConflicts = conflicts.filter((c) => modHashSet.has(c.hash))
+                  return hitConflicts.length > 0 ? (
+                    <span className="tag warn">{t('character.hashConflictTag')} ({hitConflicts.length})</span>
+                  ) : null
+                })()}
+              </div>
+
+              {staticAnalysis.nonPersistControlVars.length > 0 ? (
+                <div className="d3dx-sync-hint warn" style={{ marginTop: '8px' }}>
+                  {t('mod.diagNonPersistWarn', {
+                    count: staticAnalysis.nonPersistControlVars.length,
+                    vars: staticAnalysis.nonPersistControlVars.slice(0, 4).map((v) => `$${v}`).join(', ')
+                  })}
+                </div>
+              ) : null}
+
+              {diagExpanded ? (
+                <div className="diag-details-body">
+                  {staticAnalysis.hasLocalIgnoreFile ? (
+                    <div className="muted small" style={{ marginBottom: '6px' }}>
+                      {t('mod.diagLocalIgnoreHint', { count: staticAnalysis.localIgnoreRules.length })}
+                    </div>
+                  ) : null}
+
+                  {staticAnalysis.variables.length > 0 ? (
+                    <div className="diag-subblock">
+                      <div className="muted small" style={{ fontWeight: 600 }}>
+                        {t('mod.diagVarsTitle', { count: staticAnalysis.variables.length })}
+                      </div>
+                      <div className="diag-list">
+                        {staticAnalysis.variables.slice(0, 24).map((v) => (
+                          <div key={v.key} className={`diag-item${v.ignored ? ' is-ignored' : ''}`}>
+                            <div className="diag-item-main">
+                              <code>${v.name}</code>
+                              <span className={`tag ${v.persist ? 'ok' : 'warn'}`}>
+                                {v.persist ? t('mod.diagPersistBadge') : t('mod.diagNonPersistBadge')}
+                              </span>
+                              {v.ignored ? (
+                                <span className="tag">
+                                  {v.ignoreSource === 'local'
+                                    ? t('mod.diagSourceLocal')
+                                    : v.ignoreSource === 'global'
+                                      ? t('mod.diagSourceGlobal')
+                                      : t('mod.diagSourceBuiltin')}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="diag-item-meta">
+                              {v.drivenByKeys.length > 0 ? (
+                                <span className="muted small">
+                                  {t('mod.diagDrivenBy', { keys: v.drivenByKeys.slice(0, 2).join(', ') })}
+                                </span>
+                              ) : null}
+                              {v.linkedVars.length > 0 ? (
+                                <span className="muted small">
+                                  {t('mod.diagLinkedWith', {
+                                    vars: v.linkedVars.slice(0, 3).map((x) => `$${x}`).join(', ')
+                                  })}
+                                </span>
+                              ) : null}
+                              {!v.ignored ? (
+                                <div className="diag-ignore-actions">
+                                  <button
+                                    type="button"
+                                    className="btn ghost tiny-btn"
+                                    onClick={() => void handleAddIgnoreRule(v.name, 'global')}
+                                  >
+                                    {t('mod.diagIgnoreGlobal')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn ghost tiny-btn"
+                                    onClick={() => void handleAddIgnoreRule(v.name, 'local')}
+                                  >
+                                    {t('mod.diagIgnoreLocal')}
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {staticAnalysis.dependencies.length > 0 ? (
+                    <div className="diag-subblock">
+                      <div className="muted small" style={{ fontWeight: 600 }}>
+                        {t('mod.diagDepsTitle', { count: staticAnalysis.dependencies.length })}
+                      </div>
+                      <div className="diag-list">
+                        {staticAnalysis.dependencies.slice(0, 10).map((dep, idx) => (
+                          <div key={`${dep.triggerSection}-${dep.targetSection}-${idx}`} className="diag-dep-row">
+                            <code>{dep.triggerSection}</code>
+                            <span className="muted">→</span>
+                            <code>{dep.targetSection}</code>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {staticAnalysis.hashes.length > 0 ? (
+                    <div className="diag-subblock">
+                      <div className="muted small" style={{ fontWeight: 600 }}>
+                        {t('mod.diagHashesTitle', { count: staticAnalysis.hashes.length })}
+                      </div>
+                      <div className="diag-list">
+                        {staticAnalysis.hashes.slice(0, 16).map((item, idx) => {
+                          const hit = conflicts.find((c) => c.hash === item.hash)
+                          const others = hit
+                            ? hit.mods.filter((m) => m.folderName !== details.folderName).map((m) => m.name)
+                            : []
+                          return (
+                            <div key={`${item.hash}-${item.section}-${idx}`} className="diag-hash-row">
+                              <code>{item.hash}</code>
+                              <span className="tag">{item.kind}</span>
+                              <span className="muted small">{item.section}</span>
+                              {others.length > 0 ? (
+                                <span className="tag warn">
+                                  {t('mod.diagOverlapWith', { mods: others.join(', ') })}
+                                </span>
+                              ) : null}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="detail-actions">
             <button className="btn primary" onClick={onToggle}>
               <Icon name="check" size={15} />
@@ -633,6 +905,7 @@ export function ModDetailsPanel({
         <PresetDetailModal
           preset={inspectingPreset}
           onClose={() => setInspectingPreset(null)}
+          onAddIgnoreRule={handleAddIgnoreRule}
         />
       ) : null}
       {confirmPreset ? (

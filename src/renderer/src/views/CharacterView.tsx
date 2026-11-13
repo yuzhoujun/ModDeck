@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type {
+  CharacterHashConflict,
   CharacterInfo,
   GameDef,
   ModDetails,
@@ -68,15 +69,42 @@ export function CharacterView({
   const [detailsError, setDetailsError] = useState<string | null>(null)
   const [dragName, setDragName] = useState<string | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [conflicts, setConflicts] = useState<CharacterHashConflict[]>([])
+  const [conflictsExpanded, setConflictsExpanded] = useState(false)
 
   const { t, effectiveLocale } = useI18n()
   const name = getLocaleCharacterName(character, effectiveLocale)
   const visible = mods.filter((mod) => modMatches(mod, query))
   const selectedMod = selectedName ? mods.find((mod) => mod.name === selectedName) ?? null : null
+  const conflictFolders = new Set<string>()
+  for (const item of conflicts) {
+    for (const m of item.mods) conflictFolders.add(m.folderName)
+  }
 
   useEffect(() => {
     setChecked(new Set())
+    setConflictsExpanded(false)
   }, [character.folder])
+
+  useEffect(() => {
+    const enabledCount = mods.filter((m) => m.enabled).length
+    if (enabledCount < 2) {
+      setConflicts([])
+      return
+    }
+    let cancelled = false
+    window.moddeck
+      .scanCharacterHashConflicts(game.id, character.folder)
+      .then((res) => {
+        if (!cancelled) setConflicts(res)
+      })
+      .catch(() => {
+        if (!cancelled) setConflicts([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [game.id, character.folder, mods])
 
   useEffect(() => {
     if (!selectedName) return
@@ -304,7 +332,45 @@ export function CharacterView({
               <p className="muted">{query ? t('library.emptySearchDesc') : t('character.emptyModsDesc')}</p>
             </div>
           ) : (
-            <div className="mod-list">
+            <>
+              {conflicts.length > 0 ? (
+                <div className="conflict-banner">
+                  <div className="conflict-banner-head">
+                    <div className="conflict-banner-title">
+                      <Icon name="info" size={15} />
+                      <span>{t('character.conflictBannerTitle', { count: conflicts.length })}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn ghost tiny-btn"
+                      onClick={() => setConflictsExpanded(!conflictsExpanded)}
+                    >
+                      {conflictsExpanded ? t('character.conflictCollapse') : t('character.conflictExpand')}
+                    </button>
+                  </div>
+                  <div className="muted small">{t('character.conflictBannerDesc')}</div>
+                  {conflictsExpanded ? (
+                    <div className="conflict-banner-list">
+                      {conflicts.slice(0, 20).map((conflict) => (
+                        <div key={conflict.hash} className="conflict-item">
+                          <div className="conflict-item-head">
+                            <code>{conflict.hash}</code>
+                            <span className="tag">{conflict.kind}</span>
+                          </div>
+                          <div className="conflict-item-mods">
+                            {conflict.mods.map((m) => (
+                              <span key={m.folderName} className="chip">
+                                {m.name} ({m.sections[0] || m.files[0]})
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="mod-list">
               {visible.map((mod) => (
                 <ModRow
                   key={mod.folderName}
@@ -314,6 +380,7 @@ export function CharacterView({
                   dragging={dragName === mod.name}
                   selectable={selectMode === 'multi'}
                   checked={checked.has(mod.name)}
+                  hasHashConflict={conflictFolders.has(mod.folderName)}
                   onCheck={() =>
                     setChecked((current) => {
                       const next = new Set(current)
@@ -350,7 +417,8 @@ export function CharacterView({
                   onDragEnd={() => setDragName(null)}
                 />
               ))}
-            </div>
+              </div>
+            </>
           )}
         </div>
 
@@ -360,6 +428,7 @@ export function CharacterView({
             details={details}
             loading={detailsLoading}
             error={detailsError}
+            conflicts={conflicts}
             onClose={() => {
               setSelectedName(null)
               setDetails(null)

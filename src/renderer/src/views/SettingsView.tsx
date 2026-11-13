@@ -59,6 +59,7 @@ export function SettingsView({
   const [autoDetecting, setAutoDetecting] = useState(false)
   const [showF10WarningModal, setShowF10WarningModal] = useState(false)
   const [showDisablePresetReloadModal, setShowDisablePresetReloadModal] = useState<"modPreset" | "rosterPreset" | null>(null)
+  const [newIgnoreRule, setNewIgnoreRule] = useState('')
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -656,6 +657,24 @@ export function SettingsView({
                     </div>
                   </div>
                 </label>
+
+                <label className="check-row-card">
+                  <input
+                    type="checkbox"
+                    checked={draft.ui.autoSyncBeforeSavePreset === true}
+                    onChange={(event) =>
+                      updateUi({ autoSyncBeforeSavePreset: event.target.checked })
+                    }
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#f1f5f9' }}>
+                      {t('settings.general.autoSyncBeforeSavePreset')}
+                    </div>
+                    <div className="muted small" style={{ marginTop: '2px' }}>
+                      {t('settings.general.autoSyncBeforeSavePresetDesc')}
+                    </div>
+                  </div>
+                </label>
               </div>
 
               {(draft.ui.autoReloadModPreset === false || draft.ui.autoReloadRosterPreset === false) && (
@@ -786,6 +805,82 @@ export function SettingsView({
               <div className="setting-group-desc">
                 💡 {t('settings.advanced.f10BufferTip')}
               </div>
+            </div>
+
+            <div className="setting-group-box">
+              <div className="setting-group-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="setting-group-title">{t('settings.advanced.varIgnoreRulesTitle')}</span>
+                  <span className="tag ok">{t('settings.advanced.varIgnoreRulesBadge')}</span>
+                </div>
+              </div>
+              <div className="setting-group-desc" style={{ marginTop: 0, marginBottom: '10px' }}>
+                {t('settings.advanced.varIgnoreRulesDesc')}
+              </div>
+              <div className="field-row" style={{ gap: '8px' }}>
+                <input
+                  className="input"
+                  value={newIgnoreRule}
+                  placeholder={t('settings.advanced.varIgnorePlaceholder')}
+                  onChange={(e) => setNewIgnoreRule(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return
+                    e.preventDefault()
+                    const tokens = newIgnoreRule
+                      .split(/[,，;\n\r]+/)
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                    if (tokens.length === 0) return
+                    const current = draft.ui.variableIgnoreRules ?? []
+                    const merged = Array.from(new Set([...current, ...tokens]))
+                    updateUi({ variableIgnoreRules: merged })
+                    setNewIgnoreRule('')
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn ghost small-btn"
+                  style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                  onClick={() => {
+                    const tokens = newIgnoreRule
+                      .split(/[,，;\n\r]+/)
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                    if (tokens.length === 0) return
+                    const current = draft.ui.variableIgnoreRules ?? []
+                    const merged = Array.from(new Set([...current, ...tokens]))
+                    updateUi({ variableIgnoreRules: merged })
+                    setNewIgnoreRule('')
+                  }}
+                >
+                  <Icon name="plus" size={14} />
+                  {t('settings.advanced.varIgnoreAdd')}
+                </button>
+              </div>
+              {(draft.ui.variableIgnoreRules ?? []).length === 0 ? (
+                <div className="muted small" style={{ marginTop: '8px' }}>
+                  {t('settings.advanced.varIgnoreEmpty')}
+                </div>
+              ) : (
+                <div className="ignore-rules-chips">
+                  {(draft.ui.variableIgnoreRules ?? []).map((rule) => (
+                    <span key={rule} className="ignore-rule-chip">
+                      <code>{rule}</code>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label={`Remove ${rule}`}
+                        onClick={() => {
+                          const next = (draft.ui.variableIgnoreRules ?? []).filter((r) => r !== rule)
+                          updateUi({ variableIgnoreRules: next })
+                        }}
+                      >
+                        <Icon name="close" size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 
