@@ -63,6 +63,19 @@ export interface RecentMod {
 
 export type EnvironmentStatus = 'ok' | 'missing-line' | 'missing-file' | 'no-root'
 
+export interface EnvironmentShaderCacheInfo {
+  enabledInIni: boolean | null
+  dirExists: boolean
+  fileCount: number
+  totalBytes: number
+}
+
+export interface EnvironmentShaderFixesInfo {
+  dirExists: boolean
+  fileCount: number
+  sampleFiles: string[]
+}
+
 export interface EnvironmentCheck {
   gameId: GameId
   modsPath: string
@@ -70,9 +83,15 @@ export interface EnvironmentCheck {
   d3dxPath: string
   status: EnvironmentStatus
   detail?: string
+  shaderCache?: EnvironmentShaderCacheInfo
+  shaderFixes?: EnvironmentShaderFixesInfo
+}
 
-
-
+export interface ClearShaderCacheResult {
+  ok: boolean
+  deletedFiles?: number
+  freedBytes?: number
+  error?: string
 }
 
 export interface ImportSettings {
@@ -353,15 +372,64 @@ export interface ModStaticAnalysis {
   hasLocalIgnoreFile: boolean
 }
 
+export type ConflictSeverity = 'high' | 'warning' | 'info'
+
 export interface CharacterHashConflict {
   hash: string
   kind: 'texture' | 'shader' | 'other'
+  severity?: ConflictSeverity
   mods: Array<{
     folderName: string
     name: string
     sections: string[]
     files: string[]
+    lines?: number[]
   }>
+}
+
+export type AuditRuleCategory =
+  | 'shader-override'
+  | 'embedded-shader-regex'
+  | 'duplicate-fx-plugin'
+  | 'mutually-exclusive-fx'
+  | 'hash-collision'
+  | 'shader-fixes'
+  | 'shader-cache'
+
+export interface ConflictAuditModLocation {
+  characterFolder: string
+  folderName: string
+  name: string
+  file: string
+  line: number
+  section?: string
+  snippet?: string
+}
+
+export interface GameConflictAuditItem {
+  id: string
+  severity: ConflictSeverity
+  category: AuditRuleCategory
+  message: string
+  detail?: string
+  hash?: string
+  filterIndex?: string
+  locations: ConflictAuditModLocation[]
+}
+
+export interface GameConflictAuditReport {
+  gameId: GameId
+  modsPath: string
+  scannedAt: number
+  scannedMods: number
+  scannedIniFiles: number
+  environment?: EnvironmentCheck
+  items: GameConflictAuditItem[]
+  summary: {
+    high: number
+    warning: number
+    info: number
+  }
 }
 
 export interface SimpleResult {
@@ -507,6 +575,72 @@ export interface ImportRosterResult {
   error?: string
   schemeId?: string
   schemeName?: string
+}
+
+export interface StorageCategoryStat {
+  key: 'config' | 'covers' | 'backups' | 'logs'
+  fileCount: number
+  totalBytes: number
+}
+
+export interface ModBackupEntry {
+  id: string
+  timestampDir: string
+  createdAt: number
+  gameId: GameId
+  characterFolder: string
+  modName: string
+  totalBytes: number
+  fileCount: number
+  backupPath: string
+  targetExists: boolean
+}
+
+export interface StorageOverview {
+  dataDir: string
+  totalBytes: number
+  categories: StorageCategoryStat[]
+  backups: ModBackupEntry[]
+}
+
+export interface ConfigBundleManifest {
+  moddeckFileType: 'config-bundle'
+  version: 1
+  appVersion: string
+  exportedAt: number
+  stats: {
+    customGames: number
+    characterMeta: number
+    coverFiles: number
+    modPresetFiles: number
+    rosterPresets: number
+    languageFiles: number
+  }
+}
+
+export interface ConfigBundleInspection {
+  ok: boolean
+  error?: string
+  filePath?: string
+  manifest?: ConfigBundleManifest
+}
+
+export interface ImportConfigBundleOptions {
+  preserveExistingPaths: boolean
+}
+
+export interface ImportConfigBundleResult {
+  ok: boolean
+  error?: string
+  snapshotDir?: string
+  restored?: {
+    customGames: number
+    characterMeta: number
+    coverFiles: number
+    modPresetFiles: number
+    rosterPresets: number
+    languageFiles: number
+  }
 }
 
 /**

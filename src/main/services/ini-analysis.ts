@@ -2,6 +2,12 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import type {
   CharacterHashConflict,
+  ConflictAuditModLocation,
+  ConflictSeverity,
+  EnvironmentCheck,
+  GameConflictAuditItem,
+  GameConflictAuditReport,
+  GameId,
   IniCommandDependency,
   IniHashDeclaration,
   IniVariableInfo,
@@ -132,7 +138,8 @@ export async function appendLocalIgnoreRule(modPath: string, rule: string): Prom
 }
 
 async function collectModIniFiles(
-  modPath: string
+  modPath: string,
+  skipDisabledDirs = false
 ): Promise<{ active: string[]; disabled: string[] }> {
   const active: string[] = []
   const disabled: string[] = []
@@ -141,6 +148,7 @@ async function collectModIniFiles(
     const entries = await fs.readdir(current, { withFileTypes: true }).catch(() => [])
     for (const entry of entries) {
       if (entry.name.startsWith('.')) continue
+      if (skipDisabledDirs && entry.isDirectory() && /^disabled/i.test(entry.name)) continue
       const full = path.join(current, entry.name)
       const nextRel = relative ? path.join(relative, entry.name) : entry.name
       if (entry.isDirectory()) {
@@ -150,7 +158,7 @@ async function collectModIniFiles(
       if (!entry.isFile()) continue
       const lower = entry.name.toLowerCase()
       if (lower.endsWith('.ini') && lower !== 'desktop.ini') {
-        if (/^disabled_/i.test(entry.name)) disabled.push(nextRel)
+        if (/^disabled/i.test(entry.name)) disabled.push(nextRel)
         else active.push(nextRel)
       }
     }
@@ -496,25 +504,36 @@ export async function scanCharacterHashConflicts(
     string,
     {
       kind: 'texture' | 'shader' | 'other'
-      mods: Map<string, { folderName: string; name: string; sections: Set<string>; files: Set<string> }>
+      mods: Map<
+        string,
+        {
+          folderName: string
+          name: string
+          sections: Set<string>
+          files: Set<string>
+          lines: Set<number>
+        }
+      >
     }
   >()
 
   for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith('.') || /^DISABLED_/i.test(entry.name)) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || /^DISABLED/i.test(entry.name)) {
       continue
     }
     const modPath = path.join(characterDir, entry.name)
     if (!(await isModFolderEffectivelyEnabled(entry.name, modPath))) continue
 
-    const { active } = await collectModIniFiles(modPath)
+    const { active } = await collectModIniFiles(modPath, true)
     for (const rel of active) {
       const content = await readIniSafe(path.join(modPath, rel))
       if (!content) continue
 
       let currentSection = ''
-      for (const rawLine of content.split(/\r?\n/)) {
-        const trimmed = rawLine.trim()
+      const rawLines = content.split(/\r?\n/)
+      for (let i = 0; i < rawLines.length; i += 1) {
+        const lineNum = i + 1
+        const trimmed = rawLines[i].trim()
         if (!trimmed || trimmed.startsWith(';') || trimmed.startsWith('#')) continue
 
         const sectionMatch = trimmed.match(/^\[([^\]]+)\]/)
@@ -543,12 +562,14 @@ export async function scanCharacterHashConflicts(
             folderName: entry.name,
             name: entry.name.replace(/^DISABLED_/i, ''),
             sections: new Set(),
-            files: new Set()
+            files: new Set(),
+            lines: new Set()
           }
           bucket.mods.set(entry.name, modRec)
         }
         modRec.sections.add(currentSection)
         modRec.files.add(rel)
+        modRec.lines.add(lineNum)
       }
     }
   }
@@ -559,15 +580,517 @@ export async function scanCharacterHashConflicts(
     conflicts.push({
       hash,
       kind: bucket.kind,
+      severity: bucket.kind === 'shader' ? 'high' : 'warning',
       mods: Array.from(bucket.mods.values()).map((m) => ({
         folderName: m.folderName,
         name: m.name,
         sections: Array.from(m.sections),
-        files: Array.from(m.files)
+        files: Array.from(m.files),
+        lines: Array.from(m.lines).sort((a, b) => a - b)
       }))
     })
   }
 
   conflicts.sort((a, b) => a.hash.localeCompare(b.hash))
   return conflicts
+}
+
+type TranslateFn = (key: string, params?: Record<string, string | number>) => string
+
+interface ParsedConflictSection {
+  section: string
+  lowerSection: string
+  startLine: number
+  file: string
+  hashes: Array<{ hash: string; line: number; kind: 'texture' | 'shader' | 'other' }>
+  filterIndex?: string
+  hasHandlingSkip: boolean
+}
+
+function isKnownSafeShaderOverride(
+  gameId: GameId,
+  sectionName: string,
+  filterIndex: string | undefined,
+  relPath: string
+): boolean {
+  const lowerRel = relPath.toLowerCase()
+  const lowerSec = sectionName.toLowerCase()
+  const fi = (filterIndex || '').trim()
+
+  // RabbitFX 与 CrossIBClassifier 插件本体声明的共享着色器通道属于正常工作流
+  if (lowerRel.includes('rabbitfx') || lowerRel.includes('crossibclassifier') || lowerRel.includes('katfxmatcap')) {
+    return true
+  }
+  if (gameId === 'endfield' || fi === '1718.1' || fi === '1718.2' || /^20[0-5](?:\.|$)/.test(fi)) {
+    if (fi === '1718.1' || fi === '1718.2' || /^20[0-5](?:\.|$)/.test(fi)) {
+      return true
+    }
+  }
+  if (lowerSec.includes('rabbitfx') || lowerSec.includes('crossib')) {
+    return true
+  }
+  return false
+}
+
+function isLikelyFxPluginMod(folderName: string, activeFiles: string[], contentList: string[]): boolean {
+  const hay = `${folderName} ${activeFiles.join(' ')}`.toLowerCase()
+  if (/(rabbitfx|crossibclassifier|katfxmatcap|shadertweaks|globalshader|fxplugin)/i.test(hay)) {
+    return true
+  }
+  return contentList.some((c) => /CrossIBClassifier|RabbitFX/i.test(c))
+}
+
+async function hasDirectActiveIni(dirPath: string): Promise<boolean> {
+  const entries = await fs.readdir(dirPath, { withFileTypes: true }).catch(() => [])
+  return entries.some(
+    (e) => e.isFile() && e.name.toLowerCase().endsWith('.ini') && e.name.toLowerCase() !== 'desktop.ini' && !/^disabled/i.test(e.name)
+  )
+}
+
+function severityWeight(s: ConflictSeverity): number {
+  if (s === 'high') return 3
+  if (s === 'warning') return 2
+  return 1
+}
+
+export async function auditGameModsConflicts(
+  gameId: GameId,
+  modsPath: string,
+  environment: EnvironmentCheck | undefined,
+  t: TranslateFn
+): Promise<GameConflictAuditReport> {
+  const items: GameConflictAuditItem[] = []
+  let scannedMods = 0
+  let scannedIniFiles = 0
+
+  // 1. 环境级前置检查：ShaderFixes 残留与 ShaderCache 提示
+  if (environment?.shaderFixes?.dirExists && environment.shaderFixes.fileCount > 0) {
+    items.push({
+      id: 'env:shader-fixes',
+      severity: 'warning',
+      category: 'shader-fixes',
+      message: t('audit.shaderFixesTitle', { count: environment.shaderFixes.fileCount }),
+      detail: t('audit.shaderFixesDesc', {
+        samples: environment.shaderFixes.sampleFiles.join(', ')
+      }),
+      locations: []
+    })
+  }
+  if (environment?.shaderCache?.dirExists && environment.shaderCache.fileCount > 0) {
+    items.push({
+      id: 'env:shader-cache',
+      severity: 'info',
+      category: 'shader-cache',
+      message: t('audit.shaderCacheTitle', {
+        count: environment.shaderCache.fileCount
+      }),
+      detail: environment.shaderCache.enabledInIni
+        ? t('audit.shaderCacheEnabledDesc')
+        : t('audit.shaderCacheFilesDesc'),
+      locations: []
+    })
+  }
+
+  if (!modsPath || !(await pathExists(modsPath))) {
+    return {
+      gameId,
+      modsPath: modsPath || '',
+      scannedAt: Date.now(),
+      scannedMods,
+      scannedIniFiles,
+      environment,
+      items,
+      summary: {
+        high: items.filter((i) => i.severity === 'high').length,
+        warning: items.filter((i) => i.severity === 'warning').length,
+        info: items.filter((i) => i.severity === 'info').length
+      }
+    }
+  }
+
+  // 2. 收集全部已启用 Mod 单元（兼容根目录独立插件与 Mods/<角色>/<Mod> 两级目录）
+  interface ModScanUnit {
+    characterFolder: string
+    folderName: string
+    name: string
+    modPath: string
+  }
+  const modUnits: ModScanUnit[] = []
+  const topEntries = await fs.readdir(modsPath, { withFileTypes: true }).catch(() => [])
+  for (const top of topEntries) {
+    if (!top.isDirectory() || top.name.startsWith('.') || /^disabled/i.test(top.name)) continue
+    const topPath = path.join(modsPath, top.name)
+    if (await hasDirectActiveIni(topPath)) {
+      modUnits.push({
+        characterFolder: '',
+        folderName: top.name,
+        name: top.name.replace(/^DISABLED_/i, ''),
+        modPath: topPath
+      })
+      continue
+    }
+    const subEntries = await fs.readdir(topPath, { withFileTypes: true }).catch(() => [])
+    let pushedSub = false
+    for (const sub of subEntries) {
+      if (!sub.isDirectory() || sub.name.startsWith('.') || /^disabled/i.test(sub.name)) continue
+      const subPath = path.join(topPath, sub.name)
+      if (!(await isModFolderEffectivelyEnabled(sub.name, subPath))) continue
+      modUnits.push({
+        characterFolder: top.name,
+        folderName: sub.name,
+        name: sub.name.replace(/^DISABLED_/i, ''),
+        modPath: subPath
+      })
+      pushedSub = true
+    }
+    if (!pushedSub) {
+      // 检查是否多层嵌套直接含 ini 的插件包
+      const { active } = await collectModIniFiles(topPath, true)
+      if (active.length > 0) {
+        modUnits.push({
+          characterFolder: '',
+          folderName: top.name,
+          name: top.name.replace(/^DISABLED_/i, ''),
+          modPath: topPath
+        })
+      }
+    }
+  }
+
+  const rabbitFxLocations: ConflictAuditModLocation[] = []
+  const crossIbLocations: ConflictAuditModLocation[] = []
+  const katFxLocations: ConflictAuditModLocation[] = []
+
+  // 按角色分桶的 Hash 声明：characterFolder -> hash -> entries
+  const charHashMap = new Map<
+    string,
+    Map<
+      string,
+      {
+        kind: 'texture' | 'shader' | 'other'
+        locs: ConflictAuditModLocation[]
+      }
+    >
+  >()
+  // 全局 ShaderOverride hash 碰撞桶
+  const globalShaderOverrideHashMap = new Map<string, ConflictAuditModLocation[]>()
+
+  for (const unit of modUnits) {
+    scannedMods += 1
+    const { active } = await collectModIniFiles(unit.modPath, true)
+    const activeTexts: string[] = []
+    const sectionsParsed: ParsedConflictSection[] = []
+
+    for (const rel of active) {
+      scannedIniFiles += 1
+      const content = await readIniSafe(path.join(unit.modPath, rel))
+      if (!content) continue
+      activeTexts.push(content)
+
+      const lowerRel = rel.toLowerCase()
+      const baseIniName = path.basename(rel).toLowerCase()
+      if (baseIniName === 'rabbitfx.ini' || /rabbitfx/i.test(unit.folderName) && lowerRel === baseIniName) {
+        rabbitFxLocations.push({
+          characterFolder: unit.characterFolder,
+          folderName: unit.folderName,
+          name: unit.name,
+          file: rel,
+          line: 1
+        })
+      }
+      if (baseIniName === 'crossibclassifier.ini') {
+        crossIbLocations.push({
+          characterFolder: unit.characterFolder,
+          folderName: unit.folderName,
+          name: unit.name,
+          file: rel,
+          line: 1
+        })
+      }
+      if (/katfxmatcap/i.test(baseIniName) || /katfxmatcap/i.test(unit.folderName)) {
+        katFxLocations.push({
+          characterFolder: unit.characterFolder,
+          folderName: unit.folderName,
+          name: unit.name,
+          file: rel,
+          line: 1
+        })
+      }
+
+      const lines = content.split(/\r?\n/)
+      let current: ParsedConflictSection | null = null
+      for (let i = 0; i < lines.length; i += 1) {
+        const lineNum = i + 1
+        const trimmed = lines[i].trim()
+        if (!trimmed || trimmed.startsWith(';') || trimmed.startsWith('#')) continue
+
+        const secMatch = trimmed.match(/^\[([^\]]+)\]/)
+        if (secMatch) {
+          const secName = secMatch[1].trim()
+          current = {
+            section: secName,
+            lowerSection: secName.toLowerCase(),
+            startLine: lineNum,
+            file: rel,
+            hashes: [],
+            hasHandlingSkip: false
+          }
+          sectionsParsed.push(current)
+          continue
+        }
+
+        if (!current) continue
+        const clean = stripIniComment(trimmed)
+        if (!clean) continue
+
+        const fiMatch = clean.match(/^filter_index\s*=\s*(.+)$/i)
+        if (fiMatch) {
+          current.filterIndex = fiMatch[1].trim()
+        }
+        if (/^handling\s*=\s*skip\b/i.test(clean)) {
+          current.hasHandlingSkip = true
+        }
+        const hMatch = clean.match(/^hash\s*=\s*([0-9a-f]{4,16})\b/i)
+        if (hMatch) {
+          const hash = hMatch[1].toLowerCase()
+          const kind = classifyHashKind(current.section)
+          current.hashes.push({ hash, line: lineNum, kind })
+
+          if (unit.characterFolder && kind !== 'other') {
+            let bucketByHash = charHashMap.get(unit.characterFolder)
+            if (!bucketByHash) {
+              bucketByHash = new Map()
+              charHashMap.set(unit.characterFolder, bucketByHash)
+            }
+            let entry = bucketByHash.get(hash)
+            if (!entry) {
+              entry = { kind, locs: [] }
+              bucketByHash.set(hash, entry)
+            }
+            entry.locs.push({
+              characterFolder: unit.characterFolder,
+              folderName: unit.folderName,
+              name: unit.name,
+              file: rel,
+              line: lineNum,
+              section: current.section
+            })
+          }
+        }
+      }
+    }
+
+    const isPlugin = isLikelyFxPluginMod(unit.folderName, active, activeTexts)
+
+    for (const sec of sectionsParsed) {
+      if (sec.lowerSection.startsWith('shaderregex') && !isPlugin) {
+        items.push({
+          id: `regex:${unit.characterFolder}/${unit.folderName}:${sec.file}:${sec.startLine}`,
+          severity: 'warning',
+          category: 'embedded-shader-regex',
+          message: t('audit.embeddedShaderRegexTitle', { mod: unit.name, section: sec.section }),
+          detail: t('audit.embeddedShaderRegexDesc'),
+          locations: [
+            {
+              characterFolder: unit.characterFolder,
+              folderName: unit.folderName,
+              name: unit.name,
+              file: sec.file,
+              line: sec.startLine,
+              section: sec.section
+            }
+          ]
+        })
+      }
+
+      if (sec.lowerSection.startsWith('shaderoverride')) {
+        const safe = isKnownSafeShaderOverride(gameId, sec.section, sec.filterIndex, sec.file)
+        for (const h of sec.hashes) {
+          const loc: ConflictAuditModLocation = {
+            characterFolder: unit.characterFolder,
+            folderName: unit.folderName,
+            name: unit.name,
+            file: sec.file,
+            line: h.line,
+            section: sec.section
+          }
+          const arr = globalShaderOverrideHashMap.get(h.hash) || []
+          arr.push(loc)
+          globalShaderOverrideHashMap.set(h.hash, arr)
+
+          if (!safe && sec.hasHandlingSkip) {
+            items.push({
+              id: `so-skip:${unit.folderName}:${sec.file}:${h.line}`,
+              severity: 'warning',
+              category: 'shader-override',
+              message: t('audit.shaderOverrideRiskTitle', { mod: unit.name, hash: h.hash }),
+              detail: t('audit.shaderOverrideRiskDesc', { section: sec.section }),
+              hash: h.hash,
+              filterIndex: sec.filterIndex,
+              locations: [loc]
+            })
+          }
+        }
+      }
+    }
+  }
+
+  // 去重插件位置按 Mod 目录归并
+  const dedupeByMod = (locs: ConflictAuditModLocation[]): ConflictAuditModLocation[] => {
+    const seen = new Set<string>()
+    const out: ConflictAuditModLocation[] = []
+    for (const l of locs) {
+      const k = `${l.characterFolder}/${l.folderName}`
+      if (seen.has(k)) continue
+      seen.add(k)
+      out.push(l)
+    }
+    return out
+  }
+
+  const rabbitMods = dedupeByMod(rabbitFxLocations)
+  if (rabbitMods.length > 1) {
+    items.push({
+      id: 'dup:rabbitfx',
+      severity: 'high',
+      category: 'duplicate-fx-plugin',
+      message: t('audit.dupPluginTitle', { plugin: 'RabbitFX', count: rabbitMods.length }),
+      detail: t('audit.dupPluginDesc'),
+      locations: rabbitMods
+    })
+  }
+
+  const crossIbMods = dedupeByMod(crossIbLocations)
+  if (crossIbMods.length > 1) {
+    items.push({
+      id: 'dup:crossib',
+      severity: 'high',
+      category: 'duplicate-fx-plugin',
+      message: t('audit.dupPluginTitle', {
+        plugin: 'CrossIBClassifier.ini',
+        count: crossIbMods.length
+      }),
+      detail: t('audit.dupPluginDesc'),
+      locations: crossIbMods
+    })
+  }
+
+  const katMods = dedupeByMod(katFxLocations)
+  if (rabbitMods.length > 0 && katMods.length > 0) {
+    items.push({
+      id: 'mutex:rabbitfx-katfx',
+      severity: 'high',
+      category: 'mutually-exclusive-fx',
+      message: t('audit.mutexFxTitle'),
+      detail: t('audit.mutexFxDesc'),
+      locations: [...rabbitMods, ...katMods]
+    })
+  }
+
+  // 全局同 ShaderOverride Hash 被多个不同 Mod 声明
+  for (const [hash, locs] of globalShaderOverrideHashMap.entries()) {
+    const distinctMods = dedupeByMod(locs)
+    if (distinctMods.length < 2) continue
+    items.push({
+      id: `global-so:${hash}`,
+      severity: 'high',
+      category: 'shader-override',
+      message: t('audit.globalShaderOverrideConflictTitle', {
+        hash,
+        count: distinctMods.length
+      }),
+      detail: t('audit.globalShaderOverrideConflictDesc'),
+      hash,
+      locations: locs
+    })
+  }
+
+  // 角色内同 Hash 多 Mod 重叠
+  for (const [charFolder, hashMap] of charHashMap.entries()) {
+    for (const [hash, bucket] of hashMap.entries()) {
+      const distinctMods = dedupeByMod(bucket.locs)
+      if (distinctMods.length < 2) continue
+      items.push({
+        id: `char-hash:${charFolder}:${hash}`,
+        severity: bucket.kind === 'shader' ? 'high' : 'warning',
+        category: 'hash-collision',
+        message: t('audit.charHashConflictTitle', {
+          character: charFolder,
+          hash,
+          count: distinctMods.length
+        }),
+        detail: t('audit.charHashConflictDesc', { kind: bucket.kind }),
+        hash,
+        locations: bucket.locs
+      })
+    }
+  }
+
+  items.sort((a, b) => severityWeight(b.severity) - severityWeight(a.severity))
+
+  return {
+    gameId,
+    modsPath,
+    scannedAt: Date.now(),
+    scannedMods,
+    scannedIniFiles,
+    environment,
+    items,
+    summary: {
+      high: items.filter((i) => i.severity === 'high').length,
+      warning: items.filter((i) => i.severity === 'warning').length,
+      info: items.filter((i) => i.severity === 'info').length
+    }
+  }
+}
+
+export function formatConflictAuditReportText(
+  gameName: string,
+  report: GameConflictAuditReport,
+  t: TranslateFn
+): string {
+  const lines: string[] = []
+  lines.push('============================================================')
+  lines.push(`ModDeck Conflict Audit Report - ${gameName} (${report.gameId})`)
+  lines.push(`Generated At : ${new Date(report.scannedAt).toLocaleString()}`)
+  lines.push(`Mods Path    : ${report.modsPath || '-'}`)
+  lines.push(
+    `Scanned      : ${report.scannedMods} enabled mod(s), ${report.scannedIniFiles} .ini file(s)`
+  )
+  lines.push(
+    `Summary      : HIGH=${report.summary.high}, WARNING=${report.summary.warning}, INFO=${report.summary.info}`
+  )
+  if (report.environment) {
+    const env = report.environment
+    lines.push(`d3dx.ini     : ${env.status} (${env.d3dxPath || '-'})`)
+    if (env.shaderCache) {
+      lines.push(
+        `ShaderCache  : cache_shaders=${env.shaderCache.enabledInIni === null ? 'unset' : env.shaderCache.enabledInIni ? '1' : '0'}, files=${env.shaderCache.fileCount}`
+      )
+    }
+    if (env.shaderFixes) {
+      lines.push(`ShaderFixes  : files=${env.shaderFixes.fileCount}`)
+    }
+  }
+  lines.push('============================================================')
+  lines.push('')
+
+  if (report.items.length === 0) {
+    lines.push(t('audit.noIssuesFound'))
+    return lines.join('\r\n')
+  }
+
+  for (const item of report.items) {
+    lines.push(`[${item.severity.toUpperCase()}] [${item.category}] ${item.message}`)
+    if (item.detail) lines.push(`  Detail: ${item.detail}`)
+    for (const loc of item.locations) {
+      const modLabel = loc.characterFolder ? `${loc.characterFolder}/${loc.name}` : loc.name
+      const lineSuffix = loc.line > 0 ? `:${loc.line}` : ''
+      const secSuffix = loc.section ? ` [${loc.section}]` : ''
+      lines.push(`  - ${modLabel} -> ${loc.file}${lineSuffix}${secSuffix}`)
+    }
+    lines.push('')
+  }
+
+  return lines.join('\r\n')
 }

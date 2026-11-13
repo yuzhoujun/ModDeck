@@ -30,6 +30,7 @@ export function LibraryView({
   onReorderCharacters,
   onAdd,
   onOpenRosterPresets,
+  onOpenConflictAudit,
   isConfiguredFilterActive,
   onDisableConfiguredFilter
 }: {
@@ -45,12 +46,13 @@ export function LibraryView({
   onImport: () => void
   onImportFolder: () => void
   onRefresh: () => void
-  onOpenSettings: (tab?: 'general' | 'advanced' | 'games' | 'environment' | 'import' | 'about') => void
+  onOpenSettings: (tab?: 'general' | 'advanced' | 'games' | 'environment' | 'import' | 'storage' | 'about') => void
   onLaunchGame: () => void
   onLaunchLoader: () => void
   onReorderCharacters: (folders: string[]) => void
   onAdd: () => void
   onOpenRosterPresets?: () => void
+  onOpenConflictAudit?: () => void
   isConfiguredFilterActive?: boolean
   onDisableConfiguredFilter?: () => void
 }) {
@@ -144,6 +146,15 @@ export function LibraryView({
           <button className="btn ghost" onClick={onRefresh} title={t('library.refreshTooltip')}>
             <Icon name="refresh" size={16} />
             {t('common.refresh')}
+          </button>
+          <button
+            className="btn ghost"
+            onClick={onOpenConflictAudit}
+            disabled={!snapshot.modsPathExists}
+            title={t('audit.toolbarTooltip')}
+          >
+            <Icon name="info" size={16} />
+            {t('audit.toolbarBtn')}
           </button>
           <button className="btn ghost" onClick={onOpenRosterPresets} title={t('library.rosterPresetsTooltip')}>
             <Icon name="box" size={16} />

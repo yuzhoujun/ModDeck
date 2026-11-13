@@ -21,13 +21,18 @@ import type {
   AppInfo,
   AutoDetectPathsResult,
   CharacterMeta,
+  ClearShaderCacheResult,
   CreateCharacterInput,
   D3dxSyncStatus,
   EnvironmentCheck,
+  EnvironmentShaderCacheInfo,
+  EnvironmentShaderFixesInfo,
+  GameConflictAuditReport,
   GameDef,
   GameId,
   GameSettings,
   ImportCommitRequest,
+  ImportConfigBundleOptions,
   ImportParseRequest,
   ImportRequest,
   OverlayDetailRequest,
@@ -94,8 +99,19 @@ import {
 import {
   analyzeModIni,
   appendLocalIgnoreRule,
+  auditGameModsConflicts,
+  formatConflictAuditReportText,
   scanCharacterHashConflicts
 } from './services/ini-analysis'
+import {
+  deleteModBackup,
+  exportConfigBundle,
+  getStorageOverview,
+  importConfigBundle,
+  inspectConfigBundle,
+  pruneModBackups,
+  restoreModBackup
+} from './services/storage-backup'
 import {
   buildSnapshot,
   getModDetails,
@@ -2086,6 +2102,89 @@ async function recordRecentMod(
   await saveSettings(baseDir(), settings)
 }
 
+async function inspectShaderExtras(
+  root: string,
+  rawLines: string[]
+): Promise<{
+  shaderCache: EnvironmentShaderCacheInfo
+  shaderFixes: EnvironmentShaderFixesInfo
+}> {
+  let enabledInIni: boolean | null = null
+  let inRendering = false
+  for (const rawLine of rawLines) {
+    const trimmed = rawLine.trim()
+    if (!trimmed || trimmed.startsWith(';') || trimmed.startsWith('#')) continue
+    const sec = trimmed.match(/^\[([^\]]+)\]/)
+    if (sec) {
+      inRendering = sec[1].trim().toLowerCase() === 'rendering'
+      continue
+    }
+    if (!inRendering) continue
+    const clean = trimmed.split(';')[0].trim()
+    const match = clean.match(/^cache_shaders\s*=\s*(.+)$/i)
+    if (match) {
+      const val = match[1].trim()
+      if (val === '1' || /^true$/i.test(val)) enabledInIni = true
+      else if (val === '0' || /^false$/i.test(val)) enabledInIni = false
+    }
+  }
+
+  const cacheDir = path.join(root, 'ShaderCache')
+  let cacheExists = false
+  let cacheFiles = 0
+  let cacheBytes = 0
+  if (await pathExists(cacheDir)) {
+    cacheExists = true
+    const stack = [cacheDir]
+    while (stack.length > 0) {
+      const dir = stack.pop() as string
+      const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          stack.push(full)
+        } else if (entry.isFile()) {
+          const stat = await fs.stat(full).catch(() => null)
+          if (stat) {
+            cacheFiles += 1
+            cacheBytes += stat.size
+          }
+        }
+      }
+    }
+  }
+
+  const fixesDir = path.join(root, 'ShaderFixes')
+  let fixesExists = false
+  let fixesCount = 0
+  const sampleFiles: string[] = []
+  if (await pathExists(fixesDir)) {
+    fixesExists = true
+    const entries = await fs.readdir(fixesDir, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      if (!entry.isFile()) continue
+      if (/\.(hlsl|asm|txt)$/i.test(entry.name)) {
+        fixesCount += 1
+        if (sampleFiles.length < 5) sampleFiles.push(entry.name)
+      }
+    }
+  }
+
+  return {
+    shaderCache: {
+      enabledInIni,
+      dirExists: cacheExists,
+      fileCount: cacheFiles,
+      totalBytes: cacheBytes
+    },
+    shaderFixes: {
+      dirExists: fixesExists,
+      fileCount: fixesCount,
+      sampleFiles
+    }
+  }
+}
+
 async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
   const targets = gameId ? [gameId] : getAllGames().map((game: GameDef) => game.id)
   const result: EnvironmentCheck[] = []
@@ -2106,19 +2205,21 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
     const root = path.dirname(modsPath)
     const d3dxPath = path.join(root, 'd3dx.ini')
     if (!(await pathExists(d3dxPath))) {
+      const extras = await inspectShaderExtras(root, [])
       result.push({
         gameId: target,
         modsPath,
         root,
         d3dxPath,
         status: 'missing-file',
-        detail: tMain('common.d3dxMissingFile')
+        detail: tMain('common.d3dxMissingFile'),
+        ...extras
       })
       continue
     }
 
     try {
-      let text = await fs.readFile(d3dxPath, 'utf8')
+      const text = await fs.readFile(d3dxPath, 'utf8')
       let ok = false
       let needRestoreReloadConfig = false
 
@@ -2142,13 +2243,15 @@ async function checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]> {
         await fs.writeFile(d3dxPath, updatedLines.join('\r\n'), 'utf8').catch(() => undefined)
       }
 
+      const extras = await inspectShaderExtras(root, rawLines)
       result.push({
         gameId: target,
         modsPath,
         root,
         d3dxPath,
         status: ok ? 'ok' : 'missing-line',
-        detail: ok ? undefined : tMain('common.d3dxMissingLine')
+        detail: ok ? undefined : tMain('common.d3dxMissingLine'),
+        ...extras
       })
     } catch (error) {
       result.push({
@@ -3669,6 +3772,143 @@ function registerIpc(): void {
     const error = await shell.openPath(root)
     return error ? { ok: false, error } : { ok: true, path: root }
   })
+
+  register(IPC.clearShaderCache, async (gameId: GameId): Promise<ClearShaderCacheResult> => {
+    requireGame(gameId)
+    const gameSettings = settings.games[gameId]
+    if (!gameSettings?.modsPath) {
+      return { ok: false, error: tMain('common.modsDirNotConfigured') }
+    }
+    const root = path.dirname(gameSettings.modsPath)
+    const cacheDir = path.join(root, 'ShaderCache')
+    if (!isInside(root, cacheDir) || !(await pathExists(cacheDir))) {
+      return { ok: true, deletedFiles: 0, freedBytes: 0 }
+    }
+    let deletedFiles = 0
+    let freedBytes = 0
+    try {
+      const entries = await fs.readdir(cacheDir, { withFileTypes: true })
+      for (const entry of entries) {
+        const full = path.join(cacheDir, entry.name)
+        if (!isInside(cacheDir, full)) continue
+        if (entry.isFile()) {
+          const stat = await fs.stat(full).catch(() => null)
+          await fs.rm(full, { force: true })
+          deletedFiles += 1
+          freedBytes += stat?.size ?? 0
+        } else if (entry.isDirectory()) {
+          await fs.rm(full, { recursive: true, force: true })
+          deletedFiles += 1
+        }
+      }
+      return { ok: true, deletedFiles, freedBytes }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  register(IPC.auditGameConflicts, async (gameId: GameId): Promise<GameConflictAuditReport> => {
+    requireGame(gameId)
+    const gameSettings = settings.games[gameId]
+    const envList = await checkEnvironment(gameId).catch(() => [])
+    return auditGameModsConflicts(gameId, gameSettings?.modsPath ?? '', envList[0], tMain)
+  })
+
+  register(
+    IPC.exportConflictAuditReport,
+    async (gameId: GameId, report: GameConflictAuditReport) => {
+      const game = requireGame(gameId)
+      const dateStr = new Date(report.scannedAt || Date.now()).toISOString().slice(0, 10)
+      const win = mainWindow ?? BrowserWindow.getFocusedWindow() ?? undefined
+      const saveRes = await dialog.showSaveDialog(win as BrowserWindow, {
+        title: tMain('audit.exportTitle'),
+        defaultPath: `ModDeck_Conflict_Report_${gameId}_${dateStr}.txt`,
+        filters: [{ name: 'Text File', extensions: ['txt'] }]
+      })
+      if (saveRes.canceled || !saveRes.filePath) return { ok: false }
+      const gameName = isNonZhEffectiveLocale() ? game.nameEn || game.name : game.name
+      const text = formatConflictAuditReportText(gameName, report, tMain)
+      await fs.writeFile(saveRes.filePath, text, 'utf8')
+      return { ok: true, filePath: saveRes.filePath }
+    }
+  )
+
+  register(IPC.getStorageOverview, async () => {
+    return getStorageOverview(baseDir(), settings)
+  })
+
+  register(IPC.restoreModBackup, async (backupId: string) => {
+    try {
+      await restoreModBackup(baseDir(), backupId, settings)
+      invalidatePreviewCache()
+      broadcastStateChanged({})
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  register(IPC.deleteModBackup, async (backupId: string) => {
+    try {
+      await deleteModBackup(baseDir(), backupId)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  register(IPC.pruneModBackups, async (olderThanDays: number) => {
+    try {
+      const res = await pruneModBackups(baseDir(), olderThanDays)
+      return { ok: true, ...res }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  register(IPC.exportConfigBundle, async () => {
+    const win = mainWindow ?? BrowserWindow.getFocusedWindow() ?? undefined
+    const dateStr = new Date().toISOString().slice(0, 10)
+    const saveRes = await dialog.showSaveDialog(win as BrowserWindow, {
+      title: tMain('settings.storage.bundleExportTitle'),
+      defaultPath: `ModDeck_Backup_${dateStr}.moddeck-bundle`,
+      filters: [{ name: 'ModDeck Config Bundle', extensions: ['moddeck-bundle', 'zip'] }]
+    })
+    if (saveRes.canceled || !saveRes.filePath) return { ok: false }
+    try {
+      await exportConfigBundle(baseDir(), app.getVersion(), saveRes.filePath)
+      return { ok: true, filePath: saveRes.filePath }
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  })
+
+  register(IPC.inspectConfigBundle, async () => {
+    const win = mainWindow ?? BrowserWindow.getFocusedWindow() ?? undefined
+    const openRes = await dialog.showOpenDialog(win as BrowserWindow, {
+      title: tMain('settings.storage.bundleImportTitle'),
+      properties: ['openFile'],
+      filters: [{ name: 'ModDeck Config Bundle', extensions: ['moddeck-bundle', 'zip'] }]
+    })
+    if (openRes.canceled || !openRes.filePaths[0]) {
+      return { ok: false }
+    }
+    return inspectConfigBundle(openRes.filePaths[0])
+  })
+
+  register(
+    IPC.importConfigBundle,
+    async (filePath: string, options: ImportConfigBundleOptions) => {
+      const res = await importConfigBundle(baseDir(), filePath, settings, options)
+      if (res.ok) {
+        settings = await loadSettings(baseDir())
+        setCustomGames(settings.customGames ?? [])
+        metadata = await loadMetadata(baseDir())
+        broadcastStateChanged({})
+      }
+      return res
+    }
+  )
 
   register(IPC.reloadF10, async () => reloadF10())
 

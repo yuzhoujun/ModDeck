@@ -356,11 +356,18 @@ export function CharacterView({
                           <div className="conflict-item-head">
                             <code>{conflict.hash}</code>
                             <span className="tag">{conflict.kind}</span>
+                            {conflict.severity ? (
+                              <span className={`tag sev-${conflict.severity}`}>
+                                {conflict.severity.toUpperCase()}
+                              </span>
+                            ) : null}
                           </div>
                           <div className="conflict-item-mods">
                             {conflict.mods.map((m) => (
                               <span key={m.folderName} className="chip">
-                                {m.name} ({m.sections[0] || m.files[0]})
+                                {m.name} ({m.files[0] || ''}
+                                {m.lines?.[0] ? `:${m.lines[0]}` : ''}{' '}
+                                {m.sections[0] ? `[${m.sections[0]}]` : ''})
                               </span>
                             ))}
                           </div>

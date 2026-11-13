@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import zlib from 'node:zlib'
 import { path7za } from '7zip-bin'
 import { isInside } from '../core/safe-path'
 
@@ -178,7 +179,154 @@ async function assertTreeInside(root: string): Promise<void> {
   }
 }
 
-export async function extractArchive(archivePath: string, destination: string): Promise<void> {
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256)
+  for (let n = 0; n < 256; n += 1) {
+    let c = n
+    for (let k = 0; k < 8; k += 1) {
+      c = (c & 1) !== 0 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    }
+    table[n] = c >>> 0
+  }
+  return table
+})()
+
+function crc32(buf: Buffer): number {
+  let crc = 0xffffffff
+  for (let i = 0; i < buf.length; i += 1) {
+    crc = CRC_TABLE[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8)
+  }
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+export interface ZipMemoryEntry {
+  name: string // relative posix path e.g. 'covers/endfield/a.png'
+  data: Buffer
+}
+
+export function buildZipBuffer(entries: ZipMemoryEntry[]): Buffer {
+  const localChunks: Buffer[] = []
+  const centralChunks: Buffer[] = []
+  let offset = 0
+
+  for (const entry of entries) {
+    const posixName = entry.name.replace(/\\/g, '/').replace(/^\/+/, '')
+    const nameBuf = Buffer.from(posixName, 'utf8')
+    const raw = entry.data
+    const crc = crc32(raw)
+    const compressed = zlib.deflateRawSync(raw)
+    const useDeflate = compressed.length < raw.length
+    const payload = useDeflate ? compressed : raw
+    const method = useDeflate ? 8 : 0
+
+    // Local file header (30 bytes + name)
+    const lfh = Buffer.alloc(30)
+    lfh.writeUInt32LE(0x04034b50, 0)
+    lfh.writeUInt16LE(20, 4) // version needed
+    lfh.writeUInt16LE(0x0800, 6) // UTF-8 filename flag
+    lfh.writeUInt16LE(method, 8)
+    lfh.writeUInt16LE(0, 10)
+    lfh.writeUInt16LE(0, 12)
+    lfh.writeUInt32LE(crc, 14)
+    lfh.writeUInt32LE(payload.length, 18)
+    lfh.writeUInt32LE(raw.length, 22)
+    lfh.writeUInt16LE(nameBuf.length, 26)
+    lfh.writeUInt16LE(0, 28)
+
+    localChunks.push(lfh, nameBuf, payload)
+
+    // Central directory header (46 bytes + name)
+    const cdh = Buffer.alloc(46)
+    cdh.writeUInt32LE(0x02014b50, 0)
+    cdh.writeUInt16LE(20, 4)
+    cdh.writeUInt16LE(20, 6)
+    cdh.writeUInt16LE(0x0800, 8)
+    cdh.writeUInt16LE(method, 10)
+    cdh.writeUInt16LE(0, 12)
+    cdh.writeUInt16LE(0, 14)
+    cdh.writeUInt32LE(crc, 16)
+    cdh.writeUInt32LE(payload.length, 20)
+    cdh.writeUInt32LE(raw.length, 24)
+    cdh.writeUInt16LE(nameBuf.length, 28)
+    cdh.writeUInt16LE(0, 30)
+    cdh.writeUInt16LE(0, 32)
+    cdh.writeUInt16LE(0, 34)
+    cdh.writeUInt16LE(0, 36)
+    cdh.writeUInt32LE(0, 38)
+    cdh.writeUInt32LE(offset, 42)
+
+    centralChunks.push(cdh, nameBuf)
+    offset += lfh.length + nameBuf.length + payload.length
+  }
+
+  const centralBuf = Buffer.concat(centralChunks)
+  const eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0)
+  eocd.writeUInt16LE(0, 4)
+  eocd.writeUInt16LE(0, 6)
+  eocd.writeUInt16LE(entries.length, 8)
+  eocd.writeUInt16LE(entries.length, 10)
+  eocd.writeUInt32LE(centralBuf.length, 12)
+  eocd.writeUInt32LE(offset, 16)
+  eocd.writeUInt16LE(0, 20)
+
+  return Buffer.concat([...localChunks, centralBuf, eocd])
+}
+
+export function readZipBuffer(zipBuf: Buffer): ZipMemoryEntry[] {
+  let eocdOffset = -1
+  const minOffset = Math.max(0, zipBuf.length - 65558)
+  for (let pos = zipBuf.length - 22; pos >= minOffset; pos -= 1) {
+    if (zipBuf.readUInt32LE(pos) === 0x06054b50) {
+      eocdOffset = pos
+      break
+    }
+  }
+  if (eocdOffset < 0) {
+    throw new Error('无效的 ZIP / .moddeck-bundle 归档结构')
+  }
+
+  const totalEntries = zipBuf.readUInt16LE(eocdOffset + 10)
+  const cdOffset = zipBuf.readUInt32LE(eocdOffset + 16)
+  let ptr = cdOffset
+  const out: ZipMemoryEntry[] = []
+
+  for (let i = 0; i < totalEntries; i += 1) {
+    if (ptr + 46 > zipBuf.length || zipBuf.readUInt32LE(ptr) !== 0x02014b50) {
+      throw new Error('归档中央目录损坏')
+    }
+    const method = zipBuf.readUInt16LE(ptr + 10)
+    const compSize = zipBuf.readUInt32LE(ptr + 20)
+    const nameLen = zipBuf.readUInt16LE(ptr + 28)
+    const extraLen = zipBuf.readUInt16LE(ptr + 30)
+    const commentLen = zipBuf.readUInt16LE(ptr + 32)
+    const localHeaderOffset = zipBuf.readUInt32LE(ptr + 42)
+    const name = zipBuf.subarray(ptr + 46, ptr + 46 + nameLen).toString('utf8')
+    ptr += 46 + nameLen + extraLen + commentLen
+
+    if (!name || name.endsWith('/')) continue
+    if (localHeaderOffset + 30 > zipBuf.length || zipBuf.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
+      throw new Error(`归档条目头损坏: ${name}`)
+    }
+    const lfhNameLen = zipBuf.readUInt16LE(localHeaderOffset + 26)
+    const lfhExtraLen = zipBuf.readUInt16LE(localHeaderOffset + 28)
+    const dataStart = localHeaderOffset + 30 + lfhNameLen + lfhExtraLen
+    const slice = zipBuf.subarray(dataStart, dataStart + compSize)
+
+    let data: Buffer
+    if (method === 0) {
+      data = Buffer.from(slice)
+    } else if (method === 8) {
+      data = zlib.inflateRawSync(slice)
+    } else {
+      throw new Error(`不支持的 ZIP 压缩方式 (${method}): ${name}`)
+    }
+    out.push({ name, data })
+  }
+  return out
+}
+
+export async function extractArchive(archivePath: string, destination: string, forceType?: 'zip'): Promise<void> {
   const stat = await fs.stat(archivePath)
   if (!stat.isFile()) throw new Error(`不是文件: ${archivePath}`)
   await fs.mkdir(destination, { recursive: true })
@@ -186,7 +334,7 @@ export async function extractArchive(archivePath: string, destination: string): 
   const ext = path.extname(archivePath).toLowerCase()
   if (ext === '.rar') {
     await extractRar(archivePath, destination)
-  } else if (ext === '.zip' || ext === '.7z') {
+  } else if (forceType === 'zip' || ext === '.zip' || ext === '.7z' || ext === '.moddeck-bundle') {
     await run7za(['x', '-y', '-bd', `-o${destination}`, archivePath])
   } else {
     throw new Error(`不支持的压缩格式: ${ext || '(无扩展名)'}`)

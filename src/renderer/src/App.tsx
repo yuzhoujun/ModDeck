@@ -14,6 +14,7 @@ import type {
 } from '../../shared/types'
 import { CreateCharacterModal } from './components/CreateCharacterModal'
 import { AddCustomGameModal } from './components/AddCustomGameModal'
+import { ConflictAuditModal } from './components/ConflictAuditModal'
 import { EditCharacterModal } from './components/EditCharacterModal'
 import { Icon } from './components/Icon'
 import { ImportPreviewModal } from './components/ImportPreviewModal'
@@ -39,7 +40,7 @@ export default function App() {
   const [booting, setBooting] = useState(true)
   const [fatal, setFatal] = useState<string | null>(null)
   const [view, setView] = useState<View>('library')
-  const [settingsTab, setSettingsTab] = useState<'general' | 'advanced' | 'games' | 'environment' | 'import' | 'about'>('general')
+  const [settingsTab, setSettingsTab] = useState<'general' | 'advanced' | 'games' | 'environment' | 'import' | 'storage' | 'about'>('general')
   const [selected, setSelected] = useState<CharacterInfo | null>(null)
   const [mods, setMods] = useState<ModInfo[]>([])
   const [modsLoading, setModsLoading] = useState(false)
@@ -52,6 +53,7 @@ export default function App() {
   const [customGameModalOpen, setCustomGameModalOpen] = useState(false)
   const [editingCustomGame, setEditingCustomGame] = useState<GameDef | null>(null)
   const [showRosterPresets, setShowRosterPresets] = useState(false)
+  const [showConflictAudit, setShowConflictAudit] = useState(false)
   const [envWarning, setEnvWarning] = useState<EnvironmentCheck | null>(null)
   const [parsedImport, setParsedImport] = useState<{
     result: ImportParseResult
@@ -973,6 +975,7 @@ export default function App() {
             onReorderCharacters={reorderCharacters}
             onAdd={() => setCreating(true)}
             onOpenRosterPresets={() => setShowRosterPresets(true)}
+            onOpenConflictAudit={() => setShowConflictAudit(true)}
             isConfiguredFilterActive={boot.settings.onlyShowConfiguredGames}
             onDisableConfiguredFilter={() => void toggleOnlyShowConfigured()}
           />
@@ -999,6 +1002,14 @@ export default function App() {
           snapshot={snapshot}
           onClose={() => setShowRosterPresets(false)}
           onNotify={notify}
+        />
+      ) : null}
+      {showConflictAudit && snapshot ? (
+        <ConflictAuditModal
+          game={snapshot.game}
+          onClose={() => setShowConflictAudit(false)}
+          onNotify={notify}
+          onMutated={() => void refreshSnapshot(snapshot.game.id)}
         />
       ) : null}
       {editing ? (

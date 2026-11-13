@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import type {
   AppInfo,
+  ConfigBundleInspection,
   EnvironmentCheck,
   GameDef,
   RosterSyncStatus,
   Settings,
-  SettingsPatch
+  SettingsPatch,
+  StorageOverview
 } from '../../../shared/types'
 import { Icon } from '../components/Icon'
 import { Modal } from '../components/Modal'
@@ -13,7 +15,14 @@ import type { IconName } from '../components/Icon'
 import { errorMessage } from '../utils'
 import { useI18n, getLocaleGameName, getLocaleGameShortName } from '../i18n'
 
-type SettingsTab = 'general' | 'advanced' | 'games' | 'environment' | 'import' | 'about'
+type SettingsTab = 'general' | 'advanced' | 'games' | 'environment' | 'import' | 'storage' | 'about'
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
 
 export function SettingsView({
   games,
@@ -60,6 +69,14 @@ export function SettingsView({
   const [showF10WarningModal, setShowF10WarningModal] = useState(false)
   const [showDisablePresetReloadModal, setShowDisablePresetReloadModal] = useState<"modPreset" | "rosterPreset" | null>(null)
   const [newIgnoreRule, setNewIgnoreRule] = useState('')
+  const [clearingCacheGameId, setClearingCacheGameId] = useState<string | null>(null)
+  const [storageOverview, setStorageOverview] = useState<StorageOverview | null>(null)
+  const [storageLoading, setStorageLoading] = useState(false)
+  const [bundleInspect, setBundleInspect] = useState<ConfigBundleInspection | null>(null)
+  const [preserveExistingPaths, setPreserveExistingPaths] = useState(true)
+  const [bundleBusy, setBundleBusy] = useState(false)
+  const [restoringBackupId, setRestoringBackupId] = useState<string | null>(null)
+  const [pruningBackups, setPruningBackups] = useState(false)
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -331,12 +348,164 @@ export function SettingsView({
     }
   }
 
+  useEffect(() => {
+    if (tab === 'environment' && envResults.length === 0 && !envChecking) {
+      void refreshEnvironment()
+    } else if (tab === 'storage' && !storageOverview && !storageLoading) {
+      void refreshStorageOverview()
+    }
+  }, [tab])
+
+  async function refreshStorageOverview() {
+    setStorageLoading(true)
+    try {
+      const overview = await window.moddeck.getStorageOverview()
+      setStorageOverview(overview)
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setStorageLoading(false)
+    }
+  }
+
+  async function handleClearShaderCache(gameId: string) {
+    setClearingCacheGameId(gameId)
+    try {
+      const res = await window.moddeck.clearShaderCache(gameId)
+      if (!res.ok) {
+        onNotify(res.error || t('common.operationFailed'), 'err')
+      } else {
+        onNotify(
+          t('audit.clearCacheSuccess', {
+            count: res.deletedFiles ?? 0,
+            size: formatBytes(res.freedBytes ?? 0)
+          }),
+          'ok'
+        )
+        await refreshEnvironment()
+      }
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setClearingCacheGameId(null)
+    }
+  }
+
+  async function handleExportBundle() {
+    setBundleBusy(true)
+    try {
+      const res = await window.moddeck.exportConfigBundle()
+      if (res.ok && res.filePath) {
+        onNotify(t('settings.storage.bundleExportSuccess', { path: res.filePath }), 'ok')
+      } else if (res.error) {
+        onNotify(res.error, 'err')
+      }
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setBundleBusy(false)
+    }
+  }
+
+  async function handlePickImportBundle() {
+    setBundleBusy(true)
+    try {
+      const res = await window.moddeck.inspectConfigBundle()
+      if (!res.ok) {
+        if (res.error) onNotify(res.error, 'err')
+        return
+      }
+      setPreserveExistingPaths(true)
+      setBundleInspect(res)
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setBundleBusy(false)
+    }
+  }
+
+  async function handleConfirmImportBundle() {
+    if (!bundleInspect?.filePath) return
+    setBundleBusy(true)
+    try {
+      const res = await window.moddeck.importConfigBundle(bundleInspect.filePath, {
+        preserveExistingPaths
+      })
+      if (!res.ok) {
+        onNotify(res.error || t('common.operationFailed'), 'err')
+        return
+      }
+      setBundleInspect(null)
+      onNotify(t('settings.storage.bundleImportSuccess'), 'ok')
+      await refreshStorageOverview()
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setBundleBusy(false)
+    }
+  }
+
+  async function handleRestoreBackup(backupId: string) {
+    setRestoringBackupId(backupId)
+    try {
+      const res = await window.moddeck.restoreModBackup(backupId)
+      if (!res.ok) {
+        onNotify(res.error || t('common.operationFailed'), 'err')
+        return
+      }
+      onNotify(t('settings.storage.restoreSuccess'), 'ok')
+      await refreshStorageOverview()
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setRestoringBackupId(null)
+    }
+  }
+
+  async function handleDeleteBackup(backupId: string) {
+    try {
+      const res = await window.moddeck.deleteModBackup(backupId)
+      if (!res.ok) {
+        onNotify(res.error || t('common.operationFailed'), 'err')
+        return
+      }
+      onNotify(t('settings.storage.deleteBackupSuccess'), 'ok')
+      await refreshStorageOverview()
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    }
+  }
+
+  async function handlePruneBackups(days: number) {
+    setPruningBackups(true)
+    try {
+      const res = await window.moddeck.pruneModBackups(days)
+      if (!res.ok) {
+        onNotify(res.error || t('common.operationFailed'), 'err')
+        return
+      }
+      onNotify(
+        t('settings.storage.pruneSuccess', {
+          count: res.deletedCount ?? 0,
+          size: formatBytes(res.freedBytes ?? 0)
+        }),
+        'ok'
+      )
+      await refreshStorageOverview()
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setPruningBackups(false)
+    }
+  }
+
   const tabs: Array<{ id: SettingsTab; label: string; icon: IconName }> = [
     { id: 'general', label: t('settings.tabGeneral'), icon: 'settings' },
     { id: 'advanced', label: t('settings.tabAdvanced'), icon: 'sliders' },
     { id: 'games', label: t('settings.tabGames'), icon: 'folder' },
     { id: 'environment', label: t('settings.tabEnvironment'), icon: 'box' },
     { id: 'import', label: t('settings.tabImport'), icon: 'download' },
+    { id: 'storage', label: t('settings.tabStorage'), icon: 'upload' },
     { id: 'about', label: t('settings.tabAbout'), icon: 'info' }
   ]
 
@@ -1146,7 +1315,8 @@ export function SettingsView({
 
           <div className="env-game-list">
             {games.map((game) => {
-              const supported = game.id === 'endfield'
+              const configured = Boolean(draft.games[game.id]?.modsPath?.trim())
+              const supported = configured || game.id === 'endfield'
               const env = envResults.find((item) => item.gameId === game.id)
               return (
                 <div className={`env-game-card${supported ? '' : ' pending'}`} key={game.id}>
@@ -1155,7 +1325,7 @@ export function SettingsView({
                     <strong>{getLocaleGameName(game, effectiveLocale)}</strong>
                     <span className="muted">{game.loader}</span>
                     <span className={`chip${supported && env?.status === 'ok' ? ' ok' : ''}`}>
-                      {supported ? envStatusText(env?.status) : t('settings.environment.statusPending')}
+                      {supported ? envStatusText(env?.status) : t('settings.environment.notConfigured')}
                     </span>
                   </div>
                   {supported ? (
@@ -1167,7 +1337,42 @@ export function SettingsView({
                       <p className="muted small">
                         {t('settings.environment.ruleLabel')}<code>exclude_recursive = DISABLED*</code>
                       </p>
-                      <div className="row">
+                      {env?.shaderCache ? (
+                        <div className="env-extra-row muted small">
+                          <span>
+                            {t('settings.environment.shaderCacheLabel')}:{' '}
+                            {env.shaderCache.fileCount} ({formatBytes(env.shaderCache.totalBytes)})
+                            {env.shaderCache.enabledInIni !== null
+                              ? ` · cache_shaders=${env.shaderCache.enabledInIni ? '1' : '0'}`
+                              : ''}
+                          </span>
+                          {env.shaderCache.fileCount > 0 ? (
+                            <button
+                              type="button"
+                              className="btn ghost tiny-btn"
+                              disabled={clearingCacheGameId === game.id}
+                              onClick={() => void handleClearShaderCache(game.id)}
+                            >
+                              <Icon name="trash" size={12} />
+                              {clearingCacheGameId === game.id
+                                ? t('common.processing')
+                                : t('settings.environment.clearShaderCache')}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      {env?.shaderFixes && env.shaderFixes.fileCount > 0 ? (
+                        <div className="env-extra-warn small">
+                          <Icon name="info" size={13} />
+                          <span>
+                            {t('settings.environment.shaderFixesWarn', {
+                              count: env.shaderFixes.fileCount,
+                              samples: env.shaderFixes.sampleFiles.join(', ')
+                            })}
+                          </span>
+                        </div>
+                      ) : null}
+                      <div className="row" style={{ marginTop: '6px' }}>
                         <button
                           className="btn ghost small-btn"
                           onClick={() => void window.moddeck.openEnvironmentFolder(game.id)}
@@ -1179,7 +1384,7 @@ export function SettingsView({
                     </>
                   ) : (
                     <p className="muted small">
-                      {t('settings.environment.pendingDesc')}
+                      {t('settings.environment.pendingUnconfiguredDesc')}
                     </p>
                   )}
                 </div>
@@ -1324,6 +1529,200 @@ export function SettingsView({
         </>
       ) : null}
 
+      {tab === 'storage' ? (
+        <>
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  color: '#34d399',
+                  borderColor: 'rgba(16, 185, 129, 0.25)'
+                }}
+              >
+                <Icon name="box" size={18} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3>{t('settings.storage.overviewTitle')}</h3>
+                <p className="muted">{t('settings.storage.overviewDesc')}</p>
+              </div>
+              <div className="row">
+                <button
+                  type="button"
+                  className="btn ghost small-btn"
+                  onClick={() => void window.moddeck.openPath('data')}
+                >
+                  <Icon name="folder" size={14} />
+                  {t('settings.about.openDataFolder')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost small-btn"
+                  disabled={storageLoading}
+                  onClick={() => void refreshStorageOverview()}
+                >
+                  <Icon name="refresh" size={14} />
+                  {t('common.refresh')}
+                </button>
+              </div>
+            </div>
+
+            {storageOverview ? (
+              <div className="storage-stat-grid">
+                {storageOverview.categories.map((cat) => (
+                  <div key={cat.key} className="storage-stat-card">
+                    <div className="muted small">{t(`settings.storage.cat_${cat.key}`)}</div>
+                    <strong className="storage-stat-val">{formatBytes(cat.totalBytes)}</strong>
+                    <div className="muted small">
+                      {t('settings.storage.filesCount', { count: cat.fileCount })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="muted small">{t('common.loading')}</div>
+            )}
+          </section>
+
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  color: '#38bdf8',
+                  borderColor: 'rgba(56, 189, 248, 0.25)'
+                }}
+              >
+                <Icon name="upload" size={18} />
+              </div>
+              <div>
+                <h3>{t('settings.storage.bundleTitle')}</h3>
+                <p className="muted">{t('settings.storage.bundleDesc')}</p>
+              </div>
+            </div>
+
+            <div className="row" style={{ flexWrap: 'wrap', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn primary small-btn"
+                disabled={bundleBusy}
+                onClick={() => void handleExportBundle()}
+              >
+                <Icon name="download" size={14} />
+                {t('settings.storage.bundleExportBtn')}
+              </button>
+              <button
+                type="button"
+                className="btn ghost small-btn"
+                disabled={bundleBusy}
+                onClick={() => void handlePickImportBundle()}
+              >
+                <Icon name="upload" size={14} />
+                {t('settings.storage.bundleImportBtn')}
+              </button>
+            </div>
+          </section>
+
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(251, 146, 60, 0.12)',
+                  color: '#fb923c',
+                  borderColor: 'rgba(251, 146, 60, 0.25)'
+                }}
+              >
+                <Icon name="refresh" size={18} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3>{t('settings.storage.backupsTitle')}</h3>
+                <p className="muted">{t('settings.storage.backupsDesc')}</p>
+              </div>
+              <div className="row" style={{ flexWrap: 'wrap', gap: '6px' }}>
+                <button
+                  type="button"
+                  className="btn ghost tiny-btn"
+                  disabled={pruningBackups || !storageOverview?.backups.length}
+                  onClick={() => void handlePruneBackups(30)}
+                >
+                  {t('settings.storage.prune30d')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost tiny-btn"
+                  disabled={pruningBackups || !storageOverview?.backups.length}
+                  onClick={() => void handlePruneBackups(7)}
+                >
+                  {t('settings.storage.prune7d')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost tiny-btn"
+                  disabled={pruningBackups || !storageOverview?.backups.length}
+                  onClick={() => void handlePruneBackups(0)}
+                >
+                  <Icon name="trash" size={12} />
+                  {t('settings.storage.clearAllBackups')}
+                </button>
+              </div>
+            </div>
+
+            {!storageOverview || storageOverview.backups.length === 0 ? (
+              <div className="muted small">{t('settings.storage.noBackups')}</div>
+            ) : (
+              <div className="backup-list">
+                {storageOverview.backups.map((item) => {
+                  const gameObj = games.find((g) => g.id === item.gameId)
+                  const gameLabel = gameObj ? getLocaleGameShortName(gameObj, effectiveLocale) : item.gameId
+                  return (
+                    <div key={item.id} className="backup-row">
+                      <div className="backup-row-main">
+                        <div className="backup-row-title">
+                          <span className="tag">{gameLabel}</span>
+                          <strong>
+                            {item.characterFolder ? `${item.characterFolder} / ${item.modName}` : item.modName}
+                          </strong>
+                          {item.targetExists ? (
+                            <span className="tag warn">{t('settings.storage.targetExistsTag')}</span>
+                          ) : null}
+                        </div>
+                        <div className="muted small">
+                          {new Date(item.createdAt).toLocaleString()} · {formatBytes(item.totalBytes)} ·{' '}
+                          {t('settings.storage.filesCount', { count: item.fileCount })}
+                        </div>
+                      </div>
+                      <div className="backup-row-actions">
+                        <button
+                          type="button"
+                          className="btn ghost small-btn"
+                          disabled={restoringBackupId === item.id}
+                          onClick={() => void handleRestoreBackup(item.id)}
+                        >
+                          {restoringBackupId === item.id
+                            ? t('common.processing')
+                            : t('settings.storage.restoreBtn')}
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          title={t('common.delete')}
+                          onClick={() => void handleDeleteBackup(item.id)}
+                        >
+                          <Icon name="trash" size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+
       {tab === 'about' ? (
         <>
           <section className="settings-card">
@@ -1425,6 +1824,72 @@ export function SettingsView({
             </div>
           </section>
         </>
+      ) : null}
+
+      {bundleInspect?.manifest ? (
+        <Modal
+          title={t('settings.storage.bundlePreviewTitle')}
+          onClose={() => !bundleBusy && setBundleInspect(null)}
+          width={520}
+          footer={
+            <>
+              <button className="btn ghost" disabled={bundleBusy} onClick={() => setBundleInspect(null)}>
+                {t('common.cancel')}
+              </button>
+              <button
+                className="btn primary"
+                disabled={bundleBusy}
+                onClick={() => void handleConfirmImportBundle()}
+              >
+                {bundleBusy ? t('common.processing') : t('settings.storage.bundleConfirmImport')}
+              </button>
+            </>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="muted small">
+              {t('settings.storage.bundleMetaInfo', {
+                version: bundleInspect.manifest.appVersion,
+                time: new Date(bundleInspect.manifest.exportedAt).toLocaleString()
+              })}
+            </div>
+            <div className="kv">
+              <div>
+                <span>{t('settings.storage.bundleStatCustomGames')}</span>
+                <code>{bundleInspect.manifest.stats.customGames}</code>
+              </div>
+              <div>
+                <span>{t('settings.storage.bundleStatMeta')}</span>
+                <code>{bundleInspect.manifest.stats.characterMeta}</code>
+              </div>
+              <div>
+                <span>{t('settings.storage.bundleStatCovers')}</span>
+                <code>{bundleInspect.manifest.stats.coverFiles}</code>
+              </div>
+              <div>
+                <span>{t('settings.storage.bundleStatModPresets')}</span>
+                <code>{bundleInspect.manifest.stats.modPresetFiles}</code>
+              </div>
+              <div>
+                <span>{t('settings.storage.bundleStatRosterPresets')}</span>
+                <code>{bundleInspect.manifest.stats.rosterPresets}</code>
+              </div>
+            </div>
+            <label className="check-row-card">
+              <input
+                type="checkbox"
+                checked={preserveExistingPaths}
+                onChange={(e) => setPreserveExistingPaths(e.target.checked)}
+              />
+              <div>
+                <div style={{ fontWeight: 600, color: '#f1f5f9' }}>
+                  {t('settings.storage.preservePathsLabel')}
+                </div>
+                <div className="muted small">{t('settings.storage.preservePathsDesc')}</div>
+              </div>
+            </label>
+          </div>
+        </Modal>
       ) : null}
 
       {showF10WarningModal ? (

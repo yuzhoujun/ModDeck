@@ -116,6 +116,18 @@ const api: ModDeckApi = {
   toggleOverlay: () => ipcRenderer.invoke(IPC.overlayToggle),
   checkEnvironment: (gameId) => ipcRenderer.invoke(IPC.checkEnvironment, gameId),
   openEnvironmentFolder: (gameId) => ipcRenderer.invoke(IPC.openEnvironmentFolder, gameId),
+  clearShaderCache: (gameId) => ipcRenderer.invoke(IPC.clearShaderCache, gameId),
+  auditGameConflicts: (gameId) => ipcRenderer.invoke(IPC.auditGameConflicts, gameId),
+  exportConflictAuditReport: (gameId, report) =>
+    ipcRenderer.invoke(IPC.exportConflictAuditReport, gameId, report),
+  getStorageOverview: () => ipcRenderer.invoke(IPC.getStorageOverview),
+  restoreModBackup: (backupId) => ipcRenderer.invoke(IPC.restoreModBackup, backupId),
+  deleteModBackup: (backupId) => ipcRenderer.invoke(IPC.deleteModBackup, backupId),
+  pruneModBackups: (olderThanDays) => ipcRenderer.invoke(IPC.pruneModBackups, olderThanDays),
+  exportConfigBundle: () => ipcRenderer.invoke(IPC.exportConfigBundle),
+  inspectConfigBundle: () => ipcRenderer.invoke(IPC.inspectConfigBundle),
+  importConfigBundle: (filePath, options) =>
+    ipcRenderer.invoke(IPC.importConfigBundle, filePath, options),
   reloadF10: () => ipcRenderer.invoke(IPC.reloadF10),
   getPendingPresetCount: (gameId) => ipcRenderer.invoke(IPC.getPendingPresetCount, gameId),
   setReloadHotkey: (hotkey) => ipcRenderer.invoke(IPC.setReloadHotkey, hotkey),

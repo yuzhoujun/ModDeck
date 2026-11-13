@@ -2,7 +2,12 @@ import type {
   AppInfo,
   AutoDetectPathsResult,
   CharacterHashConflict,
+  ClearShaderCacheResult,
+  ConfigBundleInspection,
   D3dxSyncStatus,
+  GameConflictAuditReport,
+  ImportConfigBundleOptions,
+  ImportConfigBundleResult,
   ModVariantPreset,
   ModStaticAnalysis,
   RosterPreset,
@@ -35,6 +40,7 @@ import type {
   Settings,
   SettingsPatch,
   SimpleResult,
+  StorageOverview,
   ToggleResult
 } from './types'
 
@@ -112,6 +118,16 @@ export const IPC = {
   overlayToggle: 'overlay:toggle',
   checkEnvironment: 'env:check',
   openEnvironmentFolder: 'env:open-folder',
+  clearShaderCache: 'env:clear-shader-cache',
+  auditGameConflicts: 'mods:audit-conflicts',
+  exportConflictAuditReport: 'mods:export-conflict-report',
+  getStorageOverview: 'storage:overview',
+  restoreModBackup: 'storage:restore-backup',
+  deleteModBackup: 'storage:delete-backup',
+  pruneModBackups: 'storage:prune-backups',
+  exportConfigBundle: 'bundle:export',
+  inspectConfigBundle: 'bundle:inspect',
+  importConfigBundle: 'bundle:import',
   reloadF10: 'env:reload-f10',
   setReloadHotkey: 'env:set-reload-hotkey',
   getPendingPresetCount: 'preset:pending-count',
@@ -295,6 +311,16 @@ export interface ModDeckApi {
   toggleOverlay(): Promise<void>
   checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]>
   openEnvironmentFolder(gameId: GameId): Promise<ToggleResult>
+  clearShaderCache(gameId: GameId): Promise<ClearShaderCacheResult>
+  auditGameConflicts(gameId: GameId): Promise<GameConflictAuditReport>
+  exportConflictAuditReport(gameId: GameId, report: GameConflictAuditReport): Promise<ExportPresetResult>
+  getStorageOverview(): Promise<StorageOverview>
+  restoreModBackup(backupId: string): Promise<ToggleResult>
+  deleteModBackup(backupId: string): Promise<ToggleResult>
+  pruneModBackups(olderThanDays: number): Promise<{ ok: boolean; deletedCount?: number; freedBytes?: number; error?: string }>
+  exportConfigBundle(): Promise<ExportPresetResult>
+  inspectConfigBundle(): Promise<ConfigBundleInspection>
+  importConfigBundle(filePath: string, options: ImportConfigBundleOptions): Promise<ImportConfigBundleResult>
   reloadF10(): Promise<ToggleResult>
   setReloadHotkey(hotkey: string): Promise<{ ok: boolean; hotkey?: string; error?: string }>
   getPendingPresetCount(gameId?: GameId): Promise<number>
