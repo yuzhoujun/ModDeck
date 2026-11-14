@@ -45,7 +45,7 @@ npm install
 
 ## 三、多语言维护与自动化工作流（i18n Toolchain）
 
-ModDeck 内置多语言字典位于 `src/shared/i18n/locales/`，以 `zh-CN.json` 为基准语言，`en-US.json` 保持 100% 结构镜像。当前词典规模已覆盖 **660+** 项核心界面、弹窗、系统托盘及底层 IPC 报错词条。
+ModDeck 内置多语言字典位于 `src/shared/i18n/locales/`，以 `zh-CN.json` 为基准语言，`en-US.json` 保持 100% 结构镜像。当前词典规模已覆盖 **890+** 项核心界面、弹窗、系统托盘及底层 IPC 报错词条。
 
 为了避免手动维护多语言产生遗漏或键位漂移，工程提供了完整的多语言自动化维护工具链（基于 `scripts/i18n.mjs`）：
 

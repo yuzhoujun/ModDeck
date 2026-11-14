@@ -164,7 +164,7 @@ sequenceDiagram
 
 - **双语字典（Builtin Locales）**：
   - 基准语言：`src/shared/i18n/locales/zh-CN.json`（简体中文）；
-  - 英文语言：`src/shared/i18n/locales/en-US.json`（完整英文镜像，与基准 100% 结构对齐，当前已涵盖 660+ 键位）；
+  - 英文语言：`src/shared/i18n/locales/en-US.json`（完整英文镜像，与基准 100% 结构对齐，当前已涵盖 890+ 键位）；
 - **动态语言解析与注入（I18nProvider）**：
   - 渲染层通过 React Context 注入 `t(key, params)`、`getLocaleGameName`、`getLocaleGameShortName`、`getLocaleCharacterName`；
   - 主进程通过 `tMain(key, params)` 自适应当前语言注入 IPC 错误、系统托盘与原生对话框；

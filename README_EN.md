@@ -110,7 +110,7 @@ flowchart LR
 
 ### 6. Multi-Language System & Extensible i18n
 
-- **Instant Bilingual Switching**: Built-in `zh-CN` (Simplified Chinese) and `en-US` (English) translation dictionaries with 100% structural parity (nearly **700** keys); supports instant hot-reloading without restart;
+- **Instant Bilingual Switching**: Built-in `zh-CN` (Simplified Chinese) and `en-US` (English) translation dictionaries with 100% structural parity (**890+** keys); supports instant hot-reloading without restart;
 - **Canonical English Character Names**: Full offline character database with `canonicalEnName` for international game releases; seamless search by English names, Chinese, or folder names;
 - **Standalone `languages/` Directory**: Independent `languages/` folder separated from Chromium system `.pak` files; drop any community translation (e.g. `ja-JP.json`, `ko-KR.json`) to load dynamically;
 - **Developer Localization Toolchain**: Built-in `scripts/i18n.mjs` with automated Chinese code extraction (`npm run i18n:extract`), one-click incremental merge and TODO placeholders sync (`npm run i18n:extract:apply`), parity and caller verification (`npm run i18n:check`), and structural synchronization (`npm run i18n:sync`).
@@ -120,6 +120,26 @@ flowchart LR
 - **Single Mod Variant Preset Sharing (`.moddeck-preset.json`)**: Export a single variant preset or all custom presets of a mod into lightweight standard files directly from the Mod Details panel; supports file picker or direct drag & drop onto the details drawer, automatically validating parameter structures and merging into the target mod while intelligently renaming on duplicate collision;
 - **Whole-Team Roster Scheme Portability (`.moddeck-scheme.json`)**: Export full team roster outfit schemes into shareable scheme files directly from the Roster Scheme modal; deeply encapsulates active mod identifiers, variant preset names, factory default states, and variable snapshots, breaking free from local machine preset IDs;
 - **Interactive Match Inspection & Automated Variant Reconstruction (`ImportSchemeModal`)**: Interactive inspection modal when importing schemes, verifying local installed characters and mod directories, displaying match rates and missing item tags; warns on cross-game imports and supports on-import scheme renaming; upon confirmation, if the scheme references custom variant parameters that do not yet exist locally, ModDeck automatically creates and binds the preset under the target mod for zero-barrier outfit sharing.
+
+### 8. Custom Games & Sidebar Governance
+
+- **Modular Custom Games**: Add, edit, or delete custom 3DMigoto / XXMI game entries directly from the sidebar or "Settings -> Paths", with full support for category scanning, toggling, presets, and overlay;
+- **Localized Custom Game Labels**: Configure primary and extra per-locale full names and sidebar short names (`locales`) that follow active language packs;
+- **Sidebar Visibility Filtering**: Toggle "Show Configured Games Only" in one click and control per-game sidebar visibility in Settings;
+- **Dot-Prefixed Cover Compatibility**: Recognizes `.preview.*`, `_cover.*`, and dot-prefixed third-party previews (such as `.JASM_Cover.*`, excluding macOS `._*` files).
+
+### 9. Preset Sync Lifecycle, Static INI Diagnostics & Conflict Audit
+
+- **`d3dx_user.ini` Flush Awareness**: Watches `d3dx_user.ini` and its parent directory, displays the last disk flush timestamp when saving presets with an optional "F10 & Save" action and an opt-in "Auto F10 flush before saving new preset" switch (default OFF);
+- **Variable Capture Filter Rules**: Exclude transient or state variables via exact names, wildcards, regular expressions, or per-mod `.moddeck-ignore` files;
+- **Static INI Diagnostics**: Inspects `persist` declarations and shallow `[CommandList]` triggers, highlighting non-persisted control variables;
+- **Native Conflict Audit & Cache Cleanup**: Category view surfaces per-category Shader / Texture Hash overlaps, while the library Conflict Audit modal detects duplicate/conflicting FX preloads (`RabbitFX`, `CrossIBClassifier.ini`, `KatFXMatcap`), embedded `[ShaderRegex]`, risk-graded `[ShaderOverride]`, and cross-mod Hash overlaps with `.ini` line numbers—with one-click disable, `ShaderCache` clearing, and `.txt` report export.
+
+### 10. Storage Manager, Mod Backups & Config Bundle (`.moddeck-bundle`)
+
+- **Storage Space Overview**: "Settings -> Storage & Backup" measures configs/presets, category covers (including `.preview.*` / `_cover.*` stored inside configured `Mods` category folders without duplicating files locally), mod overwrite backups, and logs;
+- **Mod Backup History**: View, restore (safely backing up any existing target folder first), delete, or prune overwrite backups by retention period;
+- **Whole-Config Migration Bundle (`.moddeck-bundle`)**: Export and import settings, custom games, category metadata, covers, variant presets, and roster schemes with manifest preview, optional local path preservation, and automatic pre-import snapshots.
 
 ---
 
@@ -229,7 +249,8 @@ Data is stored locally in `%APPDATA%/ModDeck/` (openable via Settings -> About):
 │   └── {gameId}/{character}/       # [Decoupled] Independent JSON per mod (presets/{gameId}/{character}/{mod}.json)
 ├── characters.json                 # [Data] Custom character aliases, display names, and override configs
 ├── roster-cache.json               # [Cache] Bilingual character dictionary incremental cache
-├── covers/                         # [Media] User cropped character portrait covers (1:1 square png)
+├── covers/                         # [Media] User cropped category covers (1:1 square png)
+├── backups/                        # [Backup] Mod overwrite backups and config snapshots
 ├── languages/                      # [i18n] External language pack folder (compatible with portable edition)
 ├── tmp/                            # [Temp] Temporary decompression and staging folder (auto-cleaned)
 └── logs/                           # [Diag] Startup and runtime diagnostics logs
@@ -241,16 +262,17 @@ Data is stored locally in `%APPDATA%/ModDeck/` (openable via Settings -> About):
 | `settings.json` | Core settings, paths, hotkeys, and switches | Core Config |
 | `roster-presets.json` | Whole-team roster scheme definitions | Core Config |
 | `presets/` | Standalone mod variant presets (`presets/{gameId}/{character}/{mod}.json`) | Core Data |
-| `characters.json` | Custom character aliases, display names, and baseline data | Core Data |
+| `characters.json` | Custom category aliases, display names, and baseline data | Core Data |
 | `roster-cache.json` | Multilingual offline character dictionary cache | Core Data |
-| `covers/` | Custom cropped character portrait covers | User Media |
+| `covers/` | Custom cropped category covers | User Media |
+| `backups/` | Mod overwrite backups and pre-import config snapshots | Backup |
 | `languages/` | External community language packs directory | i18n Extension |
 | `tmp/` | Temporary staging during archive extraction (auto-cleaned) | Cache |
 | `logs/` | Startup and runtime diagnostic logs | Diagnostic |
 | `bin/` | Portable extraction binaries | Utilities |
 | `Cache / GPUCache / ...` | Chromium / Electron hardware acceleration cache | Runtime |
 
-> 💡 **Backup & Migration**: To migrate or backup your setup, simply copy the `%APPDATA%/ModDeck/` directory to retain all variant presets, schemes, covers, and preferences.
+> 💡 **Backup & Migration**: Export a `.moddeck-bundle` archive in "Settings -> Storage & Backup" to migrate your full setup (including category covers), or copy the `%APPDATA%/ModDeck/` directory directly.
 
 ---
 
@@ -291,7 +313,7 @@ npm run i18n:extract
 # One-click incremental merge into zh-CN and sync TODO placeholders to en-US (git diff ready)
 npm run i18n:extract:apply
 
-# Recursively synchronize all locale structures to base zh-CN (nearly 700 keys)
+# Recursively synchronize all locale structures to base zh-CN (890+ keys)
 npm run i18n:sync
 
 # Production build (outputs to out/)
