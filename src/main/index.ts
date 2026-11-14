@@ -3904,6 +3904,7 @@ function registerIpc(): void {
         settings = await loadSettings(baseDir())
         setCustomGames(settings.customGames ?? [])
         metadata = await loadMetadata(baseDir())
+        invalidatePreviewCache()
         broadcastStateChanged({})
       }
       return res

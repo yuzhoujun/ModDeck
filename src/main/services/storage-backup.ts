@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type {
@@ -14,8 +15,9 @@ import type {
   StorageOverview
 } from '../../shared/types'
 import { ensureDir, pathExists, readJsonSafe, writeJsonAtomic } from '../core/fsx'
-import { isInside } from '../core/safe-path'
+import { isInside, isSafeSegment } from '../core/safe-path'
 import { buildZipBuffer, readZipBuffer, type ZipMemoryEntry } from './archive'
+import { resolveCharacterBase, scanGameCategoryCovers } from './library'
 import { emptyMetadata, METADATA_FILE } from './metadata'
 
 async function measurePathStats(targetPath: string): Promise<{ fileCount: number; totalBytes: number }> {
@@ -133,13 +135,30 @@ export async function getStorageOverview(baseDir: string, settings: Settings): P
   }
 
   const coversStat = await measurePathStats(path.join(baseDir, 'covers'))
+  let categoryCoverCount = 0
+  let categoryCoverBytes = 0
+  const seenModsPaths = new Set<string>()
+  for (const gameSettings of Object.values(settings.games || {})) {
+    const mp = gameSettings?.modsPath?.trim()
+    if (!mp || seenModsPaths.has(mp.toLowerCase())) continue
+    seenModsPaths.add(mp.toLowerCase())
+    const foundCovers = await scanGameCategoryCovers(mp).catch(() => [])
+    for (const c of foundCovers) {
+      categoryCoverCount += 1
+      categoryCoverBytes += c.size
+    }
+  }
   const backupsRoot = path.join(baseDir, 'backups')
   const backupsStat = await measurePathStats(backupsRoot)
   const logsStat = await measurePathStats(path.join(baseDir, 'logs'))
 
   const categories: StorageCategoryStat[] = [
     { key: 'config', fileCount: configCount, totalBytes: configBytes },
-    { key: 'covers', fileCount: coversStat.fileCount, totalBytes: coversStat.totalBytes },
+    {
+      key: 'covers',
+      fileCount: coversStat.fileCount + categoryCoverCount,
+      totalBytes: coversStat.totalBytes + categoryCoverBytes
+    },
     { key: 'backups', fileCount: backupsStat.fileCount, totalBytes: backupsStat.totalBytes },
     { key: 'logs', fileCount: logsStat.fileCount, totalBytes: logsStat.totalBytes }
   ]
@@ -341,6 +360,23 @@ export async function exportConfigBundle(
     null
   )
 
+  // 一并打包各已配置游戏 Mods 分类目录中直接保存的 .preview.* / _cover.* 分类封面（跨机迁移不丢失）
+  const categoryCoverEntries: ZipMemoryEntry[] = []
+  for (const [gId, gameSettings] of Object.entries(settingsData?.games || {})) {
+    const mp = gameSettings?.modsPath?.trim()
+    if (!mp) continue
+    const found = await scanGameCategoryCovers(mp).catch(() => [])
+    for (const item of found) {
+      const data = await fs.readFile(item.filePath).catch(() => null)
+      if (!data) continue
+      categoryCoverEntries.push({
+        name: `category-covers/${gId}/${item.folder}/${item.fileName}`,
+        data
+      })
+    }
+  }
+  entries.push(...categoryCoverEntries)
+
   const characterMetaCount = metaData?.games
     ? Object.values(metaData.games).reduce((acc, map) => acc + Object.keys(map || {}).length, 0)
     : 0
@@ -359,7 +395,7 @@ export async function exportConfigBundle(
     stats: {
       customGames: Array.isArray(settingsData?.customGames) ? settingsData.customGames.length : 0,
       characterMeta: characterMetaCount,
-      coverFiles: coverEntries.length,
+      coverFiles: coverEntries.length + categoryCoverEntries.length,
       modPresetFiles: presetEntries.length,
       rosterPresets: rosterPresetsCount,
       languageFiles: langEntries.length
@@ -456,6 +492,8 @@ export async function importConfigBundle(
     let rosterPresetsRestored = 0
     let languageFilesRestored = 0
 
+    let mergedSettingsRef: Settings = currentSettings
+
     // 1. 合并 settings.json
     const incomingSettings = parseEntryJson<Settings>(entries, 'settings.json')
     if (incomingSettings) {
@@ -504,34 +542,35 @@ export async function importConfigBundle(
           ...incomingSettings.import
         }
       }
+      mergedSettingsRef = nextSettings
       await writeJsonAtomic(path.join(baseDir, 'settings.json'), nextSettings)
     }
 
     // 2. 合并 characters.json (MetadataStore)
+    let nextMetaStore = await readJsonSafe<MetadataStore>(
+      path.join(baseDir, METADATA_FILE),
+      emptyMetadata()
+    )
     const incomingMeta = parseEntryJson<MetadataStore>(entries, METADATA_FILE)
     if (incomingMeta && incomingMeta.games) {
-      const currentMeta = await readJsonSafe<MetadataStore>(
-        path.join(baseDir, METADATA_FILE),
-        emptyMetadata()
-      )
-      const mergedGames: MetadataStore['games'] = { ...currentMeta.games }
+      const mergedGames: MetadataStore['games'] = { ...nextMetaStore.games }
       for (const [gId, incChars] of Object.entries(incomingMeta.games)) {
         if (!incChars || typeof incChars !== 'object') continue
         mergedGames[gId] = {
-          ...(currentMeta.games[gId] || {}),
+          ...(nextMetaStore.games[gId] || {}),
           ...incChars
         }
         characterMetaRestored += Object.keys(incChars).length
       }
-      const nextMeta: MetadataStore = {
+      nextMetaStore = {
         schemaVersion: 1,
         games: mergedGames,
         rosterInitialized: {
-          ...(currentMeta.rosterInitialized || {}),
+          ...(nextMetaStore.rosterInitialized || {}),
           ...(incomingMeta.rosterInitialized || {})
         }
       }
-      await writeJsonAtomic(path.join(baseDir, METADATA_FILE), nextMeta)
+      await writeJsonAtomic(path.join(baseDir, METADATA_FILE), nextMetaStore)
     }
 
     // 3. 合并 roster-presets.json ({ schemaVersion: 1, presets: Record<GameId, RosterPreset[]> })
@@ -560,12 +599,57 @@ export async function importConfigBundle(
       })
     }
 
-    // 4. 安全写出 covers / presets / languages 目录条目
+    // 4. 安全写出 covers / presets / languages 目录条目与 category-covers 分类封面
+    let metaDirty = false
     for (const entry of entries) {
       const cleanPosix = entry.name.replace(/\\/g, '/').replace(/^\/+/, '')
-      const prefix = cleanPosix.split('/')[0]
+      const parts = cleanPosix.split('/')
+      const prefix = parts[0]
+
+      if (prefix === 'category-covers' && parts.length === 4) {
+        const [, gId, charFolder, fileName] = parts
+        if (
+          !isSafeSegment(gId) ||
+          !isSafeSegment(charFolder) ||
+          !/^(?:\.preview|_cover)\.(?:png|jpe?g|webp|gif|avif)$/i.test(fileName)
+        ) {
+          continue
+        }
+        const gameModsPath = mergedSettingsRef.games?.[gId]?.modsPath?.trim()
+        let wroteDirectly = false
+        if (gameModsPath && (await pathExists(gameModsPath))) {
+          const charBase = await resolveCharacterBase(gameModsPath)
+          const targetCharDir = path.join(charBase, charFolder)
+          if (isInside(charBase, targetCharDir) && (await pathExists(targetCharDir))) {
+            const dest = path.join(targetCharDir, fileName)
+            if (isInside(targetCharDir, dest)) {
+              await fs.writeFile(dest, entry.data)
+              wroteDirectly = true
+            }
+          }
+        }
+        if (!wroteDirectly) {
+          // 目标分类目录尚未在本机建立时，兜底保存至 userData/covers 并绑定元数据，避免新机丢失封面
+          const ext = path.extname(fileName).toLowerCase() || '.png'
+          const hashName = `${createHash('sha1').update(`${gId}/${charFolder}`).digest('hex').slice(0, 16)}${ext}`
+          const relCover = path.join(gId, hashName)
+          const absCover = path.join(baseDir, 'covers', relCover)
+          await ensureDir(path.dirname(absCover))
+          await fs.writeFile(absCover, entry.data)
+          const gameMeta = { ...(nextMetaStore.games[gId] || {}) }
+          gameMeta[charFolder] = {
+            ...(gameMeta[charFolder] || {}),
+            coverFile: relCover
+          }
+          nextMetaStore.games[gId] = gameMeta
+          metaDirty = true
+        }
+        coverFilesRestored += 1
+        continue
+      }
+
       if (prefix !== 'covers' && prefix !== 'presets' && prefix !== 'languages') continue
-      const dest = path.resolve(baseDir, ...cleanPosix.split('/'))
+      const dest = path.resolve(baseDir, ...parts)
       const allowedRoot = path.join(baseDir, prefix)
       if (!isInside(allowedRoot, dest)) continue
       await ensureDir(path.dirname(dest))
@@ -573,6 +657,9 @@ export async function importConfigBundle(
       if (prefix === 'covers') coverFilesRestored += 1
       else if (prefix === 'presets') modPresetFilesRestored += 1
       else if (prefix === 'languages') languageFilesRestored += 1
+    }
+    if (metaDirty) {
+      await writeJsonAtomic(path.join(baseDir, METADATA_FILE), nextMetaStore)
     }
 
     return {

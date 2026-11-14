@@ -158,7 +158,7 @@ export function invalidatePreviewCache(dir?: string): void {
   else previewCache.clear()
 }
 
-async function findCharacterCoverFile(dir: string): Promise<string | null> {
+export async function findCharacterCoverFile(dir: string): Promise<string | null> {
   const entries = await readdirSafe(dir)
   const files = new Map(
     entries.filter((entry) => entry.isFile()).map((entry) => [entry.name.toLowerCase(), entry.name])
@@ -336,6 +336,39 @@ export async function scanCharacters(
   }
 
   return sortCharacters(characters, options.sortCharacters, options.characterOrder)
+}
+
+export interface CategoryCoverFile {
+  folder: string
+  filePath: string
+  fileName: string
+  size: number
+}
+
+export async function scanGameCategoryCovers(modsPath: string): Promise<CategoryCoverFile[]> {
+  if (!modsPath || !(await pathExists(modsPath))) return []
+  const base = await resolveCharacterBase(modsPath)
+  const entries = await readdirSafe(base)
+  const covers: CategoryCoverFile[] = []
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    if (LEGACY_CONTAINERS.has(entry.name.toLowerCase())) continue
+    if (ignoredCharacterName(entry.name)) continue
+
+    const characterPath = path.join(base, entry.name)
+    const filePath = await findCharacterCoverFile(characterPath)
+    if (!filePath) continue
+    const stat = await fs.stat(filePath).catch(() => null)
+    if (!stat || !stat.isFile()) continue
+    covers.push({
+      folder: entry.name,
+      filePath,
+      fileName: path.basename(filePath),
+      size: stat.size
+    })
+  }
+  return covers
 }
 
 export async function listMods(
