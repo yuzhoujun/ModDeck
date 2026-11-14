@@ -1,6 +1,6 @@
 {
   "name": "moddeck",
-  "version": "2.5.0",
+  "version": "3.0.0-alpha.1",
   "private": true,
   "description": "Open-source local mod manager for 3DMigoto / XXMI games",
   "author": "ModDeck contributors",
@@ -10,6 +10,9 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
     "smoke": "node scripts/prepare-smoke.mjs && electron . --smoke-test --no-sandbox",
     "scan:report": "electron . --scan-report --no-sandbox",
     "package:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-portable.ps1",
@@ -20,10 +23,13 @@
     "i18n:extract:apply": "node scripts/i18n.mjs extract --apply"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-global-shortcut": "^2.4.1",
     "7zip-bin": "^5.2.0",
     "node-unrar-js": "^2.0.2"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

@@ -4,7 +4,10 @@ import App from './App'
 import { OverlayApp } from './OverlayApp'
 import { OverlayDetailApp } from './OverlayDetailApp'
 import { I18nProvider } from './i18n'
+import { ensureTauriBridge } from './tauri-bridge'
 import './styles.css'
+
+ensureTauriBridge()
 
 const mode = new URLSearchParams(window.location.search).get('mode')
 if (mode === 'overlay' || mode === 'overlay-detail') {
