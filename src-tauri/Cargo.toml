@@ -1,6 +1,6 @@
 [package]
 name = "moddeck"
-version = "3.0.0-alpha.1"
+version = "3.0.0-alpha.2"
 description = "Open-source local mod manager for 3DMigoto / XXMI games"
 authors = ["yuzhoujun <2445665133@qq.com>"]
 license = "MIT"
@@ -20,6 +20,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 percent-encoding = "2"
 walkdir = "2"
+tauri-plugin-dialog = "2"
+winreg = "0.56"
+sha1 = "0.10"
+base64 = "0.22"
+ureq = { version = "2", features = ["json"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [

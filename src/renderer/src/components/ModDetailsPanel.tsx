@@ -430,7 +430,15 @@ export function ModDetailsPanel({
     const filePath = window.moddeck.getPathForFile(targetFile)
     if (filePath) {
       void onSetPreview(filePath)
+      return
     }
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string' && reader.result.startsWith('data:image/')) {
+        void onSetPreview(reader.result)
+      }
+    }
+    reader.readAsDataURL(targetFile)
   }
 
   function handlePanelDragOver(event: DragEvent<HTMLElement>) {

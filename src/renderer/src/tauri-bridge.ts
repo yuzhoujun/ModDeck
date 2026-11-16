@@ -1,7 +1,19 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { ModDeckApi, StateChangedEvent } from '../../shared/ipc'
-import type { Bootstrap, GameSnapshot, ModDetails, ModInfo, Settings } from '../../shared/types'
+import type {
+  AutoDetectPathsResult,
+  Bootstrap,
+  ClearShaderCacheResult,
+  EnvironmentCheck,
+  GameSnapshot,
+  ModDetails,
+  ModInfo,
+  RosterSyncResult,
+  RosterSyncStatus,
+  Settings,
+  ToggleResult
+} from '../../shared/types'
 
 function notMigrated<T>(feature: string, fallback: T): Promise<T> {
   console.warn(`[ModDeck Tauri POC] "${feature}" is scheduled for a later migration stage.`)
@@ -24,12 +36,13 @@ export function ensureTauriBridge(): void {
     saveSettings: (patch) => invoke<Settings>('save_settings_cmd', { patch }),
     switchGame: (gameId) => invoke<GameSnapshot | null>('switch_game', { gameId }),
     scanGame: (gameId) => invoke<GameSnapshot | null>('scan_game', { gameId }),
-    saveCustomGame: () => notMigrated('saveCustomGame', pocError('saveCustomGame')),
-    deleteCustomGame: () => notMigrated('deleteCustomGame', pocError('deleteCustomGame')),
-    toggleGameVisibility: () =>
-      notMigrated('toggleGameVisibility', { ok: false, hiddenGameIds: [] }),
-    setOnlyShowConfiguredGames: () =>
-      notMigrated('setOnlyShowConfiguredGames', { ok: false, onlyShowConfiguredGames: false }),
+    saveCustomGame: (gameDef, gameSettings) =>
+      invoke('save_custom_game', { gameDef, gameSettings }),
+    deleteCustomGame: (gameId) => invoke('delete_custom_game', { gameId }),
+    toggleGameVisibility: (gameId, visible) =>
+      invoke('toggle_game_visibility', { gameId, visible }),
+    setOnlyShowConfiguredGames: (enabled) =>
+      invoke('set_only_show_configured_games', { enabled }),
     getMods: (gameId, characterFolder) =>
       invoke<ModInfo[]>('get_mods', { gameId, characterFolder }),
     toggleMod: (gameId, characterFolder, modFolder, enable, exclusive = false) =>
@@ -40,17 +53,15 @@ export function ensureTauriBridge(): void {
     openCharacterFolder: (gameId, characterFolder) =>
       invoke('open_character_folder', { gameId, characterFolder }),
     openPath: (kind, gameId) => invoke('open_path', { kind, gameId }),
-    pickModsFolder: () => notMigrated('pickModsFolder', null),
-    pickXxmiRoot: () =>
-      notMigrated('pickXxmiRoot', { ok: false, detectedGames: [], error: 'Stage 0 POC' }),
-    autoDetectPaths: () =>
-      notMigrated('autoDetectPaths', { ok: false, detectedGames: [], error: 'Stage 0 POC' }),
-    pickGameExe: () => notMigrated('pickGameExe', null),
-    pickLoader: () => notMigrated('pickLoader', null),
+    pickModsFolder: () => invoke<string | null>('pick_mods_folder'),
+    pickXxmiRoot: () => invoke<AutoDetectPathsResult>('pick_xxmi_root'),
+    autoDetectPaths: () => invoke<AutoDetectPathsResult>('auto_detect_paths'),
+    pickGameExe: () => invoke<string | null>('pick_game_exe'),
+    pickLoader: () => invoke<string | null>('pick_loader'),
     pickImportFiles: () => notMigrated('pickImportFiles', []),
     pickImportFolder: () => notMigrated('pickImportFolder', null),
     pickImportFolders: () => notMigrated('pickImportFolders', []),
-    pickCover: () => notMigrated('pickCover', null),
+    pickCover: () => invoke<string | null>('pick_cover'),
     importRun: () =>
       notMigrated('importRun', { items: [], importedMods: 0, createdCharacters: [] }),
     importParse: () =>
@@ -63,12 +74,22 @@ export function ensureTauriBridge(): void {
       notMigrated('importCommit', { items: [], importedMods: 0, createdCharacters: [] }),
     importDiscard: () => notMigrated('importDiscard', undefined),
     getPathForFile: (file: File) => (file as File & { path?: string }).path || '',
-    updateCharacterMeta: () => notMigrated('updateCharacterMeta', null),
-    setCharacterCover: () => notMigrated('setCharacterCover', pocError('setCharacterCover')),
-    resetCharacterMeta: () => notMigrated('resetCharacterMeta', null),
-    createCharacter: () => notMigrated('createCharacter', null),
-    saveCharacterCoverData: () => notMigrated('saveCharacterCoverData', null),
-    clearCharacterCover: () => notMigrated('clearCharacterCover', null),
+    updateCharacterMeta: (gameId, characterFolder, patch) =>
+      invoke<GameSnapshot | null>('update_character_meta', { gameId, characterFolder, patch }),
+    setCharacterCover: (gameId, characterFolder) =>
+      invoke<ToggleResult>('set_character_cover', { gameId, characterFolder }),
+    resetCharacterMeta: (gameId, characterFolder) =>
+      invoke<GameSnapshot | null>('reset_character_meta', { gameId, characterFolder }),
+    createCharacter: (gameId, input) =>
+      invoke<GameSnapshot | null>('create_character', { gameId, input }),
+    saveCharacterCoverData: (gameId, characterFolder, dataUrl) =>
+      invoke<GameSnapshot | null>('save_character_cover_data', {
+        gameId,
+        characterFolder,
+        dataUrl
+      }),
+    clearCharacterCover: (gameId, characterFolder) =>
+      invoke<GameSnapshot | null>('clear_character_cover', { gameId, characterFolder }),
     setModsEnabled: async (gameId, characterFolder, folders, enable) => {
       for (const folder of folders) {
         const res = await api.toggleMod(gameId, characterFolder, folder, enable, false)
@@ -144,9 +165,17 @@ export function ensureTauriBridge(): void {
       notMigrated('confirmImportRosterPreset', pocError('confirmImportRosterPreset')),
     getModDetails: (gameId, characterFolder, modFolder) =>
       invoke<ModDetails>('get_mod_details_cmd', { gameId, characterFolder, modFolder }),
-    setModPreview: () => notMigrated('setModPreview', pocError('setModPreview')),
-    reorderCharacters: () => notMigrated('reorderCharacters', pocError('reorderCharacters')),
-    reorderMods: () => notMigrated('reorderMods', pocError('reorderMods')),
+    setModPreview: (gameId, characterFolder, modFolder, sourcePath) =>
+      invoke<ToggleResult>('set_mod_preview', {
+        gameId,
+        characterFolder,
+        modFolder,
+        sourcePath
+      }),
+    reorderCharacters: (gameId, folders) =>
+      invoke<ToggleResult>('reorder_characters', { gameId, folders }),
+    reorderMods: (gameId, characterFolder, folders) =>
+      invoke<ToggleResult>('reorder_mods', { gameId, characterFolder, folders }),
     launchGame: () => notMigrated('launchGame', pocError('launchGame')),
     launchLoader: () => notMigrated('launchLoader', pocError('launchLoader')),
     getOverlayHotkey: () => invoke<string>('get_overlay_hotkey'),
@@ -160,10 +189,9 @@ export function ensureTauriBridge(): void {
     toggleOverlay: async () => {
       await invoke('toggle_overlay')
     },
-    checkEnvironment: () => notMigrated('checkEnvironment', []),
-    openEnvironmentFolder: () =>
-      notMigrated('openEnvironmentFolder', pocError('openEnvironmentFolder')),
-    clearShaderCache: () => notMigrated('clearShaderCache', pocError('clearShaderCache')),
+    checkEnvironment: (gameId) => invoke<EnvironmentCheck[]>('check_environment', { gameId: gameId ?? null }),
+    openEnvironmentFolder: (gameId) => invoke<ToggleResult>('open_environment_folder', { gameId }),
+    clearShaderCache: (gameId) => invoke<ClearShaderCacheResult>('clear_shader_cache', { gameId }),
     auditGameConflicts: () =>
       notMigrated('auditGameConflicts', {
         gameId: '',
@@ -192,19 +220,8 @@ export function ensureTauriBridge(): void {
     reloadF10: () => invoke('reload_f10'),
     setReloadHotkey: (hotkey) => invoke('set_reload_hotkey', { hotkey }),
     getPendingPresetCount: () => invoke<number>('get_pending_preset_count'),
-    getRosterStatus: () =>
-      notMigrated('getRosterStatus', {
-        remoteUrl: '',
-        gameCounts: {
-          'wuthering-waves': 0,
-          'honkai-star-rail': 0,
-          'zzz': 0,
-          'endfield': 0,
-          'neverness-to-everness': 0
-        },
-        hasRemoteCache: false
-      }),
-    syncRemoteRoster: () => notMigrated('syncRemoteRoster', pocError('syncRemoteRoster')),
+    getRosterStatus: () => invoke<RosterSyncStatus>('get_roster_status'),
+    syncRemoteRoster: (customUrl) => invoke<RosterSyncResult>('sync_remote_roster', { customUrl }),
     onStateChanged: (listener) => {
       let unlisten: UnlistenFn | null = null
       let disposed = false

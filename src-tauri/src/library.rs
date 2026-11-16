@@ -2,8 +2,9 @@ use crate::models::{
     CharacterInfo, CharacterMeta, GameDef, GameSettings, GameSnapshot, MetadataStore, ModDetails,
     ModInfo, Settings,
 };
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
-use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -36,47 +37,6 @@ const IGNORED_PREVIEW_SUBDIRS: &[&str] = &[
     "shaders",
 ];
 
-#[derive(Debug, Clone, Deserialize)]
-struct RosterEntry {
-    zh: String,
-    en: String,
-    #[serde(default)]
-    aliases: Vec<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct RosterFile {
-    games: HashMap<String, Vec<RosterEntry>>,
-}
-
-pub fn load_builtin_roster_map() -> HashMap<String, Vec<String>> {
-    let parsed: RosterFile =
-        serde_json::from_str(include_str!("../../roster.json")).unwrap_or(RosterFile {
-            games: HashMap::new(),
-        });
-    parsed
-        .games
-        .into_iter()
-        .map(|(k, v)| (k, v.into_iter().map(|e| e.zh).collect()))
-        .collect()
-}
-
-fn find_canonical_en(game_id: &str, token: &str) -> Option<String> {
-    let parsed: RosterFile =
-        serde_json::from_str(include_str!("../../roster.json")).ok()?;
-    let list = parsed.games.get(game_id)?;
-    let lower = token.trim().to_lowercase();
-    for entry in list {
-        if entry.zh.to_lowercase() == lower
-            || entry.en.to_lowercase() == lower
-            || entry.aliases.iter().any(|a| a.to_lowercase() == lower)
-        {
-            return Some(entry.en.clone());
-        }
-    }
-    None
-}
-
 pub fn asset_url(abs_path: &Path) -> String {
     let raw = abs_path.to_string_lossy();
     let encoded = utf8_percent_encode(&raw, NON_ALPHANUMERIC).to_string();
@@ -106,8 +66,19 @@ pub fn is_safe_segment(seg: &str) -> bool {
 
 pub fn is_inside(parent: &Path, child: &Path) -> bool {
     let p_norm = fs::canonicalize(parent).unwrap_or_else(|_| parent.to_path_buf());
-    let c_norm = fs::canonicalize(child).unwrap_or_else(|_| child.to_path_buf());
-    c_norm.starts_with(&p_norm)
+    if let Ok(c_norm) = fs::canonicalize(child) {
+        return c_norm.starts_with(&p_norm);
+    }
+    // When `child` does not exist yet (e.g., before directory creation), canonicalize its nearest
+    // existing ancestor so Windows `\\?\` UNC prefixes match cleanly.
+    if let Some(child_parent) = child.parent() {
+        if let Some(name) = child.file_name() {
+            if let Ok(cp_norm) = fs::canonicalize(child_parent) {
+                return cp_norm.join(name).starts_with(&p_norm);
+            }
+        }
+    }
+    child.starts_with(parent)
 }
 
 pub fn is_supported_image_ext(path: &Path) -> bool {
@@ -116,7 +87,7 @@ pub fn is_supported_image_ext(path: &Path) -> bool {
             .and_then(|e| e.to_str())
             .map(|e| e.to_ascii_lowercase())
             .as_deref(),
-        Some("png" | "jpg" | "jpeg" | "webp" | "gif" | "avif")
+        Some("png" | "jpg" | "jpeg" | "webp" | "gif" | "avif" | "bmp")
     )
 }
 
@@ -381,6 +352,7 @@ pub fn build_snapshot(
 ) -> GameSnapshot {
     let mods_path = Path::new(&game_settings.mods_path);
     let exists = !game_settings.mods_path.is_empty() && mods_path.is_dir();
+    let roster_cache = crate::roster::load_roster_cache(base_dir);
     if !exists {
         return GameSnapshot {
             game: game.clone(),
@@ -448,13 +420,13 @@ pub fn build_snapshot(
 
             let canonical_en_name = meta
                 .and_then(|m| m.canonical_en_name.clone())
-                .or_else(|| find_canonical_en(&game.id, &folder))
-                .or_else(|| find_canonical_en(&game.id, &display_name));
+                .or_else(|| crate::roster::find_canonical_en(&game.id, &folder, roster_cache.as_ref()))
+                .or_else(|| crate::roster::find_canonical_en(&game.id, &display_name, roster_cache.as_ref()));
 
             let mut cover_url = meta
                 .and_then(|m| m.cover_file.as_ref())
                 .and_then(|cf| {
-                    let abs = base_dir.join("covers").join(&game.id).join(cf);
+                    let abs = crate::metadata::cover_path(base_dir, &game.id, cf);
                     if abs.is_file() {
                         Some(asset_url(&abs))
                     } else {
@@ -483,10 +455,12 @@ pub fn build_snapshot(
                 .map(|o| o as usize)
                 .unwrap_or(usize::MAX);
 
-            let kind = meta
-                .and_then(|m| m.kind.clone())
-                .filter(|k| k == "utility")
-                .unwrap_or_else(|| "character".into());
+            let kind = crate::roster::infer_character_kind(
+                &game.id,
+                &folder,
+                meta.and_then(|m| m.kind.as_deref()),
+                roster_cache.as_ref(),
+            );
 
             characters.push(CharacterInfo {
                 folder,
@@ -982,6 +956,369 @@ mod tests {
         assert!(is_allowed_asset_path(&base_dir, &settings, &mod_img));
         assert!(!is_allowed_asset_path(&base_dir, &settings, &ini_file));
         assert!(!is_allowed_asset_path(&base_dir, &settings, &outside));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+}
+
+/// Lists character category directory names under a configured `mods_path`.
+pub fn list_character_folder_names(mods_path: &Path) -> Vec<String> {
+    if !mods_path.is_dir() {
+        return Vec::new();
+    }
+    let char_base = resolve_character_base(mods_path);
+    let Ok(entries) = fs::read_dir(&char_base) else {
+        return Vec::new();
+    };
+    let mut folders = Vec::new();
+    for entry in entries.flatten() {
+        let p = entry.path();
+        if !p.is_dir() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().to_string();
+        let lower = name.to_lowercase();
+        if ["characters", "character", "角色", "mods"].contains(&lower.as_str()) {
+            continue;
+        }
+        if name.starts_with('.') || name.starts_with("__") {
+            continue;
+        }
+        folders.push(name);
+    }
+    folders
+}
+
+/// Creates a new character category directory, optionally writing metadata and `.preview.png`.
+pub fn create_character_dir(
+    mods_path: &Path,
+    metadata: &mut MetadataStore,
+    game_id: &str,
+    input: &crate::models::CreateCharacterInput,
+) -> Result<String, String> {
+    let raw_folder = input.folder.trim();
+    if raw_folder.is_empty()
+        || !is_safe_segment(raw_folder)
+        || raw_folder.contains('\\')
+        || raw_folder.contains('/')
+        || raw_folder.chars().any(|c| matches!(c, ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+    {
+        return Err("Invalid character folder name".to_string());
+    }
+    if !mods_path.is_dir() {
+        return Err("Mods folder does not exist".to_string());
+    }
+
+    let char_base = resolve_character_base(mods_path);
+    let target_dir = char_base.join(raw_folder);
+    if !is_inside(&char_base, &target_dir) {
+        return Err("Target character folder escapes mods root".to_string());
+    }
+    if target_dir.exists() {
+        return Err("Character folder already exists".to_string());
+    }
+    fs::create_dir_all(&target_dir)
+        .map_err(|e| format!("Failed to create character folder: {e}"))?;
+
+    let meta = CharacterMeta {
+        display_name: input
+            .display_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string),
+        aliases: input.aliases.clone(),
+        canonical_en_name: None,
+        cover_file: None,
+        order: None,
+        hidden: None,
+        note: None,
+        kind: input.kind.as_deref().and_then(|k| match k.trim() {
+            "utility" => Some("utility".to_string()),
+            "character" => Some("character".to_string()),
+            _ => None,
+        }),
+    };
+    crate::metadata::set_character_meta(metadata, game_id, raw_folder, meta);
+
+    if let Some(data_url) = input.cover_data_url.as_deref().map(str::trim).filter(|s| !s.is_empty())
+    {
+        crate::metadata::save_character_cover_data(&target_dir, data_url)?;
+    }
+
+    Ok(raw_folder.to_string())
+}
+
+fn decode_image_data_url(data_url: &str) -> Result<(&'static str, Vec<u8>), String> {
+    let trimmed = data_url.trim();
+    let Some(rest) = trimmed.strip_prefix("data:image/") else {
+        return Err("Unsupported preview image data URL".to_string());
+    };
+    let Some((mime_sub, encoded)) = rest.split_once(";base64,") else {
+        return Err("Preview image data URL must be base64-encoded".to_string());
+    };
+    let ext = match mime_sub.trim().to_ascii_lowercase().as_str() {
+        "png" => ".png",
+        "jpeg" | "jpg" => ".jpg",
+        "webp" => ".webp",
+        "gif" => ".gif",
+        "bmp" => ".bmp",
+        _ => return Err(format!("Unsupported preview image type: {mime_sub}")),
+    };
+    let bytes = BASE64_STANDARD
+        .decode(encoded.trim())
+        .map_err(|e| format!("Invalid preview base64 image data: {e}"))?;
+    if bytes.is_empty() {
+        return Err("Preview image data is empty".to_string());
+    }
+    Ok((ext, bytes))
+}
+
+/// Saves a chosen image file or base64 data URL to `<modPath>/preview<ext>` after clearing older `preview.*` files.
+pub fn set_mod_preview_file(
+    mods_path: &Path,
+    character_folder: &str,
+    mod_folder: &str,
+    source_image_or_data: &str,
+) -> Result<(), String> {
+    let trimmed_source = source_image_or_data.trim();
+    if trimmed_source.is_empty() {
+        return Err("Selected preview file is invalid or unsupported".to_string());
+    }
+    if !is_safe_segment(mod_folder) {
+        return Err("Invalid mod folder".to_string());
+    }
+    let char_dir = resolve_character_dir(mods_path, character_folder)?;
+    let mod_dir = char_dir.join(mod_folder);
+    if !is_inside(&char_dir, &mod_dir) || !mod_dir.is_dir() {
+        return Err("Mod folder does not exist".to_string());
+    }
+
+    let is_data_url = trimmed_source.starts_with("data:image/");
+    let decoded_payload = if is_data_url {
+        Some(decode_image_data_url(trimmed_source)?)
+    } else {
+        let source_path = Path::new(trimmed_source);
+        if !source_path.is_file() || !is_supported_image_ext(source_path) {
+            return Err("Selected preview file is invalid or unsupported".to_string());
+        }
+        None
+    };
+
+    for old_ext in [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"] {
+        let candidate = mod_dir.join(format!("preview{old_ext}"));
+        if candidate.is_file() {
+            let _ = fs::remove_file(&candidate);
+        }
+    }
+
+    if let Some((ext, bytes)) = decoded_payload {
+        let dest = mod_dir.join(format!("preview{ext}"));
+        fs::write(&dest, bytes).map_err(|e| format!("Failed to write preview image: {e}"))?;
+    } else {
+        let source_path = Path::new(trimmed_source);
+        let ext = source_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| format!(".{}", e.to_lowercase()))
+            .unwrap_or_else(|| ".png".to_string());
+        let dest = mod_dir.join(format!("preview{ext}"));
+        fs::copy(source_path, &dest).map_err(|e| format!("Failed to copy preview image: {e}"))?;
+    }
+    Ok(())
+}
+
+/// Creates missing category directories on disk after a remote roster sync.
+pub fn sync_missing_roster_folders_to_disk(
+    settings: &Settings,
+    metadata: &mut MetadataStore,
+    cache: Option<&crate::models::RosterCacheFile>,
+    prefer_en: bool,
+) -> (usize, bool) {
+    let mut created_count = 0usize;
+    let mut metadata_changed = false;
+
+    for game in crate::games::get_all_games(settings) {
+        let Some(gs) = settings.games.get(&game.id) else {
+            continue;
+        };
+        let mods_path = Path::new(&gs.mods_path);
+        if gs.mods_path.trim().is_empty() || !mods_path.is_dir() {
+            continue;
+        }
+        let char_base = resolve_character_base(mods_path);
+        let existing_folders = list_character_folder_names(mods_path);
+        let mut existing_norms = HashSet::new();
+        for f in &existing_folders {
+            let n = crate::roster::normalize_match_text(f);
+            if !n.is_empty() {
+                existing_norms.insert(n);
+            }
+            if let Some(meta) = crate::metadata::get_character_meta(metadata, &game.id, f) {
+                if let Some(dn) = &meta.display_name {
+                    let n = crate::roster::normalize_match_text(dn);
+                    if !n.is_empty() {
+                        existing_norms.insert(n);
+                    }
+                }
+                if let Some(en) = &meta.canonical_en_name {
+                    let n = crate::roster::normalize_match_text(en);
+                    if !n.is_empty() {
+                        existing_norms.insert(n);
+                    }
+                }
+                if let Some(aliases) = &meta.aliases {
+                    for a in aliases {
+                        let n = crate::roster::normalize_match_text(a);
+                        if !n.is_empty() {
+                            existing_norms.insert(n);
+                        }
+                    }
+                }
+            }
+        }
+
+        for entry in crate::roster::get_merged_roster(&game.id, cache) {
+            if entry.zh == "其他" {
+                continue;
+            }
+            let mut tokens = Vec::new();
+            for candidate in std::iter::once(entry.zh.as_str())
+                .chain(std::iter::once(entry.en.as_str()))
+                .chain(std::iter::once(entry.pinyin.as_str()))
+                .chain(entry.aliases.iter().map(String::as_str))
+            {
+                let norm = crate::roster::normalize_match_text(candidate);
+                if !norm.is_empty() {
+                    tokens.push(norm);
+                }
+            }
+            if tokens.iter().any(|tok| existing_norms.contains(tok)) {
+                continue;
+            }
+
+            let raw_name = if prefer_en && !entry.en.is_empty() {
+                entry.en.as_str()
+            } else {
+                entry.zh.as_str()
+            };
+            let folder_name: String = raw_name
+                .chars()
+                .filter(|c| !matches!(c, '\\' | '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+                .collect::<String>()
+                .trim()
+                .to_string();
+            if folder_name.is_empty() || !is_safe_segment(&folder_name) {
+                continue;
+            }
+            let target_dir = char_base.join(&folder_name);
+            if !is_inside(&char_base, &target_dir) {
+                continue;
+            }
+            if !target_dir.exists() && fs::create_dir_all(&target_dir).is_ok() {
+                created_count += 1;
+            }
+            for tok in tokens {
+                existing_norms.insert(tok);
+            }
+            existing_norms.insert(crate::roster::normalize_match_text(&folder_name));
+            if entry.kind.as_deref() == Some("utility") {
+                let mut current = crate::metadata::get_character_meta(metadata, &game.id, &folder_name)
+                    .cloned()
+                    .unwrap_or_default();
+                if current.kind.as_deref() != Some("utility") {
+                    current.kind = Some("utility".to_string());
+                    crate::metadata::set_character_meta(metadata, &game.id, &folder_name, current);
+                    metadata_changed = true;
+                }
+            }
+        }
+    }
+
+    (created_count, metadata_changed)
+}
+
+#[cfg(test)]
+mod stage1_tests {
+    use super::*;
+
+    #[test]
+    fn snapshot_resolves_electron_relative_cover_and_utility_kind() {
+        let root = std::env::temp_dir().join(format!("moddeck-stage1-lib-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let base_dir = root.join("data");
+        let mods_path = root.join("Mods");
+        let ow_dir = mods_path.join("OpenWorld");
+        fs::create_dir_all(&ow_dir).unwrap();
+
+        let src_cover = root.join("cover_src.png");
+        fs::write(&src_cover, b"fake-png").unwrap();
+        let saved_rel = crate::metadata::save_cover(&base_dir, "endfield", "OpenWorld", &src_cover).unwrap();
+        assert!(saved_rel.starts_with("endfield/"));
+
+        let mut metadata = MetadataStore::default();
+        crate::metadata::set_character_meta(
+            &mut metadata,
+            "endfield",
+            "OpenWorld",
+            CharacterMeta {
+                cover_file: Some(saved_rel),
+                ..Default::default()
+            },
+        );
+
+        let mut settings = crate::settings::default_settings();
+        settings.games.insert(
+            "endfield".to_string(),
+            GameSettings {
+                mods_path: mods_path.to_string_lossy().to_string(),
+                ..Default::default()
+            },
+        );
+        let game = crate::games::get_game(&settings, "endfield").unwrap();
+        let snap = build_snapshot(&base_dir, &game, &settings.games["endfield"], &metadata, &settings);
+
+        assert_eq!(snap.characters.len(), 1);
+        assert!(snap.characters[0].has_cover);
+        assert_eq!(snap.characters[0].kind, "utility");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn creates_character_and_sets_mod_preview() {
+        let root = std::env::temp_dir().join(format!("moddeck-stage1-create-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let mods_path = root.join("Mods");
+        fs::create_dir_all(&mods_path).unwrap();
+
+        let mut metadata = MetadataStore::default();
+        let folder = create_character_dir(
+            &mods_path,
+            &mut metadata,
+            "endfield",
+            &crate::models::CreateCharacterInput {
+                folder: "NewHero".to_string(),
+                display_name: Some("New Hero".to_string()),
+                aliases: Some(vec!["NH".to_string()]),
+                kind: Some("character".to_string()),
+                cover_data_url: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(folder, "NewHero");
+
+        let mod_dir = mods_path.join("NewHero").join("CoolMod");
+        fs::create_dir_all(&mod_dir).unwrap();
+        let img = root.join("shot.webp");
+        fs::write(&img, b"webp-bytes").unwrap();
+        set_mod_preview_file(&mods_path, "NewHero", "CoolMod", &img.to_string_lossy()).unwrap();
+        assert!(mod_dir.join("preview.webp").is_file());
+
+        let data_url = format!("data:image/png;base64,{}", BASE64_STANDARD.encode(b"png-bytes"));
+        set_mod_preview_file(&mods_path, "NewHero", "CoolMod", &data_url).unwrap();
+        assert!(!mod_dir.join("preview.webp").exists());
+        assert_eq!(fs::read(mod_dir.join("preview.png")).unwrap(), b"png-bytes");
 
         let _ = fs::remove_dir_all(&root);
     }

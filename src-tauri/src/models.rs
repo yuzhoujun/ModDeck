@@ -376,3 +376,158 @@ fn default_recent_count() -> usize {
 fn default_schema_version() -> u32 {
     1
 }
+
+fn default_roster_schema_version() -> u32 {
+    1
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterEntry {
+    pub zh: String,
+    #[serde(default)]
+    pub en: String,
+    #[serde(default)]
+    pub pinyin: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterCacheFile {
+    #[serde(default = "default_roster_schema_version")]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub updated_at: String,
+    #[serde(default)]
+    pub games: HashMap<String, Vec<RosterEntry>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterSyncStatus {
+    pub remote_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    pub game_counts: HashMap<String, usize>,
+    pub has_remote_cache: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterSyncResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub added_or_updated: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_folders_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<RosterSyncStatus>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoDetectPathsResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xxmi_root: Option<String>,
+    pub detected_games: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub settings: Option<Settings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCharacterInput {
+    pub folder: String,
+    #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
+    pub aliases: Option<Vec<String>>,
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub cover_data_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomGameMutationResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snapshot: Option<GameSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToggleVisibilityResult {
+    pub ok: bool,
+    pub hidden_game_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnlyConfiguredResult {
+    pub ok: bool,
+    pub only_show_configured_games: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentShaderCacheInfo {
+    pub enabled_in_ini: Option<bool>,
+    pub dir_exists: bool,
+    pub file_count: usize,
+    pub total_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentShaderFixesInfo {
+    pub dir_exists: bool,
+    pub file_count: usize,
+    pub sample_files: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvironmentCheck {
+    pub game_id: String,
+    pub mods_path: String,
+    pub root: String,
+    pub d3dx_path: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shader_cache: Option<EnvironmentShaderCacheInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shader_fixes: Option<EnvironmentShaderFixesInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClearShaderCacheResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deleted_files: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub freed_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}

@@ -80,3 +80,125 @@ pub fn get_game(settings: &Settings, game_id: &str) -> Option<GameDef> {
         .into_iter()
         .find(|g| g.id == trimmed)
 }
+
+pub fn is_builtin_game(game_id: &str) -> bool {
+    builtin_games().iter().any(|g| g.id == game_id)
+}
+
+pub fn slugify_game_id(name: &str, existing_ids: &[String]) -> String {
+    let mut slug: String = name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    while slug.contains("--") {
+        slug = slug.replace("--", "-");
+    }
+    let trimmed = slug.trim_matches('-');
+    let base = if trimmed.is_empty() {
+        "custom-game".to_string()
+    } else {
+        trimmed.to_string()
+    };
+
+    if !existing_ids.iter().any(|id| id == &base) && !is_builtin_game(&base) {
+        return base;
+    }
+
+    let mut suffix = 2usize;
+    loop {
+        let candidate = format!("{base}-{suffix}");
+        if !existing_ids.iter().any(|id| id == &candidate) && !is_builtin_game(&candidate) {
+            return candidate;
+        }
+        suffix += 1;
+    }
+}
+
+pub fn sanitize_custom_game(
+    input: &serde_json::Value,
+    existing_ids: &[String],
+) -> Result<GameDef, String> {
+    let obj = input
+        .as_object()
+        .ok_or_else(|| "Invalid custom game payload".to_string())?;
+    let name = obj
+        .get("name")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Game name is required".to_string())?;
+
+    let requested_id = obj
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let id = match requested_id {
+        Some(req) => {
+            if is_builtin_game(&req) {
+                return Err("Cannot overwrite a built-in game".to_string());
+            }
+            req
+        }
+        None => slugify_game_id(&name, existing_ids),
+    };
+
+    let short_name = obj
+        .get("shortName")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| name.clone());
+
+    let name_en = obj
+        .get("nameEn")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let short_name_en = obj
+        .get("shortNameEn")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let loader = obj
+        .get("loader")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "XXMI".to_string());
+
+    let exe_hint = obj
+        .get("exeHint")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    let accent = obj
+        .get("accent")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| Some("#5ce1e6".to_string()));
+
+    let locales = obj
+        .get("locales")
+        .cloned()
+        .and_then(|v| serde_json::from_value(v).ok());
+
+    Ok(GameDef {
+        id,
+        name,
+        name_en,
+        short_name,
+        short_name_en,
+        loader,
+        exe_hint,
+        accent,
+        is_custom: Some(true),
+        locales,
+    })
+}

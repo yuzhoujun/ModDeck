@@ -250,6 +250,7 @@ pub fn acquire_single_instance_or_focus() -> bool {
     }
 }
 
+#[allow(dead_code)]
 pub fn send_f10(exe_hints: &[String]) -> Result<(), String> {
     #[cfg(windows)]
     {
