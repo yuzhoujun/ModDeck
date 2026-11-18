@@ -4,6 +4,18 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 结构与标准 [SemVer 2.0.0](https://semver.org/lang/zh-CN/) 语义化版本规范。
 
+## [3.0.1] - 2026-11-19
+
+### 新增（Added）
+
+- **Windows NSIS 安装/卸载包（`ModDeck-<version>-win-x64-setup.exe`）**：新增标准 NSIS 安装包构建脚本 `npm run package:installer`，与便携 ZIP 并行提供下载；支持中英文界面随系统匹配、基于注册表自动定位原安装路径实现后续无感覆盖升级，并通过 `src-tauri/windows/hooks.nsh` 在真实卸载且勾选「删除应用数据」时同步清理 `%APPDATA%\ModDeck\`。
+- **旧版 Electron 数据目录检测与一键规范清理**：新增后端命令 `clean_legacy_electron_data` 及主界面横幅 /「设置 -> 存储与备份」清理卡片，自动识别旧版 `v2.x` Electron 浏览器缓存、`ModDeckKeyHelper-v2`、已废弃的 `mod-presets.json` 与 v2 旧日志并安全清除，不触碰任何现用预设、封面、配置与 Mod 备份。
+- **仓库内持久化路线图与灵感记录**：新增 [docs/ROADMAP.md](docs/ROADMAP.md) 与 [docs/ROADMAP.zh-CN.md](docs/ROADMAP.zh-CN.md)，记录 `v3.1.0`（全角色池分游戏拆目录无感迁移、支持镜像加速的在线升级）及后续功能待办。
+
+### 修复（Fixed）
+
+- 修正「设置 -> 关于」页中的运行时字段标签（「应用框架」/「后端内核」），移除遗留的 Electron / Node.js 文案标注。
+
 ## [3.0.0] - 2026-11-19
 
 ### 新增（Added）

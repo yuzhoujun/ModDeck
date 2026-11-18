@@ -12,17 +12,10 @@ import type {
 import { Icon } from '../components/Icon'
 import { Modal } from '../components/Modal'
 import type { IconName } from '../components/Icon'
-import { errorMessage } from '../utils'
+import { errorMessage, formatBytes } from '../utils'
 import { useI18n, getLocaleGameName, getLocaleGameShortName } from '../i18n'
 
 type SettingsTab = 'general' | 'advanced' | 'games' | 'environment' | 'import' | 'storage' | 'about'
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
-}
 
 export function SettingsView({
   games,
@@ -30,6 +23,7 @@ export function SettingsView({
   initialTab = 'general',
   onSave,
   onNotify,
+  onLegacyCleaned,
   onAddCustomGame,
   onEditCustomGame,
   onDeleteCustomGame
@@ -39,12 +33,16 @@ export function SettingsView({
   initialTab?: SettingsTab
   onSave: (patch: SettingsPatch) => Promise<void>
   onNotify: (text: string, kind?: 'ok' | 'err' | 'info') => void
+  onLegacyCleaned?: () => void
   onAddCustomGame?: () => void
   onEditCustomGame?: (game: GameDef) => void
   onDeleteCustomGame?: (gameId: string) => Promise<void>
 }) {
   const { t, setLocale, effectiveLocale, availableLocales } = useI18n()
   const [tab, setTab] = useState<SettingsTab>(initialTab)
+  useEffect(() => {
+    setTab(initialTab)
+  }, [initialTab])
   const [draft, setDraft] = useState<Settings>(settings)
   const [hotkeyDraft, setHotkeyDraft] = useState(settings.ui.overlayHotkey)
   const [reloadHotkeyDraft, setReloadHotkeyDraft] = useState(settings.ui.reloadHotkey || 'F10')
@@ -77,6 +75,7 @@ export function SettingsView({
   const [bundleBusy, setBundleBusy] = useState(false)
   const [restoringBackupId, setRestoringBackupId] = useState<string | null>(null)
   const [pruningBackups, setPruningBackups] = useState(false)
+  const [cleaningLegacy, setCleaningLegacy] = useState(false)
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -496,6 +495,30 @@ export function SettingsView({
       onNotify(errorMessage(error), 'err')
     } finally {
       setPruningBackups(false)
+    }
+  }
+
+  async function handleCleanLegacy() {
+    setCleaningLegacy(true)
+    try {
+      const res = await window.moddeck.cleanLegacyElectronData()
+      if (!res.ok) {
+        onNotify(res.error || t('common.operationFailed'), 'err')
+      } else {
+        onNotify(
+          t('settings.storage.legacyCleanSuccess', {
+            count: res.deletedFiles,
+            size: formatBytes(res.freedBytes)
+          }),
+          'ok'
+        )
+        onLegacyCleaned?.()
+      }
+      await refreshStorageOverview()
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setCleaningLegacy(false)
     }
   }
 
@@ -1623,6 +1646,64 @@ export function SettingsView({
                 {t('settings.storage.bundleImportBtn')}
               </button>
             </div>
+          </section>
+
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(168, 85, 247, 0.12)',
+                  color: '#c084fc',
+                  borderColor: 'rgba(168, 85, 247, 0.25)'
+                }}
+              >
+                <Icon name="trash" size={18} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3>{t('settings.storage.legacyTitle')}</h3>
+                <p className="muted">{t('settings.storage.legacyDesc')}</p>
+              </div>
+              <button
+                type="button"
+                className="btn primary small-btn"
+                disabled={cleaningLegacy || !storageOverview || storageOverview.legacyElectronFiles === 0}
+                onClick={() => void handleCleanLegacy()}
+              >
+                <Icon name="trash" size={13} />
+                {cleaningLegacy ? t('common.processing') : t('settings.storage.legacyCleanBtn')}
+              </button>
+            </div>
+            {storageOverview ? (
+              storageOverview.legacyElectronFiles > 0 ? (
+                <div className="setting-group-desc" style={{ marginTop: 0 }}>
+                  <div>
+                    <strong>
+                      {t('settings.storage.legacyDetected', {
+                        count: storageOverview.legacyElectronFiles,
+                        size: formatBytes(storageOverview.legacyElectronBytes)
+                      })}
+                    </strong>
+                  </div>
+                  <div className="row" style={{ flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                    {storageOverview.legacyElectronItems.map((item) => (
+                      <span key={item} className="tag">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="muted small" style={{ marginTop: '6px' }}>
+                    {t('settings.storage.legacyCleanHint')}
+                  </div>
+                </div>
+              ) : (
+                <div className="muted small" style={{ color: '#34d399' }}>
+                  {t('settings.storage.legacyCleanOk')}
+                </div>
+              )
+            ) : (
+              <div className="muted small">{t('common.loading')}</div>
+            )}
           </section>
 
           <section className="settings-card">

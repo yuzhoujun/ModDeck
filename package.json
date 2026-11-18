@@ -1,6 +1,6 @@
 {
   "name": "moddeck",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "description": "Open-source local mod manager for 3DMigoto / XXMI games",
   "author": "ModDeck contributors",
@@ -14,6 +14,7 @@
     "tauri:build": "tauri build",
     "tauri:test": "cargo test --manifest-path src-tauri/Cargo.toml",
     "package:portable": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-portable.ps1",
+    "package:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-installer.ps1",
     "typecheck": "tsc --noEmit -p tsconfig.web.json",
     "i18n:check": "node scripts/i18n.mjs check",
     "i18n:sync": "node scripts/i18n.mjs sync",

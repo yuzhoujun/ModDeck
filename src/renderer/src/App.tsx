@@ -10,6 +10,7 @@ import type {
   ImportParseResult,
   ModInfo,
   SettingsPatch,
+  StorageOverview,
   UiSettings
 } from '../../shared/types'
 import { CreateCharacterModal } from './components/CreateCharacterModal'
@@ -24,7 +25,7 @@ import { RosterPresetModal } from './components/RosterPresetModal'
 import { CharacterView } from './views/CharacterView'
 import { LibraryView } from './views/LibraryView'
 import { SettingsView } from './views/SettingsView'
-import { errorMessage } from './utils'
+import { errorMessage, formatBytes } from './utils'
 import { useI18n, getLocaleGameShortName, getLocaleGameName } from './i18n'
 import { cleanupStagedDrops, resolveDroppedFilePath } from './tauri-bridge'
 
@@ -58,6 +59,8 @@ export default function App() {
   const [showRosterPresets, setShowRosterPresets] = useState(false)
   const [showConflictAudit, setShowConflictAudit] = useState(false)
   const [envWarning, setEnvWarning] = useState<EnvironmentCheck | null>(null)
+  const [legacyStorage, setLegacyStorage] = useState<StorageOverview | null>(null)
+  const [cleaningLegacy, setCleaningLegacy] = useState(false)
   const [parsedImport, setParsedImport] = useState<{
     result: ImportParseResult
     targetCharacter?: string
@@ -216,6 +219,46 @@ export default function App() {
       setBoot((current) => (current ? { ...current, settings: next } : current))
     } catch (error) {
       notify(errorMessage(error), 'err')
+    }
+  }
+
+  useEffect(() => {
+    if (booting || !boot) return
+    let cancelled = false
+    window.moddeck
+      .getStorageOverview()
+      .then((overview) => {
+        if (!cancelled && overview.legacyElectronFiles > 0) {
+          setLegacyStorage(overview)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [booting])
+
+  async function cleanLegacyFromBanner() {
+    setCleaningLegacy(true)
+    try {
+      const res = await window.moddeck.cleanLegacyElectronData()
+      if (!res.ok) {
+        notify(res.error || t('common.operationFailed'), 'err')
+      } else {
+        notify(
+          t('settings.storage.legacyCleanSuccess', {
+            count: res.deletedFiles,
+            size: formatBytes(res.freedBytes)
+          }),
+          'ok'
+        )
+      }
+      const next = await window.moddeck.getStorageOverview()
+      setLegacyStorage(next.legacyElectronFiles > 0 ? next : null)
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    } finally {
+      setCleaningLegacy(false)
     }
   }
 
@@ -1003,6 +1046,48 @@ export default function App() {
             </div>
           </div>
         ) : null}
+        {legacyStorage && legacyStorage.legacyElectronFiles > 0 ? (
+          <div className="env-banner">
+            <div className="env-banner-main">
+              <Icon name="box" size={18} />
+              <div>
+                <strong>{t('common.legacyBannerTitle')}</strong>
+                <span>
+                  {t('common.legacyBannerDesc', {
+                    count: legacyStorage.legacyElectronFiles,
+                    size: formatBytes(legacyStorage.legacyElectronBytes),
+                    items: legacyStorage.legacyElectronItems.slice(0, 4).join(', ')
+                  })}
+                </span>
+              </div>
+            </div>
+            <div className="env-banner-actions">
+              <button
+                className="btn primary small-btn"
+                disabled={cleaningLegacy}
+                onClick={() => void cleanLegacyFromBanner()}
+              >
+                {cleaningLegacy ? t('common.processing') : t('common.legacyCleanNow')}
+              </button>
+              <button
+                className="btn ghost small-btn"
+                onClick={() => {
+                  setSettingsTab('storage')
+                  setView('settings')
+                }}
+              >
+                {t('common.legacyOpenStorage')}
+              </button>
+              <button
+                className="icon-btn"
+                onClick={() => setLegacyStorage(null)}
+                title={t('common.closeThisTime')}
+              >
+                <Icon name="close" size={15} />
+              </button>
+            </div>
+          </div>
+        ) : null}
         {view === 'settings' ? (
           <SettingsView
             games={boot.games}
@@ -1010,6 +1095,7 @@ export default function App() {
             initialTab={settingsTab}
             onSave={saveSettings}
             onNotify={notify}
+            onLegacyCleaned={() => setLegacyStorage(null)}
             onAddCustomGame={() => {
               setEditingCustomGame(null)
               setCustomGameModalOpen(true)

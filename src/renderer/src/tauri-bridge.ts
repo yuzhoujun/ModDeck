@@ -17,6 +17,7 @@ import type {
   ImportPresetsResult,
   ImportResult,
   ImportRosterResult,
+  LegacyCleanupResult,
   ModDetails,
   ModInfo,
   ModStaticAnalysis,
@@ -249,6 +250,7 @@ export function ensureTauriBridge(): void {
     exportConflictAuditReport: (gameId, report) =>
       invoke<ExportPresetResult>('export_conflict_audit_report', { gameId, report }),
     getStorageOverview: () => invoke<StorageOverview>('get_storage_overview'),
+    cleanLegacyElectronData: () => invoke<LegacyCleanupResult>('clean_legacy_electron_data'),
     restoreModBackup: (backupId) => invoke<ToggleResult>('restore_mod_backup', { backupId }),
     deleteModBackup: (backupId) => invoke<ToggleResult>('delete_mod_backup', { backupId }),
     pruneModBackups: (olderThanDays) => invoke('prune_mod_backups', { olderThanDays }),

@@ -29,7 +29,7 @@ use models::{
     D3dxSyncStatus, EnvironmentCheck, ExportPresetResult, GameConflictAuditReport, GameSettings,
     GameSnapshot, HotkeyResult, ImportCommitRequest, ImportConfigBundleOptions,
     ImportConfigBundleResult, ImportParseRequest, ImportParseResult, ImportPresetsResult,
-    ImportRequest, ImportResult, ImportRosterResult, MetadataStore, ModDetails, ModInfo,
+    ImportRequest, ImportResult, ImportRosterResult, LegacyCleanupResult, MetadataStore, ModDetails, ModInfo,
     ModStaticAnalysis, ModVariantPreset, OnlyConfiguredResult, PruneBackupsResult, RosterPreset,
     RosterSchemeImportInspection, RosterSyncResult, RosterSyncStatus, SaveModPresetOptions,
     SaveModPresetResult, SaveRosterPresetInput, Settings, SimpleResult, StateChangedEvent,
@@ -2209,6 +2209,12 @@ fn prune_mod_backups(state: State<'_, AppState>, older_than_days: i64) -> PruneB
 }
 
 #[tauri::command]
+fn clean_legacy_electron_data(state: State<'_, AppState>) -> LegacyCleanupResult {
+    let guard = state.0.lock().expect("state lock");
+    storage::clean_legacy_electron_data(&guard.base_dir)
+}
+
+#[tauri::command]
 async fn export_config_bundle(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -4123,6 +4129,7 @@ pub fn run() {
             restore_mod_backup,
             delete_mod_backup,
             prune_mod_backups,
+            clean_legacy_electron_data,
             export_config_bundle,
             inspect_config_bundle,
             import_config_bundle,

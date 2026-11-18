@@ -676,6 +676,20 @@ pub struct StorageOverview {
     pub total_bytes: u64,
     pub categories: Vec<StorageCategoryStat>,
     pub backups: Vec<ModBackupEntry>,
+    pub legacy_electron_files: usize,
+    pub legacy_electron_bytes: u64,
+    pub legacy_electron_items: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyCleanupResult {
+    pub ok: bool,
+    pub removed_items: Vec<String>,
+    pub deleted_files: usize,
+    pub freed_bytes: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

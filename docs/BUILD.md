@@ -38,6 +38,7 @@ npm install
 | `npm run tauri:test` | Run all Rust unit & integration tests (`cargo test --manifest-path src-tauri/Cargo.toml`) |
 | `npx vite build --config vite.config.ts` | Build frontend production bundle to `out/tauri-renderer/` |
 | `npm run package:portable` | Run checks/tests, build Tauri release binary, and create portable ZIP + SHA256 |
+| `npm run package:installer` | Run checks/tests and build Windows NSIS installer (`release/ModDeck-<version>-win-x64-setup.exe`) + SHA256 |
 
 ---
 

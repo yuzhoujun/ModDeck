@@ -7,7 +7,7 @@
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck?label=release&cacheSeconds=300)](https://github.com/yuzhoujun/ModDeck/releases/latest)
 
-[简体中文文档 (README.zh-CN.md)](README.zh-CN.md) | [v2 -> v3 Migration Guide](docs/MIGRATION_V2_TO_V3.md)
+[简体中文文档 (README.zh-CN.md)](README.zh-CN.md) | [v2 -> v3 Migration Guide](docs/MIGRATION_V2_TO_V3.md) | [Roadmap](docs/ROADMAP.md)
 
 An open-source, Local-First Windows mod manager and in-game floating overlay built with Tauri 2 and Rust for 3DMigoto / XXMI games.
 
@@ -21,10 +21,11 @@ ModDeck manages game `Mods` directories directly on disk: toggling (`DISABLED_`)
 > **Prerequisites & Scope**:
 > ModDeck manages mods and presets; **it does not bundle or teach initial setup of XXMI or game-specific model importers**. Please obtain XXMI from [SpectrumQT/XXMI-Launcher](https://github.com/SpectrumQT/XXMI-Launcher) first. Basic familiarity with 3DMigoto/XXMI directory layouts is expected.
 
-1. Download the portable archive (`ModDeck-<version>-win-x64.zip`) from [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest).
-2. Extract the full ZIP into a writable folder (avoid launching inside the archive preview or system-protected read-only folders).
-3. Double-click `ModDeck.exe` to launch:
-   - Requires Microsoft Edge WebView2 Runtime (pre-installed on Windows 11 and updated Windows 10; if missing on stripped Windows builds, ModDeck prompts on startup and offers Microsoft's Evergreen installer page).
+1. Download either the **Windows Installer** (`ModDeck-<version>-win-x64-setup.exe`) or the **Portable ZIP** (`ModDeck-<version>-win-x64.zip`) from [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest).
+2. Run the installer (supports clean uninstall with optional user-data removal and automatic in-place upgrade over registry-tracked install paths), or extract the full ZIP into a writable folder (avoid launching inside the archive preview or system-protected read-only folders).
+3. Launch `ModDeck` (`ModDeck.exe`):
+   - Requires Microsoft Edge WebView2 Runtime (pre-installed on Windows 11 and updated Windows 10; the NSIS installer downloads WebView2 automatically if absent, and the portable binary prompts with Microsoft's official page on startup).
+   - Upgrading from v2.x portable builds automatically preserves `%APPDATA%\ModDeck\` and offers one-click cleanup for obsolete Electron v2 caches under **Settings -> Storage & Backups**.
 4. Open **Settings -> Paths** to configure each game's `Mods` or XXMI root folder and optional launcher/game executables (supports auto-detection and manual selection):
 
    ![Game and Directory Paths](docs/ModDeck.Paths.en.png)

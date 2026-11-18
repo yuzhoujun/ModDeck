@@ -38,6 +38,7 @@ npm install
 | `npm run tauri:test` | 运行全部 Rust 单元测试与集成测试（`cargo test --manifest-path src-tauri/Cargo.toml`） |
 | `npx vite build --config vite.config.ts` | 构建生产前端静态产物至 `out/tauri-renderer/` |
 | `npm run package:portable` | 执行校验/单测、编译 Tauri Release 并产出便携 ZIP 与 SHA256 |
+| `npm run package:installer` | 执行校验/单测并构建 Windows NSIS 安装/卸载包（`release/ModDeck-<version>-win-x64-setup.exe`）与 SHA256 |
 
 ---
 

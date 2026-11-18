@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ModDeck",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "identifier": "dev.moddeck.desktop",
   "build": {
     "beforeDevCommand": "npx vite --config vite.config.ts",
@@ -66,10 +66,27 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "publisher": "yuzhoujun",
+    "homepage": "https://github.com/yuzhoujun/ModDeck",
+    "copyright": "Copyright (c) 2026 yuzhoujun",
     "icon": [
       "../build/icon_32x32.png",
       "../build/icon.png",
       "../build/icon.ico"
-    ]
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "SimpChinese"],
+        "displayLanguageSelector": false,
+        "installerIcon": "../build/icon.ico",
+        "uninstallerIcon": "../build/icon.ico",
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    }
   }
 }

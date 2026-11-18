@@ -613,6 +613,17 @@ export interface StorageOverview {
   totalBytes: number
   categories: StorageCategoryStat[]
   backups: ModBackupEntry[]
+  legacyElectronFiles: number
+  legacyElectronBytes: number
+  legacyElectronItems: string[]
+}
+
+export interface LegacyCleanupResult {
+  ok: boolean
+  removedItems: string[]
+  deletedFiles: number
+  freedBytes: number
+  error?: string
 }
 
 export interface ConfigBundleManifest {

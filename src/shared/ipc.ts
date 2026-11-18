@@ -30,6 +30,7 @@ import type {
   ImportRequest,
   ImportResult,
   ImportRosterResult,
+  LegacyCleanupResult,
   ModDetails,
   ModInfo,
   OverlayDetailRequest,
@@ -317,6 +318,7 @@ export interface ModDeckApi {
   auditGameConflicts(gameId: GameId): Promise<GameConflictAuditReport>
   exportConflictAuditReport(gameId: GameId, report: GameConflictAuditReport): Promise<ExportPresetResult>
   getStorageOverview(): Promise<StorageOverview>
+  cleanLegacyElectronData(): Promise<LegacyCleanupResult>
   restoreModBackup(backupId: string): Promise<ToggleResult>
   deleteModBackup(backupId: string): Promise<ToggleResult>
   pruneModBackups(olderThanDays: number): Promise<{ ok: boolean; deletedCount?: number; freedBytes?: number; error?: string }>

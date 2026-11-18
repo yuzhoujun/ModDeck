@@ -5,9 +5,9 @@ use crate::library::{
 use crate::metadata::{load_metadata, save_metadata, METADATA_FILE};
 use crate::models::{
     ConfigBundleInspection, ConfigBundleManifest, ConfigBundleRestoredCounts, ConfigBundleStats,
-    GameSettings, ImportConfigBundleOptions, ImportConfigBundleResult, MetadataStore,
-    ModBackupEntry, PruneBackupsResult, Settings, StorageCategoryStat, StorageOverview,
-    ToggleResult,
+    GameSettings, ImportConfigBundleOptions, ImportConfigBundleResult, LegacyCleanupResult,
+    MetadataStore, ModBackupEntry, PruneBackupsResult, Settings, StorageCategoryStat,
+    StorageOverview, ToggleResult,
 };
 use crate::settings::{normalize_settings, save_settings_atomic};
 use serde_json::Value;
@@ -289,6 +289,132 @@ fn strip_disabled_prefix(name: &str) -> &str {
     }
 }
 
+const LEGACY_ELECTRON_ROOT_ITEMS: &[&str] = &[
+    "mod-presets.json",
+    "bin",
+    "GrShaderCache",
+    "Cache",
+    "GPUCache",
+    "DawnWebGPUCache",
+    "DawnGraphiteCache",
+    "ShaderCache",
+    "Network",
+    "Shared Dictionary",
+    "Code Cache",
+    "blob_storage",
+    "GPUPersistentCache",
+    "Local Storage",
+    "Session Storage",
+    "DIPS",
+    "declarative_performance_observer.db",
+    "declarative_performance_observer.db-journal",
+    "Local State",
+    "Preferences",
+    "Cookies",
+    "Cookies-journal",
+    "TransportSecurity",
+    "Trust Tokens",
+    "Trust Tokens-journal",
+];
+
+const LEGACY_ELECTRON_LOG_FILES: &[&str] = &["moddeck.log", "startup.log"];
+
+fn scan_legacy_electron_entries(base_dir: &Path) -> (Vec<String>, usize, u64) {
+    let mut items = Vec::new();
+    let mut file_count = 0usize;
+    let mut total_bytes = 0u64;
+
+    for name in LEGACY_ELECTRON_ROOT_ITEMS {
+        let candidate = base_dir.join(name);
+        if candidate.exists() {
+            let (fc, tb) = measure_path_stats(&candidate);
+            items.push((*name).to_string());
+            file_count += fc;
+            total_bytes = total_bytes.saturating_add(tb);
+        }
+    }
+
+    let logs_dir = base_dir.join("logs");
+    for name in LEGACY_ELECTRON_LOG_FILES {
+        let candidate = logs_dir.join(name);
+        if candidate.is_file() {
+            let (fc, tb) = measure_path_stats(&candidate);
+            items.push(format!("logs/{name}"));
+            file_count += fc;
+            total_bytes = total_bytes.saturating_add(tb);
+        }
+    }
+
+    (items, file_count, total_bytes)
+}
+
+/// Safely removes obsolete Electron v2 caches, key-helper binaries, old logs, and v2.1 mod-presets.json.
+pub fn clean_legacy_electron_data(base_dir: &Path) -> LegacyCleanupResult {
+    let mut removed_items = Vec::new();
+    let mut deleted_files = 0usize;
+    let mut freed_bytes = 0u64;
+    let mut errors = Vec::new();
+
+    for name in LEGACY_ELECTRON_ROOT_ITEMS {
+        let candidate = base_dir.join(name);
+        if !candidate.exists() {
+            continue;
+        }
+        let (fc, tb) = measure_path_stats(&candidate);
+        let res = if candidate.is_dir() {
+            fs::remove_dir_all(&candidate)
+        } else {
+            fs::remove_file(&candidate)
+        };
+        match res {
+            Ok(()) => {
+                removed_items.push((*name).to_string());
+                deleted_files += fc;
+                freed_bytes = freed_bytes.saturating_add(tb);
+            }
+            Err(err) => errors.push(format!("{name}: {err}")),
+        }
+    }
+
+    let logs_dir = base_dir.join("logs");
+    for name in LEGACY_ELECTRON_LOG_FILES {
+        let candidate = logs_dir.join(name);
+        if !candidate.is_file() {
+            continue;
+        }
+        let (fc, tb) = measure_path_stats(&candidate);
+        match fs::remove_file(&candidate) {
+            Ok(()) => {
+                removed_items.push(format!("logs/{name}"));
+                deleted_files += fc;
+                freed_bytes = freed_bytes.saturating_add(tb);
+            }
+            Err(err) => errors.push(format!("logs/{name}: {err}")),
+        }
+    }
+
+    let tmp_dir = base_dir.join("tmp");
+    if tmp_dir.is_dir()
+        && fs::read_dir(&tmp_dir)
+            .map(|mut it| it.next().is_none())
+            .unwrap_or(false)
+    {
+        let _ = fs::remove_dir(&tmp_dir);
+    }
+
+    LegacyCleanupResult {
+        ok: errors.is_empty(),
+        removed_items,
+        deleted_files,
+        freed_bytes,
+        error: if errors.is_empty() {
+            None
+        } else {
+            Some(errors.join("; "))
+        },
+    }
+}
+
 pub fn get_storage_overview(base_dir: &Path, settings: &Settings) -> StorageOverview {
     let config_files = ["settings.json", METADATA_FILE, "roster-presets.json", "roster-cache.json"];
     let mut config_count = 0usize;
@@ -440,12 +566,17 @@ pub fn get_storage_overview(base_dir: &Path, settings: &Settings) -> StorageOver
 
     backups.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     let total_bytes = categories.iter().fold(0u64, |acc, c| acc.saturating_add(c.total_bytes));
+    let (legacy_electron_items, legacy_electron_files, legacy_electron_bytes) =
+        scan_legacy_electron_entries(base_dir);
 
     StorageOverview {
         data_dir: base_dir.to_string_lossy().to_string(),
         total_bytes,
         categories,
         backups,
+        legacy_electron_files,
+        legacy_electron_bytes,
+        legacy_electron_items,
     }
 }
 
@@ -1267,6 +1398,53 @@ mod tests {
         assert!(pruned.ok);
         assert_eq!(pruned.deleted_count, Some(1));
         assert_eq!(pruned.freed_bytes, Some(5));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn legacy_electron_cleanup_preserves_user_data_and_backups() {
+        let root = std::env::temp_dir().join(format!(
+            "moddeck-legacy-cleanup-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        let base_dir = root.join("app_data");
+        fs::create_dir_all(base_dir.join("Cache")).unwrap();
+        fs::create_dir_all(base_dir.join("bin")).unwrap();
+        fs::create_dir_all(base_dir.join("logs")).unwrap();
+        fs::create_dir_all(base_dir.join("presets").join("endfield")).unwrap();
+        fs::create_dir_all(base_dir.join("backups").join("snap")).unwrap();
+
+        fs::write(base_dir.join("Cache").join("data_0"), b"123456").unwrap();
+        fs::write(base_dir.join("bin").join("ModDeckKeyHelper-v2.exe"), b"exe").unwrap();
+        fs::write(base_dir.join("mod-presets.json"), b"{}").unwrap();
+        fs::write(base_dir.join("logs").join("moddeck.log"), b"v2log").unwrap();
+        fs::write(base_dir.join("logs").join("tauri-crash.log"), b"v3log").unwrap();
+        fs::write(base_dir.join("settings.json"), b"{}").unwrap();
+        fs::write(base_dir.join("roster-presets.json"), b"{}").unwrap();
+        fs::write(base_dir.join("presets").join("endfield").join("a.json"), b"{}").unwrap();
+        fs::write(base_dir.join("backups").join("snap").join("b.txt"), b"keep").unwrap();
+
+        let settings = default_settings();
+        let before = get_storage_overview(&base_dir, &settings);
+        assert_eq!(before.legacy_electron_files, 4);
+        assert_eq!(before.legacy_electron_bytes, 16);
+        assert!(before.legacy_electron_items.contains(&"Cache".to_string()));
+        assert!(before.legacy_electron_items.contains(&"logs/moddeck.log".to_string()));
+
+        let res = clean_legacy_electron_data(&base_dir);
+        assert!(res.ok, "{:?}", res.error);
+        assert_eq!(res.deleted_files, 4);
+        assert_eq!(res.freed_bytes, 16);
+
+        let after = get_storage_overview(&base_dir, &settings);
+        assert_eq!(after.legacy_electron_files, 0);
+        assert!(base_dir.join("settings.json").is_file());
+        assert!(base_dir.join("roster-presets.json").is_file());
+        assert!(base_dir.join("presets").join("endfield").join("a.json").is_file());
+        assert!(base_dir.join("backups").join("snap").join("b.txt").is_file());
+        assert!(base_dir.join("logs").join("tauri-crash.log").is_file());
 
         let _ = fs::remove_dir_all(&root);
     }

@@ -7,7 +7,7 @@
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck?label=release&cacheSeconds=300)](https://github.com/yuzhoujun/ModDeck/releases/latest)
 
-[English Documentation (README.md)](README.md) | [v2 -> v3 无损迁移指南](docs/MIGRATION_V2_TO_V3.zh-CN.md)
+[English Documentation (README.md)](README.md) | [v2 -> v3 无损迁移指南](docs/MIGRATION_V2_TO_V3.zh-CN.md) | [后续路线图 (Roadmap)](docs/ROADMAP.zh-CN.md)
 
 面向 3DMigoto / XXMI 系游戏的开源、本地优先（Local-First）Windows Mod 管理器与游戏内快捷悬浮工作台（基于 Tauri 2 + Rust 原生后端与系统 WebView2）。
 
@@ -21,10 +21,11 @@ ModDeck 专职在磁盘与配置层面管理游戏 `Mods` 目录：`DISABLED_` �
 > **前置要求说明**：
 > 本软件为 Mod 资源管理与快捷操作台，**不内置 XXMI 或各游戏 MI 的安装包及基础配置教程**。请先前往 [SpectrumQT/XXMI-Launcher](https://github.com/SpectrumQT/XXMI-Launcher) 完成对应游戏 MI 环境搭建。
 
-1. 前往 [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) 下载便携包 `ModDeck-<version>-win-x64.zip`。
-2. 将压缩包完整解压到任意可写入的文件夹（切勿在压缩包预览内直接双击运行）。
-3. 双击 `ModDeck.exe` 即可启动：
-   - 依赖 Windows 系统内置的 Microsoft Edge WebView2 运行库（Windows 11 与常规 Windows 10 已自带；精简版系统若缺失，启动时会弹出引导提示并可一键打开微软官方下载页）。
+1. 前往 [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) 下载 **Windows 安装包**（`ModDeck-<version>-win-x64-setup.exe`）或 **免安装便携包**（`ModDeck-<version>-win-x64.zip`）。
+2. 运行安装向导（支持标准卸载并可勾选是否清理用户数据，后续覆盖升级可依据注册表自动定位安装目录），或将便携 ZIP 完整解压到任意可写入文件夹（切勿在压缩包预览内直接双击运行）。
+3. 启动 `ModDeck`（`ModDeck.exe`）：
+   - 依赖 Windows 系统内置的 Microsoft Edge WebView2 运行库（Win11 与常见 Win10 已自带；NSIS 安装包缺失时可自动安装，便携版启动时亦会弹出微软官方引导提示）。
+   - 从 v2.x 免安装版升级时会自动无损沿用 `%APPDATA%\ModDeck\`，并在发现旧版 Electron 缓存/废旧文件时提供一键规范清理入口（位于启动横幅或「设置 -> 存储与备份」）。
 4. 首次进入 **设置 -> 路径** 配置游戏 `Mods` / XXMI 根目录及可选启动器路径（支持自动探测与手动选取）：
 
    ![游戏与目录路径配置](docs/ModDeck.Paths.png)
