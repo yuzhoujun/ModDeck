@@ -506,6 +506,207 @@ pub fn sync_remote_roster(
     }
 }
 
+fn contains_token(haystack_raw: &str, token_raw: &str) -> bool {
+    let token = token_raw.trim();
+    if token.is_empty() {
+        return false;
+    }
+    let is_ascii_ident = token
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || c == '_' || c == '-');
+    if is_ascii_ident {
+        let clean = normalize_match_text(token);
+        if clean.is_empty() {
+            return false;
+        }
+        if clean.len() <= 2 {
+            // Short ASCII tokens like "ui", "si", "yi" require non-alphanumeric word boundaries.
+            let lower_hay = haystack_raw.to_ascii_lowercase();
+            let lower_tok = token.to_ascii_lowercase();
+            let h_bytes = lower_hay.as_bytes();
+            let t_bytes = lower_tok.as_bytes();
+            if t_bytes.is_empty() || h_bytes.len() < t_bytes.len() {
+                return false;
+            }
+            for i in 0..=(h_bytes.len() - t_bytes.len()) {
+                if &h_bytes[i..i + t_bytes.len()] == t_bytes {
+                    let left_ok = i == 0 || !h_bytes[i - 1].is_ascii_alphanumeric();
+                    let right_ok = i + t_bytes.len() == h_bytes.len()
+                        || !h_bytes[i + t_bytes.len()].is_ascii_alphanumeric();
+                    if left_ok && right_ok {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        return normalize_match_text(haystack_raw).contains(&clean);
+    }
+
+    haystack_raw
+        .to_lowercase()
+        .contains(&token.to_lowercase())
+        || normalize_match_text(haystack_raw).contains(&normalize_match_text(token))
+}
+
+/// Matches a candidate mod against existing character directories and the merged roster.
+pub fn match_character_for_mod(
+    game_id: &str,
+    cache: Option<&RosterCacheFile>,
+    existing_characters: &[crate::models::CharacterInfo],
+    texts_to_match: &[&str],
+    prefer_en: bool,
+) -> (String, String) {
+    let combined_raw = texts_to_match
+        .iter()
+        .copied()
+        .filter(|s| !s.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(" / ");
+    if combined_raw.trim().is_empty() {
+        return (
+            if prefer_en { "Others" } else { "其他" }.to_string(),
+            if prefer_en {
+                "Unmatched (default Others)"
+            } else {
+                "未匹配（默认其他）"
+            }
+            .to_string(),
+        );
+    }
+
+    let roster = get_merged_roster(game_id, cache);
+    let mut existing_by_norm: HashMap<String, &crate::models::CharacterInfo> = HashMap::new();
+    for ch in existing_characters {
+        let fn_norm = normalize_match_text(&ch.folder);
+        if !fn_norm.is_empty() {
+            existing_by_norm.insert(fn_norm, ch);
+        }
+        let dn_norm = normalize_match_text(&ch.display_name);
+        if !dn_norm.is_empty() {
+            existing_by_norm.entry(dn_norm).or_insert(ch);
+        }
+        for alias in &ch.aliases {
+            let an_norm = normalize_match_text(alias);
+            if !an_norm.is_empty() {
+                existing_by_norm.entry(an_norm).or_insert(ch);
+            }
+        }
+    }
+
+    struct CandidateScore {
+        folder: String,
+        reason: String,
+        score: usize,
+    }
+    let mut best: Option<CandidateScore> = None;
+
+    let mut consider = |folder: &str, token: &str, label: &str, bonus: usize| {
+        if !contains_token(&combined_raw, token) {
+            return;
+        }
+        let norm_len = normalize_match_text(token).chars().count();
+        let is_cjk = token.chars().any(|c| ('\u{4e00}'..='\u{9fa5}').contains(&c));
+        let score = (if is_cjk { norm_len * 12 } else { norm_len * 6 }) + bonus;
+        if best.as_ref().map(|b| score > b.score).unwrap_or(true) {
+            best = Some(CandidateScore {
+                folder: folder.to_string(),
+                reason: if prefer_en {
+                    format!("Matched \"{label}\"")
+                } else {
+                    format!("匹配「{label}」")
+                },
+                score,
+            });
+        }
+    };
+
+    for ch in existing_characters {
+        if ch.folder == "其他" {
+            continue;
+        }
+        consider(&ch.folder, &ch.folder, &ch.display_name, 20);
+        if ch.display_name != ch.folder {
+            consider(&ch.folder, &ch.display_name, &ch.display_name, 20);
+        }
+        for alias in &ch.aliases {
+            consider(
+                &ch.folder,
+                alias,
+                &format!("{} ({alias})", ch.display_name),
+                15,
+            );
+        }
+    }
+
+    for entry in &roster {
+        if entry.zh == "其他" {
+            continue;
+        }
+        let matched_existing = existing_by_norm
+            .get(&normalize_match_text(&entry.zh))
+            .or_else(|| existing_by_norm.get(&normalize_match_text(&entry.en)))
+            .or_else(|| existing_by_norm.get(&normalize_match_text(&entry.pinyin)))
+            .copied();
+
+        let target_folder = if let Some(existing) = matched_existing {
+            existing.folder.as_str()
+        } else if prefer_en && !entry.en.is_empty() {
+            entry.en.as_str()
+        } else {
+            entry.zh.as_str()
+        };
+        let bonus = if matched_existing.is_some() { 15 } else { 0 };
+
+        consider(target_folder, &entry.zh, &entry.zh, bonus + 10);
+        if !entry.en.is_empty() {
+            consider(
+                target_folder,
+                &entry.en,
+                &format!("{} ({})", entry.zh, entry.en),
+                bonus + 8,
+            );
+        }
+        if entry.pinyin.len() >= 3 {
+            consider(
+                target_folder,
+                &entry.pinyin,
+                &format!("{} ({})", entry.zh, entry.pinyin),
+                bonus + 5,
+            );
+        }
+        for alias in &entry.aliases {
+            consider(
+                target_folder,
+                alias,
+                &format!("{} ({alias})", entry.zh),
+                bonus + 6,
+            );
+        }
+    }
+
+    if let Some(m) = best {
+        return (m.folder, m.reason);
+    }
+
+    let existing_other = existing_by_norm
+        .get(&normalize_match_text("其他"))
+        .or_else(|| existing_by_norm.get(&normalize_match_text("others")))
+        .copied();
+    let default_folder = existing_other
+        .map(|c| c.folder.clone())
+        .unwrap_or_else(|| if prefer_en { "Others" } else { "其他" }.to_string());
+    (
+        default_folder,
+        if prefer_en {
+            "Unmatched (default Others)"
+        } else {
+            "未匹配（默认其他）"
+        }
+        .to_string(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -17,13 +17,16 @@ import { AddCustomGameModal } from './components/AddCustomGameModal'
 import { ConflictAuditModal } from './components/ConflictAuditModal'
 import { EditCharacterModal } from './components/EditCharacterModal'
 import { Icon } from './components/Icon'
+import { ImportPasswordModal, type PasswordPromptItem } from './components/ImportPasswordModal'
 import { ImportPreviewModal } from './components/ImportPreviewModal'
+import { Modal } from './components/Modal'
 import { RosterPresetModal } from './components/RosterPresetModal'
 import { CharacterView } from './views/CharacterView'
 import { LibraryView } from './views/LibraryView'
 import { SettingsView } from './views/SettingsView'
 import { errorMessage } from './utils'
 import { useI18n, getLocaleGameShortName, getLocaleGameName } from './i18n'
+import { cleanupStagedDrops, resolveDroppedFilePath } from './tauri-bridge'
 
 type View = 'library' | 'character' | 'settings'
 type ToastKind = 'ok' | 'err' | 'info'
@@ -59,6 +62,17 @@ export default function App() {
     result: ImportParseResult
     targetCharacter?: string
   } | null>(null)
+  const [passwordPrompt, setPasswordPrompt] = useState<{
+    paths: string[]
+    targetCharacter?: string
+    passwords: Record<string, string>
+    items: PasswordPromptItem[]
+  } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{
+    characterFolder: string
+    mods: ModInfo[]
+  } | null>(null)
+  const [deletingMods, setDeletingMods] = useState(false)
   const [dropActive, setDropActive] = useState(false)
 
   useEffect(() => {
@@ -137,6 +151,36 @@ export default function App() {
       unsubscribe()
     }
   }, [booting, snapshot?.game.id, selected?.folder, view])
+
+  useEffect(() => {
+    if (booting || !snapshot) return
+    let lastRefreshAt = 0
+    const handleFocusRefresh = () => {
+      const now = Date.now()
+      if (now - lastRefreshAt < 1000) return
+      lastRefreshAt = now
+      void (async () => {
+        try {
+          const snap = await window.moddeck.scanGame(snapshot.game.id)
+          if (!snap) return
+          setSnapshot(snap)
+          if (selected) {
+            const updated = snap.characters.find((entry) => entry.folder === selected.folder) ?? null
+            setSelected(updated)
+            if (updated) {
+              setMods(await window.moddeck.getMods(snap.game.id, updated.folder))
+            } else {
+              setMods([])
+            }
+          }
+        } catch {
+          // ignore focus sync errors
+        }
+      })()
+    }
+    window.addEventListener('focus', handleFocusRefresh)
+    return () => window.removeEventListener('focus', handleFocusRefresh)
+  }, [booting, snapshot?.game.id, selected?.folder])
 
   useEffect(() => {
     if (!boot || !snapshot) return
@@ -327,25 +371,43 @@ export default function App() {
     }
   }
 
-  async function deleteMod(mod: ModInfo) {
+  function requestDeleteMod(mod: ModInfo) {
     if (!selected || !snapshot) return
-    if (!window.confirm(t('common.confirmDeleteMod', { name: mod.name }))) return
+    setPendingDelete({ characterFolder: selected.folder, mods: [mod] })
+  }
+
+  function requestDeleteMods(targetMods: ModInfo[]) {
+    if (!selected || !snapshot || targetMods.length === 0) return
+    setPendingDelete({ characterFolder: selected.folder, mods: targetMods })
+  }
+
+  async function confirmDeleteMods() {
+    if (!pendingDelete || !snapshot || deletingMods) return
+    setDeletingMods(true)
+    const { characterFolder, mods: targets } = pendingDelete
+    const folders = targets.map((m) => m.folderName)
+    const targetFolderSet = new Set(folders)
     try {
-      const result = await window.moddeck.deleteMod(
+      const result = await window.moddeck.deleteMods(
         snapshot.game.id,
-        selected.folder,
-        mod.folderName
+        characterFolder,
+        folders
       )
       if (!result.ok) {
         notify(result.error || t('common.deleteFailed'), 'err')
         return
       }
-      setMods((list) => list.filter((item) => item.folderName !== mod.folderName))
+      setPendingDelete(null)
+      setMods((list) => list.filter((item) => !targetFolderSet.has(item.folderName)))
       const snap = await refreshSnapshot(snapshot.game.id)
-      const updated = snap.characters.find((entry) => entry.folder === selected.folder)
-      if (updated) setSelected(updated)
+      if (selected && selected.folder === characterFolder) {
+        const updated = snap.characters.find((entry) => entry.folder === selected.folder)
+        if (updated) setSelected(updated)
+      }
     } catch (error) {
       notify(errorMessage(error), 'err')
+    } finally {
+      setDeletingMods(false)
     }
   }
 
@@ -359,9 +421,14 @@ export default function App() {
     if (!result.ok && result.error) notify(result.error, 'err')
   }
 
-  async function openImportPreview(paths: string[], targetCharacter?: string) {
+  async function openImportPreview(
+    paths: string[],
+    targetCharacter?: string,
+    passwords: Record<string, string> = {}
+  ) {
     if (!snapshot || paths.length === 0) return
     if (!snapshot.modsPathExists) {
+      void cleanupStagedDrops(paths)
       notify(t('common.modsDirNotConfigured'), 'err')
       return
     }
@@ -370,16 +437,39 @@ export default function App() {
       const parsed = await window.moddeck.importParse({
         gameId: snapshot.game.id,
         paths,
-        targetCharacter
+        targetCharacter,
+        passwords
       })
+      const pwdErrors = parsed.errors.filter(
+        (err) => err.code === 'PASSWORD_REQUIRED' || err.code === 'WRONG_PASSWORD'
+      )
+      if (pwdErrors.length > 0) {
+        if (parsed.sessionId) {
+          await window.moddeck.importDiscard(parsed.sessionId).catch(() => undefined)
+        }
+        setPasswordPrompt({
+          paths,
+          targetCharacter,
+          passwords,
+          items: pwdErrors.map((err) => ({
+            source: err.source,
+            sourcePath: err.sourcePath || err.source,
+            wrongPassword: err.code === 'WRONG_PASSWORD'
+          }))
+        })
+        return
+      }
+      setPasswordPrompt(null)
       if (parsed.candidates.length === 0) {
         await window.moddeck.importDiscard(parsed.sessionId)
+        void cleanupStagedDrops(paths)
         const msg = parsed.errors[0]?.message || t('common.noModsFoundInImport')
         notify(msg, 'err')
         return
       }
       setParsedImport({ result: parsed, targetCharacter })
     } catch (error) {
+      void cleanupStagedDrops(paths)
       notify(errorMessage(error), 'err')
     } finally {
       setBusy(false)
@@ -492,7 +582,7 @@ export default function App() {
     setDropActive(false)
   }
 
-  function handleMainDrop(event: DragEvent<HTMLElement>) {
+  async function handleMainDrop(event: DragEvent<HTMLElement>) {
     if (isMainImportBlocked(event.target)) {
       if (dropActive) setDropActive(false)
       return
@@ -501,9 +591,15 @@ export default function App() {
     event.preventDefault()
     setDropActive(false)
     const files = Array.from(event.dataTransfer.files)
-    const paths = files
-      .map((file) => window.moddeck.getPathForFile(file))
-      .filter((item): item is string => Boolean(item))
+    if (files.length === 0) return
+    setBusy(true)
+    let paths: string[] = []
+    try {
+      paths = (await Promise.all(files.map((file) => resolveDroppedFilePath(file))))
+        .filter((item): item is string => Boolean(item))
+    } finally {
+      if (paths.length === 0) setBusy(false)
+    }
     if (paths.length === 0) return
     const targetCharacter = view === 'character' && selected ? selected.folder : undefined
     void openImportPreview(paths, targetCharacter)
@@ -940,7 +1036,8 @@ export default function App() {
             onSelectMode={changeModSelectMode}
             onSetMods={setModsEnabled}
             onOpen={openModFolder}
-            onDelete={deleteMod}
+            onDelete={requestDeleteMod}
+            onDeleteMods={requestDeleteMods}
             onImport={() => void runImport('files')}
             onImportFolder={() => void runImport('folder')}
             onEdit={() => setEditing(selected)}
@@ -1030,6 +1127,87 @@ export default function App() {
           onClose={() => setCreating(false)}
           onCreate={createCharacter}
         />
+      ) : null}
+
+      {passwordPrompt ? (
+        <ImportPasswordModal
+          items={passwordPrompt.items}
+          submitting={busy}
+          canSkip={
+            passwordPrompt.paths.length > passwordPrompt.items.length
+          }
+          onCancel={() => {
+            const stale = passwordPrompt.paths
+            setPasswordPrompt(null)
+            void cleanupStagedDrops(stale)
+          }}
+          onSkipAll={() => {
+            const encryptedPaths = passwordPrompt.items.map((item) => item.sourcePath)
+            const encryptedSet = new Set(encryptedPaths)
+            const remaining = passwordPrompt.paths.filter((p) => !encryptedSet.has(p))
+            const targetChar = passwordPrompt.targetCharacter
+            const pwds = passwordPrompt.passwords
+            setPasswordPrompt(null)
+            void cleanupStagedDrops(encryptedPaths)
+            if (remaining.length > 0) {
+              void openImportPreview(remaining, targetChar, pwds)
+            }
+          }}
+          onSubmit={async (newPasswords) => {
+            const merged = { ...passwordPrompt.passwords, ...newPasswords }
+            await openImportPreview(
+              passwordPrompt.paths,
+              passwordPrompt.targetCharacter,
+              merged
+            )
+          }}
+        />
+      ) : null}
+
+      {pendingDelete ? (
+        <Modal
+          title={t('common.confirmDeleteTitle')}
+          onClose={() => {
+            if (!deletingMods) setPendingDelete(null)
+          }}
+          width={420}
+          footer={
+            <>
+              <button
+                className="btn ghost"
+                onClick={() => setPendingDelete(null)}
+                disabled={deletingMods}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                className="btn danger"
+                onClick={() => void confirmDeleteMods()}
+                disabled={deletingMods}
+              >
+                <Icon name="trash" size={14} />
+                {deletingMods ? t('common.deleting') : t('common.moveToRecycleBin')}
+              </button>
+            </>
+          }
+        >
+          <div className="danger-confirm-dialog">
+            <p>
+              {pendingDelete.mods.length === 1
+                ? t('common.confirmDeleteMod', { name: pendingDelete.mods[0].name })
+                : t('common.confirmDeleteBatchMod', { count: pendingDelete.mods.length })}
+            </p>
+            {pendingDelete.mods.length > 1 ? (
+              <div className="delete-preview-list">
+                {pendingDelete.mods.map((m) => (
+                  <div key={m.folderName} className="delete-preview-item">
+                    {m.name}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </Modal>
       ) : null}
 
       {parsedImport && snapshot ? (

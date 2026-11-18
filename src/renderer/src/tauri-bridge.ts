@@ -4,16 +4,63 @@ import type { ModDeckApi, StateChangedEvent } from '../../shared/ipc'
 import type {
   AutoDetectPathsResult,
   Bootstrap,
+  CharacterHashConflict,
   ClearShaderCacheResult,
+  ConfigBundleInspection,
+  D3dxSyncStatus,
   EnvironmentCheck,
+  ExportPresetResult,
+  GameConflictAuditReport,
   GameSnapshot,
+  ImportConfigBundleResult,
+  ImportParseResult,
+  ImportPresetsResult,
+  ImportResult,
+  ImportRosterResult,
   ModDetails,
   ModInfo,
+  ModStaticAnalysis,
+  ModVariantPreset,
+  RosterPreset,
+  RosterSchemeImportInspection,
   RosterSyncResult,
   RosterSyncStatus,
+  SaveModPresetResult,
   Settings,
+  StorageOverview,
   ToggleResult
 } from '../../shared/types'
+
+/**
+ * Resolves a local path for a dropped File; in Tauri WebView2 (with HTML5 drag-drop enabled),
+ * `File.path` is unavailable so non-empty dropped files are staged into the backend temp dir.
+ */
+export async function resolveDroppedFilePath(file: File): Promise<string> {
+  const direct = window.moddeck?.getPathForFile(file) || ''
+  if (direct) return direct
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window && file.size > 0) {
+    try {
+      const buffer = await file.arrayBuffer()
+      return await invoke<string>('stage_dropped_file', buffer, {
+        headers: { 'x-file-name': encodeURIComponent(file.name) }
+      })
+    } catch {
+      return ''
+    }
+  }
+  return ''
+}
+
+export async function cleanupStagedDrops(paths: string[]): Promise<void> {
+  if (paths.length === 0) return
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    try {
+      await invoke<void>('cleanup_staged_drops', { paths })
+    } catch {
+      // ignore cleanup failures
+    }
+  }
+}
 
 function notMigrated<T>(feature: string, fallback: T): Promise<T> {
   console.warn(`[ModDeck Tauri POC] "${feature}" is scheduled for a later migration stage.`)
@@ -47,7 +94,10 @@ export function ensureTauriBridge(): void {
       invoke<ModInfo[]>('get_mods', { gameId, characterFolder }),
     toggleMod: (gameId, characterFolder, modFolder, enable, exclusive = false) =>
       invoke('toggle_mod_cmd', { gameId, characterFolder, modFolder, enable, exclusive }),
-    deleteMod: () => notMigrated('deleteMod', pocError('deleteMod')),
+    deleteMod: (gameId, characterFolder, modFolder) =>
+      invoke<ToggleResult>('delete_mod', { gameId, characterFolder, modFolder }),
+    deleteMods: (gameId, characterFolder, modFolders) =>
+      invoke<ToggleResult>('delete_mods', { gameId, characterFolder, modFolders }),
     openModFolder: (gameId, characterFolder, modFolder) =>
       invoke('open_mod_folder', { gameId, characterFolder, modFolder }),
     openCharacterFolder: (gameId, characterFolder) =>
@@ -58,21 +108,14 @@ export function ensureTauriBridge(): void {
     autoDetectPaths: () => invoke<AutoDetectPathsResult>('auto_detect_paths'),
     pickGameExe: () => invoke<string | null>('pick_game_exe'),
     pickLoader: () => invoke<string | null>('pick_loader'),
-    pickImportFiles: () => notMigrated('pickImportFiles', []),
-    pickImportFolder: () => notMigrated('pickImportFolder', null),
-    pickImportFolders: () => notMigrated('pickImportFolders', []),
+    pickImportFiles: () => invoke<string[]>('pick_import_files'),
+    pickImportFolder: () => invoke<string | null>('pick_import_folder'),
+    pickImportFolders: () => invoke<string[]>('pick_import_folders'),
     pickCover: () => invoke<string | null>('pick_cover'),
-    importRun: () =>
-      notMigrated('importRun', { items: [], importedMods: 0, createdCharacters: [] }),
-    importParse: () =>
-      notMigrated('importParse', {
-        sessionId: '',
-        candidates: [],
-        errors: [{ source: 'poc', message: 'Stage 0 POC' }]
-      }),
-    importCommit: () =>
-      notMigrated('importCommit', { items: [], importedMods: 0, createdCharacters: [] }),
-    importDiscard: () => notMigrated('importDiscard', undefined),
+    importRun: (request) => invoke<ImportResult>('import_run', { request }),
+    importParse: (request) => invoke<ImportParseResult>('import_parse', { request }),
+    importCommit: (request) => invoke<ImportResult>('import_commit', { request }),
+    importDiscard: (sessionId) => invoke<void>('import_discard', { sessionId }),
     getPathForFile: (file: File) => (file as File & { path?: string }).path || '',
     updateCharacterMeta: (gameId, characterFolder, patch) =>
       invoke<GameSnapshot | null>('update_character_meta', { gameId, characterFolder, patch }),
@@ -101,68 +144,85 @@ export function ensureTauriBridge(): void {
     showOverlayDetail: () => notMigrated('showOverlayDetail', pocError('showOverlayDetail')),
     hideOverlayDetail: () => notMigrated('hideOverlayDetail', undefined),
     sendModHotkey: (key) => invoke('send_mod_hotkey', { key }),
-    getRosterPresets: () => notMigrated('getRosterPresets', []),
-    saveRosterPreset: () => notMigrated('saveRosterPreset', pocError('saveRosterPreset')),
-    applyRosterPreset: () => notMigrated('applyRosterPreset', pocError('applyRosterPreset')),
-    deleteRosterPreset: () => notMigrated('deleteRosterPreset', pocError('deleteRosterPreset')),
-    getD3dxAutoSaveInterval: () => notMigrated('getD3dxAutoSaveInterval', 60),
-    setD3dxAutoSaveInterval: () =>
-      notMigrated('setD3dxAutoSaveInterval', pocError('setD3dxAutoSaveInterval')),
-    getD3dxSyncStatus: () =>
-      notMigrated('getD3dxSyncStatus', {
-        exists: false,
-        mtimeMs: 0,
-        autoSaveInterval: 60,
-        gameRunning: false,
-        pendingCount: 0
+    getRosterPresets: (gameId) => invoke<RosterPreset[]>('get_roster_presets', { gameId }),
+    saveRosterPreset: (gameId, input) =>
+      invoke<ToggleResult>('save_roster_preset', { gameId, input }),
+    applyRosterPreset: (gameId, presetId) =>
+      invoke<ToggleResult>('apply_roster_preset', { gameId, presetId }),
+    deleteRosterPreset: (gameId, presetId) =>
+      invoke<ToggleResult>('delete_roster_preset', { gameId, presetId }),
+    getD3dxAutoSaveInterval: (gameId) => invoke<number>('get_d3dx_auto_save_interval', { gameId }),
+    setD3dxAutoSaveInterval: (gameId, interval) =>
+      invoke<ToggleResult>('set_d3dx_auto_save_interval', { gameId, interval }),
+    getD3dxSyncStatus: (gameId) => invoke<D3dxSyncStatus>('get_d3dx_sync_status', { gameId }),
+    analyzeModIni: (gameId, characterFolder, modFolder) =>
+      invoke<ModStaticAnalysis>('analyze_mod_ini', { gameId, characterFolder, modFolder }),
+    scanCharacterHashConflicts: (gameId, characterFolder) =>
+      invoke<CharacterHashConflict[]>('scan_character_hash_conflicts', {
+        gameId,
+        characterFolder
       }),
-    analyzeModIni: () =>
-      notMigrated('analyzeModIni', {
-        variables: [],
-        dependencies: [],
-        hashes: [],
-        nonPersistControlVars: [],
-        localIgnoreRules: [],
-        hasLocalIgnoreFile: false
+    addVariableIgnoreRule: (rule, scope, target) =>
+      invoke<ToggleResult>('add_variable_ignore_rule', { rule, scope, target: target ?? null }),
+    getModPresets: (gameId, characterFolder, modFolder) =>
+      invoke<ModVariantPreset[]>('get_mod_presets', { gameId, characterFolder, modFolder }),
+    saveModPreset: (gameId, characterFolder, modFolder, presetName, options) =>
+      invoke<SaveModPresetResult>('save_mod_preset', {
+        gameId,
+        characterFolder,
+        modFolder,
+        presetName,
+        options: options ?? null
       }),
-    scanCharacterHashConflicts: () => notMigrated('scanCharacterHashConflicts', []),
-    addVariableIgnoreRule: () =>
-      notMigrated('addVariableIgnoreRule', pocError('addVariableIgnoreRule')),
-    getModPresets: () => notMigrated('getModPresets', []),
-    saveModPreset: () => notMigrated('saveModPreset', pocError('saveModPreset')),
-    applyModPreset: () => notMigrated('applyModPreset', pocError('applyModPreset')),
-    deleteModPreset: () => notMigrated('deleteModPreset', pocError('deleteModPreset')),
-    exportModPresets: () => notMigrated('exportModPresets', pocError('exportModPresets')),
-    importModPresets: () => notMigrated('importModPresets', pocError('importModPresets')),
-    importModPresetsFromPath: () =>
-      notMigrated('importModPresetsFromPath', pocError('importModPresetsFromPath')),
-    exportRosterPreset: () => notMigrated('exportRosterPreset', pocError('exportRosterPreset')),
-    inspectRosterPresetFile: () =>
-      notMigrated('inspectRosterPresetFile', {
-        ok: false,
-        error: 'Stage 0 POC',
-        totalCharacters: 0,
-        matchedCharacters: 0,
-        totalMods: 0,
-        matchedMods: 0,
-        missingCharacters: [],
-        missingMods: [],
-        matchedItems: []
+    applyModPreset: (gameId, characterFolder, modFolder, presetId) =>
+      invoke<ToggleResult>('apply_mod_preset', {
+        gameId,
+        characterFolder,
+        modFolder,
+        presetId
       }),
-    inspectRosterPresetFileFromPath: () =>
-      notMigrated('inspectRosterPresetFileFromPath', {
-        ok: false,
-        error: 'Stage 0 POC',
-        totalCharacters: 0,
-        matchedCharacters: 0,
-        totalMods: 0,
-        matchedMods: 0,
-        missingCharacters: [],
-        missingMods: [],
-        matchedItems: []
+    deleteModPreset: (gameId, characterFolder, modFolder, presetId) =>
+      invoke<ToggleResult>('delete_mod_preset', {
+        gameId,
+        characterFolder,
+        modFolder,
+        presetId
       }),
-    confirmImportRosterPreset: () =>
-      notMigrated('confirmImportRosterPreset', pocError('confirmImportRosterPreset')),
+    exportModPresets: (gameId, characterFolder, modFolder, presetId) =>
+      invoke<ExportPresetResult>('export_mod_presets', {
+        gameId,
+        characterFolder,
+        modFolder,
+        presetId: presetId ?? null
+      }),
+    importModPresets: (gameId, characterFolder, modFolder) =>
+      invoke<ImportPresetsResult>('import_mod_presets', {
+        gameId,
+        characterFolder,
+        modFolder
+      }),
+    importModPresetsFromPath: (gameId, characterFolder, modFolder, filePath) =>
+      invoke<ImportPresetsResult>('import_mod_presets_from_path', {
+        gameId,
+        characterFolder,
+        modFolder,
+        filePath
+      }),
+    exportRosterPreset: (gameId, presetId) =>
+      invoke<ExportPresetResult>('export_roster_preset', { gameId, presetId }),
+    inspectRosterPresetFile: (gameId) =>
+      invoke<RosterSchemeImportInspection>('inspect_roster_preset_file', { gameId }),
+    inspectRosterPresetFileFromPath: (gameId, filePath) =>
+      invoke<RosterSchemeImportInspection>('inspect_roster_preset_file_from_path', {
+        gameId,
+        filePath
+      }),
+    confirmImportRosterPreset: (gameId, rawExport, customName) =>
+      invoke<ImportRosterResult>('confirm_import_roster_preset', {
+        gameId,
+        rawExport,
+        customName: customName ?? null
+      }),
     getModDetails: (gameId, characterFolder, modFolder) =>
       invoke<ModDetails>('get_mod_details_cmd', { gameId, characterFolder, modFolder }),
     setModPreview: (gameId, characterFolder, modFolder, sourcePath) =>
@@ -192,34 +252,21 @@ export function ensureTauriBridge(): void {
     checkEnvironment: (gameId) => invoke<EnvironmentCheck[]>('check_environment', { gameId: gameId ?? null }),
     openEnvironmentFolder: (gameId) => invoke<ToggleResult>('open_environment_folder', { gameId }),
     clearShaderCache: (gameId) => invoke<ClearShaderCacheResult>('clear_shader_cache', { gameId }),
-    auditGameConflicts: () =>
-      notMigrated('auditGameConflicts', {
-        gameId: '',
-        modsPath: '',
-        scannedAt: Date.now(),
-        scannedMods: 0,
-        scannedIniFiles: 0,
-        items: [],
-        summary: { high: 0, warning: 0, info: 0 }
-      }),
-    exportConflictAuditReport: () =>
-      notMigrated('exportConflictAuditReport', pocError('exportConflictAuditReport')),
-    getStorageOverview: () =>
-      notMigrated('getStorageOverview', {
-        dataDir: '',
-        totalBytes: 0,
-        categories: [],
-        backups: []
-      }),
-    restoreModBackup: () => notMigrated('restoreModBackup', pocError('restoreModBackup')),
-    deleteModBackup: () => notMigrated('deleteModBackup', pocError('deleteModBackup')),
-    pruneModBackups: () => notMigrated('pruneModBackups', pocError('pruneModBackups')),
-    exportConfigBundle: () => notMigrated('exportConfigBundle', pocError('exportConfigBundle')),
-    inspectConfigBundle: () => notMigrated('inspectConfigBundle', pocError('inspectConfigBundle')),
-    importConfigBundle: () => notMigrated('importConfigBundle', pocError('importConfigBundle')),
+    auditGameConflicts: (gameId) => invoke<GameConflictAuditReport>('audit_game_conflicts', { gameId }),
+    exportConflictAuditReport: (gameId, report) =>
+      invoke<ExportPresetResult>('export_conflict_audit_report', { gameId, report }),
+    getStorageOverview: () => invoke<StorageOverview>('get_storage_overview'),
+    restoreModBackup: (backupId) => invoke<ToggleResult>('restore_mod_backup', { backupId }),
+    deleteModBackup: (backupId) => invoke<ToggleResult>('delete_mod_backup', { backupId }),
+    pruneModBackups: (olderThanDays) => invoke('prune_mod_backups', { olderThanDays }),
+    exportConfigBundle: () => invoke<ExportPresetResult>('export_config_bundle'),
+    inspectConfigBundle: () => invoke<ConfigBundleInspection>('inspect_config_bundle'),
+    importConfigBundle: (filePath, options) =>
+      invoke<ImportConfigBundleResult>('import_config_bundle', { filePath, options }),
     reloadF10: () => invoke('reload_f10'),
     setReloadHotkey: (hotkey) => invoke('set_reload_hotkey', { hotkey }),
-    getPendingPresetCount: () => invoke<number>('get_pending_preset_count'),
+    getPendingPresetCount: (gameId) =>
+      invoke<number>('get_pending_preset_count', { gameId: gameId ?? null }),
     getRosterStatus: () => invoke<RosterSyncStatus>('get_roster_status'),
     syncRemoteRoster: (customUrl) => invoke<RosterSyncResult>('sync_remote_roster', { customUrl }),
     onStateChanged: (listener) => {

@@ -15,6 +15,7 @@ import { Modal } from './Modal'
 import { ScrollTitle } from './ScrollTitle'
 import { ImportSchemeModal } from './ImportSchemeModal'
 import { useI18n, getLocaleCharacterName, getLocaleGameName } from '../i18n'
+import { resolveDroppedFilePath } from '../tauri-bridge'
 
 export function RosterPresetModal({
   game,
@@ -634,12 +635,12 @@ export function RosterPresetModal({
             e.dataTransfer.dropEffect = 'copy'
           }
         }}
-        onDrop={(e) => {
+        onDrop={async (e) => {
           if (!Array.from(e.dataTransfer.types).includes('Files')) return
           e.preventDefault()
           e.stopPropagation()
           const file = e.dataTransfer.files[0]
-          const filePath = file ? window.moddeck.getPathForFile(file) : null
+          const filePath = file ? await resolveDroppedFilePath(file) : ''
           if (filePath) {
             void handleDropImportFile(filePath)
           }

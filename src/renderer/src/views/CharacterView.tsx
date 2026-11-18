@@ -30,6 +30,7 @@ export function CharacterView({
   onSetMods,
   onOpen,
   onDelete,
+  onDeleteMods,
   onImport,
   onImportFolder,
   onEdit,
@@ -54,6 +55,7 @@ export function CharacterView({
   onSetMods: (folders: string[], enable: boolean) => Promise<void> | void
   onOpen: (mod: ModInfo) => void
   onDelete: (mod: ModInfo) => Promise<void> | void
+  onDeleteMods?: (mods: ModInfo[]) => Promise<void> | void
   onImport: () => void
   onImportFolder: () => void
   onEdit: () => void
@@ -85,6 +87,15 @@ export function CharacterView({
     setChecked(new Set())
     setConflictsExpanded(false)
   }, [character.folder])
+
+  useEffect(() => {
+    setChecked((curr) => {
+      if (curr.size === 0) return curr
+      const valid = new Set(mods.map((m) => m.name))
+      const next = new Set(Array.from(curr).filter((name) => valid.has(name)))
+      return next.size === curr.size ? curr : next
+    })
+  }, [mods])
 
   useEffect(() => {
     const enabledCount = mods.filter((m) => m.enabled).length
@@ -279,33 +290,67 @@ export function CharacterView({
             {t('preset.multi')}
           </button>
         </div>
-        {selectMode === 'multi' && checked.size > 0 ? (
+        {selectMode === 'multi' && visible.length > 0 ? (
           <>
-            <span className="hint">{t('character.selectedCount', { count: checked.size })}</span>
             <button
               className="btn ghost"
-              onClick={() => {
-                void onSetMods(
-                  mods.filter((mod) => checked.has(mod.name)).map((mod) => mod.folderName),
-                  true
-                )
-                setChecked(new Set())
-              }}
+              onClick={() => setChecked(new Set(visible.map((m) => m.name)))}
+              disabled={visible.every((m) => checked.has(m.name))}
             >
-              {t('character.enableSelected')}
+              {t('character.selectAll')}
             </button>
             <button
               className="btn ghost"
-              onClick={() => {
-                void onSetMods(
-                  mods.filter((mod) => checked.has(mod.name)).map((mod) => mod.folderName),
-                  false
-                )
-                setChecked(new Set())
-              }}
+              onClick={() => setChecked(new Set())}
+              disabled={checked.size === 0}
             >
-              {t('character.disableSelected')}
+              {t('character.deselectAll')}
             </button>
+            {checked.size > 0 ? (
+              <>
+                <span className="hint">{t('character.selectedCount', { count: checked.size })}</span>
+                <button
+                  className="btn ghost"
+                  onClick={() => {
+                    void onSetMods(
+                      mods.filter((mod) => checked.has(mod.name)).map((mod) => mod.folderName),
+                      true
+                    )
+                    setChecked(new Set())
+                  }}
+                >
+                  {t('character.enableSelected')}
+                </button>
+                <button
+                  className="btn ghost"
+                  onClick={() => {
+                    void onSetMods(
+                      mods.filter((mod) => checked.has(mod.name)).map((mod) => mod.folderName),
+                      false
+                    )
+                    setChecked(new Set())
+                  }}
+                >
+                  {t('character.disableSelected')}
+                </button>
+                <button
+                  className="btn ghost danger-text"
+                  onClick={() => {
+                    const targets = mods.filter((mod) => checked.has(mod.name))
+                    if (targets.length === 0) return
+                    if (onDeleteMods) {
+                      void onDeleteMods(targets)
+                    } else {
+                      void onDelete(targets[0])
+                    }
+                  }}
+                  title={t('character.deleteToRecycleBin')}
+                >
+                  <Icon name="trash" size={14} />
+                  {t('character.deleteSelected')}
+                </button>
+              </>
+            ) : null}
           </>
         ) : null}
         {sort === 'custom' ? <span className="hint">{t('character.dragToSort')}</span> : null}
@@ -401,10 +446,6 @@ export function CharacterView({
                   onOpen={() => onOpen(mod)}
                   onDelete={() => {
                     void onDelete(mod)
-                    if (selectedName === mod.name) {
-                      setSelectedName(null)
-                      setDetails(null)
-                    }
                   }}
                   onDragStart={(event) => {
                     setDragName(mod.name)
@@ -449,8 +490,6 @@ export function CharacterView({
             onDelete={() => {
               if (!selectedMod) return
               void onDelete(selectedMod)
-              setSelectedName(null)
-              setDetails(null)
             }}
             onRefreshDetails={() => {
               if (selectedMod) {

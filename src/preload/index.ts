@@ -22,6 +22,13 @@ const api: ModDeckApi = {
     ipcRenderer.invoke(IPC.toggleMod, gameId, characterFolder, modFolder, enable, exclusive),
   deleteMod: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.deleteMod, gameId, characterFolder, modFolder),
+  deleteMods: async (gameId, characterFolder, modFolders) => {
+    for (const folder of modFolders) {
+      const res = await ipcRenderer.invoke(IPC.deleteMod, gameId, characterFolder, folder)
+      if (res && res.ok === false) return res
+    }
+    return { ok: true }
+  },
   openModFolder: (gameId, characterFolder, modFolder) =>
     ipcRenderer.invoke(IPC.openModFolder, gameId, characterFolder, modFolder),
   openCharacterFolder: (gameId, characterFolder) =>

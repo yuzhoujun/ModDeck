@@ -196,7 +196,7 @@ fn inspect_mod_ini_status(dir: &Path, max_depth: usize) -> (bool, bool, bool) {
     (has_ini, has_active_ini, has_disabled_ini)
 }
 
-fn is_mod_effectively_enabled(folder_name: &str, mod_path: &Path) -> bool {
+pub fn is_mod_effectively_enabled(folder_name: &str, mod_path: &Path) -> bool {
     if folder_name.to_ascii_lowercase().starts_with("disabled_") {
         return false;
     }
@@ -205,6 +205,42 @@ fn is_mod_effectively_enabled(folder_name: &str, mod_path: &Path) -> bool {
         return false;
     }
     true
+}
+
+pub fn resolve_mod_target_dir(
+    mods_path: &Path,
+    character_folder: &str,
+    mod_folder: &str,
+) -> Result<PathBuf, String> {
+    if !is_safe_segment(mod_folder) {
+        return Err("Invalid mod folder name".to_string());
+    }
+    let char_dir = resolve_character_dir(mods_path, character_folder)?;
+    let direct = char_dir.join(mod_folder);
+    if direct.is_dir() && is_inside(&char_dir, &direct) {
+        return Ok(direct);
+    }
+    let clean = if mod_folder.len() >= 9 && mod_folder.as_bytes()[..9].eq_ignore_ascii_case(b"disabled_")
+    {
+        &mod_folder[9..]
+    } else {
+        mod_folder
+    };
+    let alt = if mod_folder.len() >= 9 && mod_folder.as_bytes()[..9].eq_ignore_ascii_case(b"disabled_")
+    {
+        clean.to_string()
+    } else {
+        format!("DISABLED_{clean}")
+    };
+    let alt_dir = char_dir.join(&alt);
+    if alt_dir.is_dir() && is_inside(&char_dir, &alt_dir) {
+        return Ok(alt_dir);
+    }
+    if is_inside(&char_dir, &direct) {
+        Ok(direct)
+    } else {
+        Err("Mod directory escapes character folder".to_string())
+    }
 }
 
 fn find_character_cover_file(dir: &Path) -> Option<PathBuf> {
@@ -1236,6 +1272,136 @@ pub fn sync_missing_roster_folders_to_disk(
     }
 
     (created_count, metadata_changed)
+}
+
+/// Sanitizes a user or archive-supplied folder/file segment for safe path joining.
+pub fn sanitize_segment(raw: &str, fallback: &str) -> String {
+    let cleaned: String = raw
+        .trim()
+        .chars()
+        .map(|c| {
+            if matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') || c.is_control()
+            {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_end_matches('.');
+    let mut s = trimmed.to_string();
+    while s.starts_with('.') {
+        s.remove(0);
+    }
+    let s = s.trim().to_string();
+    if s.is_empty() || s == "." || s == ".." {
+        fallback.to_string()
+    } else {
+        s
+    }
+}
+
+/// Returns a unique directory name under `parent` by appending `(2)`, `(3)`, ... when needed.
+pub fn unique_dir_name(parent: &Path, base_name: &str) -> String {
+    let clean = sanitize_segment(base_name, "mod");
+    if !parent.join(&clean).exists() {
+        return clean;
+    }
+    let mut idx = 2usize;
+    loop {
+        let candidate = format!("{clean} ({idx})");
+        if !parent.join(&candidate).exists() {
+            return candidate;
+        }
+        idx += 1;
+    }
+}
+
+/// Recursively copies a directory tree from `src` to `dst` (which must not already exist).
+pub fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
+    if dst.exists() {
+        return Err(format!("Destination already exists: {}", dst.display()));
+    }
+    fs::create_dir_all(dst).map_err(|e| format!("Failed to create dir {}: {e}", dst.display()))?;
+    for entry in fs::read_dir(src).map_err(|e| format!("Failed to read dir {}: {e}", src.display()))?
+    {
+        let entry = entry.map_err(|e| format!("Dir entry error: {e}"))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("File type error: {e}"))?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        let target = dst.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_recursive(&entry.path(), &target)?;
+        } else if file_type.is_file() {
+            fs::copy(entry.path(), &target)
+                .map_err(|e| format!("Failed to copy {}: {e}", target.display()))?;
+        }
+    }
+    Ok(())
+}
+
+/// Moves `src` to `dst`, falling back to recursive copy + remove across volumes.
+pub fn move_dir_or_copy(src: &Path, dst: &Path) -> Result<(), String> {
+    if let Some(parent) = dst.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create parent dir {}: {e}", parent.display()))?;
+    }
+    match fs::rename(src, dst) {
+        Ok(()) => Ok(()),
+        Err(_) => {
+            copy_dir_recursive(src, dst)?;
+            fs::remove_dir_all(src)
+                .map_err(|e| format!("Failed to remove source {}: {e}", src.display()))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DiscoveredCategoryCover {
+    pub folder: String,
+    pub file_name: String,
+    pub file_path: PathBuf,
+    pub size: u64,
+}
+
+/// Lists `.preview.*` / `_cover.*` category cover files stored inside `modsPath`.
+pub fn scan_game_category_covers(mods_path: &Path) -> Vec<DiscoveredCategoryCover> {
+    let mut out = Vec::new();
+    if !mods_path.is_dir() {
+        return out;
+    }
+    let char_base = resolve_character_base(mods_path);
+    let Ok(entries) = fs::read_dir(&char_base) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(folder) = entry.file_name().to_str().map(str::to_string) else {
+            continue;
+        };
+        if ignored_character_name(&folder) || is_legacy_container(&folder) {
+            continue;
+        }
+        if let Some(cover_path) = find_character_cover_file(&path) {
+            if let Ok(meta) = fs::metadata(&cover_path) {
+                if let Some(file_name) = cover_path.file_name().and_then(|s| s.to_str()) {
+                    out.push(DiscoveredCategoryCover {
+                        folder,
+                        file_name: file_name.to_string(),
+                        size: meta.len(),
+                        file_path: cover_path,
+                    });
+                }
+            }
+        }
+    }
+    out
 }
 
 #[cfg(test)]

@@ -233,6 +233,7 @@ export interface ImportRequest {
   archivePaths?: string[]
   folderPaths?: string[]
   targetCharacter?: string
+  passwords?: Record<string, string>
 }
 
 export interface ImportCandidate {
@@ -250,12 +251,20 @@ export interface ImportParseRequest {
   gameId: GameId
   paths: string[]
   targetCharacter?: string
+  passwords?: Record<string, string>
+}
+
+export interface ImportParseError {
+  source: string
+  message: string
+  sourcePath?: string
+  code?: 'PASSWORD_REQUIRED' | 'WRONG_PASSWORD' | string
 }
 
 export interface ImportParseResult {
   sessionId: string
   candidates: ImportCandidate[]
-  errors: Array<{ source: string; message: string }>
+  errors: ImportParseError[]
 }
 
 export interface ImportCommitItem {

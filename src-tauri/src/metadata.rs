@@ -7,6 +7,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub const METADATA_FILE: &str = "characters.json";
 pub const CHARACTER_COVER_FILE: &str = ".preview.png";
 pub const LEGACY_CHARACTER_COVERS: [&str; 7] = [
     ".preview.jpg",

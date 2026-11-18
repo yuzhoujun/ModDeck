@@ -57,6 +57,7 @@ export const IPC = {
   getMods: 'mods:list',
   toggleMod: 'mods:toggle',
   deleteMod: 'mods:delete',
+  deleteMods: 'mods:delete-batch',
   openModFolder: 'shell:open-mod-folder',
   openCharacterFolder: 'shell:open-character-folder',
   openPath: 'shell:open-path',
@@ -171,6 +172,7 @@ export interface ModDeckApi {
     exclusive?: boolean
   ): Promise<ToggleResult>
   deleteMod(gameId: GameId, characterFolder: string, modFolder: string): Promise<ToggleResult>
+  deleteMods(gameId: GameId, characterFolder: string, modFolders: string[]): Promise<ToggleResult>
   openModFolder(gameId: GameId, characterFolder: string, modFolder: string): Promise<ToggleResult>
   openCharacterFolder(gameId: GameId, characterFolder: string): Promise<ToggleResult>
   openPath(kind: 'mods' | 'game' | 'loader' | 'data' | 'logs' | 'languages' | 'locales', gameId?: GameId): Promise<ToggleResult>

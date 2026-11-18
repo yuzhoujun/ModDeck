@@ -1,17 +1,21 @@
-mod detect;
+﻿mod detect;
 mod games;
+mod imports;
+mod ini_analysis;
 mod input;
 mod library;
 mod metadata;
 mod models;
+mod presets;
 mod roster;
 mod settings;
+mod storage;
 
 use games::{get_all_games, get_game, is_builtin_game, sanitize_custom_game};
 use library::{
     build_snapshot, create_character_dir, decode_asset_query, get_mod_details,
-    is_allowed_asset_path, list_mods, resolve_character_dir, set_mod_preview_file,
-    sync_missing_roster_folders_to_disk, toggle_mod as fs_toggle_mod,
+    is_allowed_asset_path, list_mods, resolve_character_dir, resolve_mod_target_dir,
+    set_mod_preview_file, sync_missing_roster_folders_to_disk, toggle_mod as fs_toggle_mod,
 };
 use metadata::{
     clear_character_cover_files, get_character_meta, load_metadata, mark_roster_initialized,
@@ -19,11 +23,16 @@ use metadata::{
     save_metadata, set_character_meta,
 };
 use models::{
-    AppInfo, AutoDetectPathsResult, Bootstrap, CharacterMeta, ClearShaderCacheResult,
-    CreateCharacterInput, CustomGameMutationResult, EnvironmentCheck, GameSettings, GameSnapshot,
-    HotkeyResult, MetadataStore, ModDetails, ModInfo, OnlyConfiguredResult, RosterSyncResult,
-    RosterSyncStatus, Settings, SimpleResult, StateChangedEvent, ToggleResult,
-    ToggleVisibilityResult,
+    AppInfo, AutoDetectPathsResult, Bootstrap, CharacterHashConflict, CharacterMeta,
+    ClearShaderCacheResult, ConfigBundleInspection, CreateCharacterInput, CustomGameMutationResult,
+    D3dxSyncStatus, EnvironmentCheck, ExportPresetResult, GameConflictAuditReport, GameSettings,
+    GameSnapshot, HotkeyResult, ImportCommitRequest, ImportConfigBundleOptions,
+    ImportConfigBundleResult, ImportParseRequest, ImportParseResult, ImportPresetsResult,
+    ImportRequest, ImportResult, ImportRosterResult, MetadataStore, ModDetails, ModInfo,
+    ModStaticAnalysis, ModVariantPreset, OnlyConfiguredResult, PruneBackupsResult, RosterPreset,
+    RosterSchemeImportInspection, RosterSyncResult, RosterSyncStatus, SaveModPresetOptions,
+    SaveModPresetResult, SaveRosterPresetInput, Settings, SimpleResult, StateChangedEvent,
+    StorageOverview, ToggleResult, ToggleVisibilityResult,
 };
 use serde_json::Value;
 use settings::{
@@ -33,12 +42,126 @@ use settings::{
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::http::{header::CONTENT_TYPE, Response, StatusCode};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+static SUPPRESS_WATCHER_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
+
+fn now_epoch_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+fn mark_internal_fs_mutation() {
+    SUPPRESS_WATCHER_UNTIL_MS.store(now_epoch_ms().saturating_add(850), Ordering::Relaxed);
+}
+
+#[cfg(windows)]
+fn spawn_mods_watcher(app: AppHandle) {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{HANDLE, WAIT_OBJECT_0};
+    use windows::Win32::Storage::FileSystem::{
+        FindCloseChangeNotification, FindFirstChangeNotificationW, FindNextChangeNotification,
+        FILE_NOTIFY_CHANGE_DIR_NAME, FILE_NOTIFY_CHANGE_FILE_NAME,
+    };
+    use windows::Win32::System::Threading::WaitForSingleObject;
+
+    std::thread::Builder::new()
+        .name("moddeck-mods-watcher".to_string())
+        .spawn(move || {
+            let mut watched_path = String::new();
+            let mut watched_game = String::new();
+            let mut handle: Option<HANDLE> = None;
+
+            loop {
+                let target = app
+                    .state::<AppState>()
+                    .0
+                    .try_lock()
+                    .ok()
+                    .map(|g| {
+                        let gid = g.settings.active_game_id.clone();
+                        let mp = g
+                            .settings
+                            .games
+                            .get(&gid)
+                            .map(|cfg| cfg.mods_path.trim().to_string())
+                            .unwrap_or_default();
+                        (gid, mp)
+                    });
+
+                if let Some((gid, mp)) = target {
+                    if mp != watched_path || gid != watched_game {
+                        if let Some(h) = handle.take() {
+                            unsafe {
+                                let _ = FindCloseChangeNotification(h);
+                            }
+                        }
+                        watched_path = mp.clone();
+                        watched_game = gid.clone();
+                        if !watched_path.is_empty() && Path::new(&watched_path).is_dir() {
+                            let wide: Vec<u16> = Path::new(&watched_path)
+                                .as_os_str()
+                                .encode_wide()
+                                .chain(Some(0))
+                                .collect();
+                            if let Ok(h) = unsafe {
+                                FindFirstChangeNotificationW(
+                                    PCWSTR(wide.as_ptr()),
+                                    true,
+                                    FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_FILE_NAME,
+                                )
+                            } {
+                                handle = Some(h);
+                            }
+                        }
+                    }
+                }
+
+                let Some(h) = handle else {
+                    std::thread::sleep(Duration::from_millis(500));
+                    continue;
+                };
+
+                let wait = unsafe { WaitForSingleObject(h, 450) };
+                if wait == WAIT_OBJECT_0 {
+                    // Drain bursts over a short debounce window before notifying UI
+                    let _ = unsafe { FindNextChangeNotification(h) };
+                    std::thread::sleep(Duration::from_millis(260));
+                    while unsafe { WaitForSingleObject(h, 20) } == WAIT_OBJECT_0 {
+                        let _ = unsafe { FindNextChangeNotification(h) };
+                    }
+                    if now_epoch_ms() >= SUPPRESS_WATCHER_UNTIL_MS.load(Ordering::Relaxed)
+                        && !watched_game.is_empty()
+                    {
+                        emit_state_changed(&app, Some(&watched_game), None);
+                    }
+                } else {
+                    // Check for missed handle invalidation if watched folder was removed
+                    if !watched_path.is_empty() && !Path::new(&watched_path).is_dir() {
+                        if let Some(h) = handle.take() {
+                            unsafe {
+                                let _ = FindCloseChangeNotification(h);
+                            }
+                        }
+                        watched_path.clear();
+                    }
+                }
+            }
+        })
+        .ok();
+}
+
+#[cfg(not(windows))]
+fn spawn_mods_watcher(_app: AppHandle) {}
 
 struct InnerState {
     base_dir: PathBuf,
@@ -47,6 +170,8 @@ struct InnerState {
     registered_hotkey: Option<String>,
     last_overlay_toggle: Option<Instant>,
     webview_data_dir: Option<PathBuf>,
+    import_sessions: imports::ImportSessionManager,
+    pending_queue: presets::PendingQueueState,
 }
 
 pub struct AppState(Mutex<InnerState>);
@@ -99,10 +224,17 @@ fn mime_for_path(path: &Path) -> &'static str {
 }
 
 fn emit_state_changed(app: &AppHandle, game_id: Option<&str>, character_folder: Option<&str>) {
+    let pending_count = app
+        .state::<AppState>()
+        .0
+        .try_lock()
+        .ok()
+        .map(|g| g.pending_queue.pending_count(game_id))
+        .unwrap_or(0);
     let payload = StateChangedEvent {
         game_id: game_id.map(str::to_string),
         character_folder: character_folder.map(str::to_string),
-        pending_preset_count: Some(0),
+        pending_preset_count: Some(pending_count),
     };
     let _ = app.emit("app:state-changed", payload);
 }
@@ -356,6 +488,7 @@ fn toggle_mod_cmd(
             error: Some("Mods path not configured".into()),
         };
     }
+    mark_internal_fs_mutation();
     match fs_toggle_mod(
         Path::new(&mods_path_str),
         &character_folder,
@@ -385,6 +518,11 @@ fn toggle_mod_cmd(
             );
             let _ = save_settings_atomic(&guard.base_dir, &guard.settings);
             let auto_reload = guard.settings.ui.auto_reload_mod_toggle;
+            if !auto_reload {
+                guard
+                    .pending_queue
+                    .record_mod_toggle(&game_id, &character_folder, &mod_folder, enable);
+            }
             let hints = active_exe_hints(&guard.settings);
             let reload_key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
                 "F10".to_string()
@@ -512,20 +650,34 @@ fn open_in_explorer(target: &Path) -> SimpleResult {
 }
 
 #[tauri::command]
-fn reload_f10(state: State<'_, AppState>) -> SimpleResult {
-    let guard = state.0.lock().expect("state lock");
+fn reload_f10(app: AppHandle, state: State<'_, AppState>) -> SimpleResult {
+    let mut guard = state.0.lock().expect("state lock");
     let hints = active_exe_hints(&guard.settings);
     let reload_key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
         "F10".to_string()
     } else {
         guard.settings.ui.reload_hotkey.trim().to_string()
     };
+    let active_id = guard.settings.active_game_id.clone();
+    let active_mods = guard
+        .settings
+        .games
+        .get(&active_id)
+        .map(|g| g.mods_path.clone())
+        .unwrap_or_default();
+    guard.pending_queue.clear_all(Some(&active_id));
     drop(guard);
     match input::send_hotkey(&reload_key, &hints) {
-        Ok(()) => SimpleResult {
-            ok: true,
-            error: None,
-        },
+        Ok(()) => {
+            if !active_mods.trim().is_empty() {
+                presets::clear_preset_bridge_ini(Path::new(&active_mods));
+            }
+            emit_state_changed(&app, Some(&active_id), None);
+            SimpleResult {
+                ok: true,
+                error: None,
+            }
+        }
         Err(e) => SimpleResult {
             ok: false,
             error: Some(e),
@@ -691,8 +843,10 @@ fn set_overlay_hotkey(
 }
 
 #[tauri::command]
-fn get_pending_preset_count() -> usize {
-    0
+fn get_pending_preset_count(state: State<'_, AppState>, game_id: Option<String>) -> usize {
+    let guard = state.0.lock().expect("state lock");
+    let target = game_id.as_deref().unwrap_or(&guard.settings.active_game_id);
+    guard.pending_queue.pending_count(Some(target))
 }
 
 fn file_path_to_string(fp: FilePath) -> Option<String> {
@@ -1113,6 +1267,1272 @@ fn clear_shader_cache(state: State<'_, AppState>, game_id: String) -> ClearShade
     };
     let is_en = is_non_zh_effective_locale(&settings.ui.language);
     detect::clear_shader_cache_for_game(&settings, &game_id, is_en)
+}
+
+#[tauri::command]
+async fn delete_mods(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folders: Vec<String>,
+) -> Result<ToggleResult, String> {
+    if mod_folders.is_empty() {
+        return Ok(ToggleResult::ok());
+    }
+    let (prev_len, mut settings_copy) = {
+        let guard = state.0.lock().expect("state lock");
+        (guard.settings.recent_mods.len(), guard.settings.clone())
+    };
+
+    mark_internal_fs_mutation();
+    let game_clone = game_id.clone();
+    let char_clone = character_folder.clone();
+    let folders_clone = mod_folders.clone();
+    let work = tauri::async_runtime::spawn_blocking(move || {
+        let res = storage::delete_mods_to_trash(
+            &mut settings_copy,
+            &game_clone,
+            &char_clone,
+            &folders_clone,
+        );
+        (res, settings_copy)
+    })
+    .await;
+
+    let (res, next_settings) = match work {
+        Ok(pair) => pair,
+        Err(err) => return Ok(ToggleResult::err(format!("Delete task panicked: {err}"))),
+    };
+
+    match res {
+        Ok(()) => {
+            mark_internal_fs_mutation();
+            let mut guard = state.0.lock().expect("state lock");
+            for folder in &mod_folders {
+                guard
+                    .pending_queue
+                    .clear_for_mod(&game_id, &character_folder, folder);
+            }
+            if next_settings.recent_mods.len() != prev_len {
+                guard.settings.recent_mods = next_settings.recent_mods;
+                let _ = save_settings(&guard.base_dir, &guard.settings);
+            }
+            drop(guard);
+            emit_state_changed(&app, Some(&game_id), Some(&character_folder));
+            Ok(ToggleResult::ok())
+        }
+        Err(err) => Ok(ToggleResult::err(err)),
+    }
+}
+
+#[tauri::command]
+async fn delete_mod(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+) -> Result<ToggleResult, String> {
+    delete_mods(app, state, game_id, character_folder, vec![mod_folder]).await
+}
+
+#[tauri::command]
+async fn pick_import_files(app: AppHandle) -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut builder = app
+            .dialog()
+            .file()
+            .set_title("Select Mod Archives")
+            .add_filter("Mod Archives", &["zip", "7z", "rar"]);
+        if let Some(win) = app.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        builder
+            .blocking_pick_files()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|p| match p {
+                FilePath::Path(path) => Some(path.to_string_lossy().to_string()),
+                _ => None,
+            })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn pick_import_folder(app: AppHandle) -> Option<String> {
+    pick_folder_async(app, "Select Mod Folder", None).await
+}
+
+#[tauri::command]
+async fn pick_import_folders(app: AppHandle) -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut builder = app.dialog().file().set_title("Select Mod Folders");
+        if let Some(win) = app.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        builder
+            .blocking_pick_folders()
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|p| match p {
+                FilePath::Path(path) => Some(path.to_string_lossy().to_string()),
+                _ => None,
+            })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn stage_dropped_file(
+    state: State<'_, AppState>,
+    request: tauri::ipc::Request<'_>,
+) -> Result<String, String> {
+    let base_dir = {
+        let guard = state.0.lock().expect("state lock");
+        guard.base_dir.clone()
+    };
+
+    let (file_name, bytes): (String, Vec<u8>) = match request.body() {
+        tauri::ipc::InvokeBody::Raw(raw) => {
+            let encoded_name = request
+                .headers()
+                .get("x-file-name")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("dropped.zip");
+            let decoded = percent_encoding::percent_decode_str(encoded_name)
+                .decode_utf8_lossy()
+                .into_owned();
+            (decoded, raw.clone())
+        }
+        tauri::ipc::InvokeBody::Json(val) => {
+            let fname = val
+                .get("fileName")
+                .and_then(|v| v.as_str())
+                .unwrap_or("dropped.zip")
+                .to_string();
+            let raw_bytes: Vec<u8> = val
+                .get("bytes")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|n| n.as_u64().map(|x| x as u8))
+                        .collect()
+                })
+                .unwrap_or_default();
+            (fname, raw_bytes)
+        }
+    };
+
+    let path = tauri::async_runtime::spawn_blocking(move || {
+        imports::stage_dropped_file(&base_dir, &file_name, &bytes)
+    })
+    .await
+    .map_err(|e| format!("Drop staging failed: {e}"))??;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn import_parse(
+    state: State<'_, AppState>,
+    request: ImportParseRequest,
+) -> Result<ImportParseResult, String> {
+    let (base_dir, settings, metadata) = {
+        let guard = state.0.lock().expect("state lock");
+        (
+            guard.base_dir.clone(),
+            guard.settings.clone(),
+            guard.metadata.clone(),
+        )
+    };
+    let (result, session_opt) = tauri::async_runtime::spawn_blocking(move || {
+        imports::parse_import_sources_detached(&base_dir, &settings, &metadata, &request)
+    })
+    .await
+    .map_err(|e| format!("Import parse panicked: {e}"))??;
+
+    if let Some((id, session)) = session_opt {
+        let mut guard = state.0.lock().expect("state lock");
+        guard.import_sessions.insert(id, session);
+    }
+    Ok(result)
+}
+
+#[tauri::command]
+async fn import_commit(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    request: ImportCommitRequest,
+) -> Result<ImportResult, String> {
+    let (base_dir, settings, session) = {
+        let mut guard = state.0.lock().expect("state lock");
+        let session = guard
+            .import_sessions
+            .take(&request.session_id)
+            .ok_or_else(|| "Import session expired; please select files again".to_string())?;
+        (guard.base_dir.clone(), guard.settings.clone(), session)
+    };
+
+    mark_internal_fs_mutation();
+    let game_id = request.game_id.clone();
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        imports::commit_import_session_detached(&base_dir, &settings, session, &request)
+    })
+    .await
+    .map_err(|e| format!("Import commit panicked: {e}"))??;
+
+    mark_internal_fs_mutation();
+    emit_state_changed(&app, Some(&game_id), None);
+    Ok(res)
+}
+
+#[tauri::command]
+fn cleanup_staged_drops(state: State<'_, AppState>, paths: Vec<String>) {
+    let base_dir = {
+        let guard = state.0.lock().expect("state lock");
+        guard.base_dir.clone()
+    };
+    imports::cleanup_staged_drops(&base_dir, &paths);
+}
+
+#[tauri::command]
+fn import_discard(state: State<'_, AppState>, session_id: String) {
+    let mut guard = state.0.lock().expect("state lock");
+    guard.import_sessions.discard(&session_id);
+}
+
+#[tauri::command]
+async fn import_run(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    request: ImportRequest,
+) -> Result<ImportResult, String> {
+    let (base_dir, settings, metadata) = {
+        let guard = state.0.lock().expect("state lock");
+        (
+            guard.base_dir.clone(),
+            guard.settings.clone(),
+            guard.metadata.clone(),
+        )
+    };
+
+    mark_internal_fs_mutation();
+    let game_id = request.game_id.clone();
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        let mut temp_sessions = imports::ImportSessionManager::default();
+        imports::run_import(&base_dir, &settings, &metadata, &mut temp_sessions, &request)
+    })
+    .await
+    .map_err(|e| format!("Import failed: {e}"))??;
+
+    mark_internal_fs_mutation();
+    emit_state_changed(&app, Some(&game_id), None);
+    Ok(res)
+}
+
+#[tauri::command]
+fn get_storage_overview(state: State<'_, AppState>) -> StorageOverview {
+    let guard = state.0.lock().expect("state lock");
+    storage::get_storage_overview(&guard.base_dir, &guard.settings)
+}
+
+#[tauri::command]
+fn restore_mod_backup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    backup_id: String,
+) -> ToggleResult {
+    let guard = state.0.lock().expect("state lock");
+    let res = storage::restore_mod_backup(&guard.base_dir, &backup_id, &guard.settings);
+    let active_id = guard.settings.active_game_id.clone();
+    drop(guard);
+    if res.ok {
+        emit_state_changed(&app, Some(&active_id), None);
+    }
+    res
+}
+
+#[tauri::command]
+fn delete_mod_backup(state: State<'_, AppState>, backup_id: String) -> ToggleResult {
+    let guard = state.0.lock().expect("state lock");
+    storage::delete_mod_backup(&guard.base_dir, &backup_id)
+}
+
+#[tauri::command]
+fn prune_mod_backups(state: State<'_, AppState>, older_than_days: i64) -> PruneBackupsResult {
+    let guard = state.0.lock().expect("state lock");
+    storage::prune_mod_backups(&guard.base_dir, older_than_days)
+}
+
+#[tauri::command]
+async fn export_config_bundle(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<ExportPresetResult, String> {
+    let date = storage::format_timestamp_dir_utc()
+        .split('T')
+        .next()
+        .unwrap_or("backup")
+        .to_string();
+    let app_clone = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let mut builder = app_clone
+            .dialog()
+            .file()
+            .set_title("Export ModDeck Config Bundle")
+            .set_file_name(format!("ModDeck_Backup_{date}.moddeck-bundle"))
+            .add_filter("ModDeck Config Bundle", &["moddeck-bundle", "zip"]);
+        if let Some(win) = app_clone.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        builder.blocking_save_file().and_then(|fp| match fp {
+            FilePath::Path(p) => Some(p),
+            _ => None,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some(output_path) = picked else {
+        return Ok(ExportPresetResult {
+            ok: false,
+            error: None,
+            file_path: None,
+            count: None,
+        });
+    };
+
+    let (base_dir, settings, version) = {
+        let guard = state.0.lock().expect("state lock");
+        (
+            guard.base_dir.clone(),
+            guard.settings.clone(),
+            app.package_info().version.to_string(),
+        )
+    };
+    match storage::export_config_bundle(&base_dir, &version, &output_path, &settings) {
+        Ok(_) => Ok(ExportPresetResult {
+            ok: true,
+            error: None,
+            file_path: Some(output_path.to_string_lossy().to_string()),
+            count: None,
+        }),
+        Err(err) => Ok(ExportPresetResult {
+            ok: false,
+            error: Some(err),
+            file_path: None,
+            count: None,
+        }),
+    }
+}
+
+#[tauri::command]
+async fn inspect_config_bundle(app: AppHandle) -> ConfigBundleInspection {
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let mut builder = app
+            .dialog()
+            .file()
+            .set_title("Select ModDeck Config Bundle")
+            .add_filter("ModDeck Config Bundle", &["moddeck-bundle", "zip"]);
+        if let Some(win) = app.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        builder.blocking_pick_file().and_then(|fp| match fp {
+            FilePath::Path(p) => Some(p),
+            _ => None,
+        })
+    })
+    .await
+    .ok()
+    .flatten();
+
+    let Some(path) = picked else {
+        return ConfigBundleInspection {
+            ok: false,
+            error: None,
+            file_path: None,
+            manifest: None,
+        };
+    };
+    storage::inspect_config_bundle(&path)
+}
+
+#[tauri::command]
+fn import_config_bundle(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    file_path: String,
+    options: ImportConfigBundleOptions,
+) -> ImportConfigBundleResult {
+    let mut guard = state.0.lock().expect("state lock");
+    let base_dir = guard.base_dir.clone();
+    let current_settings = guard.settings.clone();
+    let (res, next_settings, next_meta) = storage::import_config_bundle(
+        &base_dir,
+        Path::new(&file_path),
+        &current_settings,
+        &options,
+    );
+    if let Some(s) = next_settings {
+        guard.settings = s;
+    }
+    if let Some(m) = next_meta {
+        guard.metadata = m;
+    }
+    let active_id = guard.settings.active_game_id.clone();
+    drop(guard);
+    if res.ok {
+        emit_state_changed(&app, Some(&active_id), None);
+    }
+    res
+}
+
+#[tauri::command]
+fn analyze_mod_ini(
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+) -> Result<ModStaticAnalysis, String> {
+    let guard = state.0.lock().expect("state lock");
+    let mods_path = guard
+        .settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.trim())
+        .unwrap_or("");
+    if mods_path.is_empty() {
+        return Err("Mods directory is not configured".to_string());
+    }
+    let mod_dir = resolve_mod_target_dir(Path::new(mods_path), &character_folder, &mod_folder)?;
+    let rules = guard.settings.ui.variable_ignore_rules.clone();
+    drop(guard);
+    Ok(ini_analysis::analyze_mod_ini(&mod_dir, &rules))
+}
+
+#[tauri::command]
+fn scan_character_hash_conflicts(
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+) -> Result<Vec<CharacterHashConflict>, String> {
+    let guard = state.0.lock().expect("state lock");
+    let mods_path = guard
+        .settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.trim().to_string())
+        .unwrap_or_default();
+    drop(guard);
+    if mods_path.is_empty() {
+        return Ok(Vec::new());
+    }
+    ini_analysis::scan_character_hash_conflicts(Path::new(&mods_path), &character_folder)
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IgnoreRuleTarget {
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+}
+
+#[tauri::command]
+fn add_variable_ignore_rule(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    rule: String,
+    scope: String,
+    target: Option<IgnoreRuleTarget>,
+) -> ToggleResult {
+    let cleaned = rule.trim().to_string();
+    if cleaned.is_empty() {
+        return ToggleResult::err("Ignore rule cannot be empty");
+    }
+    if scope == "local" {
+        let Some(t) = target else {
+            return ToggleResult::err("Missing mod target for local rule");
+        };
+        let mods_path = {
+            let guard = state.0.lock().expect("state lock");
+            guard
+                .settings
+                .games
+                .get(&t.game_id)
+                .map(|g| g.mods_path.trim().to_string())
+                .unwrap_or_default()
+        };
+        if mods_path.is_empty() {
+            return ToggleResult::err("Mods directory is not configured");
+        }
+        return match resolve_mod_target_dir(Path::new(&mods_path), &t.character_folder, &t.mod_folder)
+            .and_then(|dir| ini_analysis::append_local_ignore_rule(&dir, &cleaned))
+        {
+            Ok(()) => ToggleResult::ok(),
+            Err(err) => ToggleResult::err(err),
+        };
+    }
+
+    let mut guard = state.0.lock().expect("state lock");
+    if !guard
+        .settings
+        .ui
+        .variable_ignore_rules
+        .iter()
+        .any(|r| r.eq_ignore_ascii_case(&cleaned))
+    {
+        guard.settings.ui.variable_ignore_rules.push(cleaned);
+        if let Err(err) = save_settings(&guard.base_dir, &guard.settings) {
+            return ToggleResult::err(err);
+        }
+    }
+    let active_id = guard.settings.active_game_id.clone();
+    drop(guard);
+    emit_state_changed(&app, Some(&active_id), None);
+    ToggleResult::ok()
+}
+
+#[tauri::command]
+fn audit_game_conflicts(state: State<'_, AppState>, game_id: String) -> GameConflictAuditReport {
+    let settings = {
+        let guard = state.0.lock().expect("state lock");
+        guard.settings.clone()
+    };
+    let is_en = is_non_zh_effective_locale(&settings.ui.language);
+    let mods_path = settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.clone())
+        .unwrap_or_default();
+    let env = detect::check_environment_for_settings(&settings, Some(&game_id), is_en)
+        .into_iter()
+        .next();
+    ini_analysis::audit_game_mods_conflicts(&game_id, &mods_path, env, is_en)
+}
+
+#[tauri::command]
+async fn export_conflict_audit_report(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    report: GameConflictAuditReport,
+) -> Result<ExportPresetResult, String> {
+    let (game_name, is_en) = {
+        let guard = state.0.lock().expect("state lock");
+        let name = get_game(&guard.settings, &game_id)
+            .map(|g| g.name)
+            .unwrap_or_else(|| game_id.clone());
+        let en = is_non_zh_effective_locale(&guard.settings.ui.language);
+        (name, en)
+    };
+    let date = storage::format_timestamp_dir_utc()
+        .split('T')
+        .next()
+        .unwrap_or("report")
+        .to_string();
+    let app_clone = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let mut builder = app_clone
+            .dialog()
+            .file()
+            .set_title("Export ModDeck Conflict Audit Report")
+            .set_file_name(format!("ModDeck_Conflict_Report_{game_id}_{date}.txt"))
+            .add_filter("Text Report", &["txt"]);
+        if let Some(win) = app_clone.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        builder.blocking_save_file().and_then(|fp| match fp {
+            FilePath::Path(p) => Some(p),
+            _ => None,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some(save_path) = picked else {
+        return Ok(ExportPresetResult {
+            ok: false,
+            error: None,
+            file_path: None,
+            count: None,
+        });
+    };
+    let text = ini_analysis::format_conflict_audit_report_text(&game_name, &report, is_en);
+    match fs::write(&save_path, text) {
+        Ok(()) => Ok(ExportPresetResult {
+            ok: true,
+            error: None,
+            file_path: Some(save_path.to_string_lossy().to_string()),
+            count: None,
+        }),
+        Err(err) => Ok(ExportPresetResult {
+            ok: false,
+            error: Some(err.to_string()),
+            file_path: None,
+            count: None,
+        }),
+    }
+}
+
+#[tauri::command]
+fn get_d3dx_auto_save_interval(state: State<'_, AppState>, game_id: String) -> i64 {
+    let guard = state.0.lock().expect("state lock");
+    let mods_path = guard
+        .settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.trim())
+        .unwrap_or("");
+    if mods_path.is_empty() {
+        return 60;
+    }
+    presets::get_d3dx_auto_save_interval(Path::new(mods_path))
+}
+
+#[tauri::command]
+fn set_d3dx_auto_save_interval(
+    state: State<'_, AppState>,
+    game_id: String,
+    interval: i64,
+) -> ToggleResult {
+    let guard = state.0.lock().expect("state lock");
+    let mods_path = guard
+        .settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.trim().to_string())
+        .unwrap_or_default();
+    drop(guard);
+    if mods_path.is_empty() {
+        return ToggleResult::err("Mods directory is not configured");
+    }
+    presets::set_d3dx_auto_save_interval(Path::new(&mods_path), interval)
+}
+
+#[tauri::command]
+fn get_d3dx_sync_status(state: State<'_, AppState>, game_id: String) -> D3dxSyncStatus {
+    let guard = state.0.lock().expect("state lock");
+    let mods_path = guard
+        .settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.trim())
+        .unwrap_or("");
+    let pending_count = guard.pending_queue.pending_count(Some(&game_id));
+    presets::get_d3dx_sync_status(Path::new(mods_path), pending_count)
+}
+
+#[tauri::command]
+fn get_mod_presets(
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+) -> Vec<ModVariantPreset> {
+    let guard = state.0.lock().expect("state lock");
+    let mods_path = guard
+        .settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.trim())
+        .unwrap_or("");
+    if mods_path.is_empty() {
+        return presets::get_mod_presets(
+            &guard.base_dir,
+            &game_id,
+            &character_folder,
+            &mod_folder,
+            None,
+            None,
+            &guard.settings.ui.variable_ignore_rules,
+            &guard.pending_queue,
+        );
+    }
+    let mp = Path::new(mods_path);
+    let mod_dir = resolve_mod_target_dir(mp, &character_folder, &mod_folder).ok();
+    presets::get_mod_presets(
+        &guard.base_dir,
+        &game_id,
+        &character_folder,
+        &mod_folder,
+        mod_dir.as_deref(),
+        Some(mp),
+        &guard.settings.ui.variable_ignore_rules,
+        &guard.pending_queue,
+    )
+}
+
+#[tauri::command]
+fn save_mod_preset(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+    preset_name: String,
+    options: Option<SaveModPresetOptions>,
+) -> SaveModPresetResult {
+    let sync_f10 = options.and_then(|o| o.sync_f10).unwrap_or(false);
+    let (hints, reload_key, auto_reload) = {
+        let guard = state.0.lock().expect("state lock");
+        let hints = active_exe_hints(&guard.settings);
+        let key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
+            "F10".to_string()
+        } else {
+            guard.settings.ui.reload_hotkey.trim().to_string()
+        };
+        (hints, key, guard.settings.ui.allow_hotkey_send)
+    };
+    let synced_f10 = if sync_f10 && auto_reload {
+        input::send_hotkey(&reload_key, &hints).is_ok()
+    } else {
+        false
+    };
+
+    let mut guard = state.0.lock().expect("state lock");
+    let base_dir = guard.base_dir.clone();
+    let mods_path = guard
+        .settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.trim().to_string())
+        .unwrap_or_default();
+    if mods_path.is_empty() {
+        return SaveModPresetResult {
+            ok: false,
+            reloaded: None,
+            error: Some("Mods directory is not configured".to_string()),
+            synced_f10: Some(synced_f10),
+            possible_stale: None,
+            stale_reason: None,
+        };
+    }
+    let Ok(mod_dir) = resolve_mod_target_dir(Path::new(&mods_path), &character_folder, &mod_folder)
+    else {
+        return SaveModPresetResult {
+            ok: false,
+            reloaded: None,
+            error: Some("Invalid mod directory".to_string()),
+            synced_f10: Some(synced_f10),
+            possible_stale: None,
+            stale_reason: None,
+        };
+    };
+    let rules = guard.settings.ui.variable_ignore_rules.clone();
+    let mut res = presets::save_mod_preset(
+        &base_dir,
+        &game_id,
+        &character_folder,
+        &mod_folder,
+        &mod_dir,
+        Path::new(&mods_path),
+        &preset_name,
+        &rules,
+        &mut guard.pending_queue,
+    );
+    res.synced_f10 = Some(synced_f10);
+    drop(guard);
+    if res.ok {
+        emit_state_changed(&app, Some(&game_id), Some(&character_folder));
+    }
+    res
+}
+
+#[tauri::command]
+fn apply_mod_preset(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+    preset_id: String,
+) -> ToggleResult {
+    let mut guard = state.0.lock().expect("state lock");
+    let base_dir = guard.base_dir.clone();
+    let mods_path = guard
+        .settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.trim().to_string())
+        .unwrap_or_default();
+    if mods_path.is_empty() {
+        return ToggleResult::err("Mods directory is not configured");
+    }
+    let Ok(mod_dir) = resolve_mod_target_dir(Path::new(&mods_path), &character_folder, &mod_folder)
+    else {
+        return ToggleResult::err("Invalid mod directory");
+    };
+    let rules = guard.settings.ui.variable_ignore_rules.clone();
+    let auto_reload = guard.settings.ui.auto_reload_mod_preset;
+    let hints = active_exe_hints(&guard.settings);
+    let reload_key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
+        "F10".to_string()
+    } else {
+        guard.settings.ui.reload_hotkey.trim().to_string()
+    };
+
+    let res = presets::apply_mod_preset(
+        &base_dir,
+        &game_id,
+        &character_folder,
+        &mod_folder,
+        &mod_dir,
+        Path::new(&mods_path),
+        &preset_id,
+        false,
+        &rules,
+        &mut guard.pending_queue,
+    );
+    drop(guard);
+
+    if res.ok {
+        if auto_reload {
+            let _ = input::send_hotkey(&reload_key, &hints);
+        }
+        emit_state_changed(&app, Some(&game_id), Some(&character_folder));
+    }
+    res
+}
+
+#[tauri::command]
+fn delete_mod_preset(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+    preset_id: String,
+) -> ToggleResult {
+    let guard = state.0.lock().expect("state lock");
+    let res = presets::delete_mod_preset(
+        &guard.base_dir,
+        &game_id,
+        &character_folder,
+        &mod_folder,
+        &preset_id,
+    );
+    drop(guard);
+    if res.ok {
+        emit_state_changed(&app, Some(&game_id), Some(&character_folder));
+    }
+    res
+}
+
+#[tauri::command]
+async fn export_mod_presets(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+    preset_id: Option<String>,
+) -> Result<ExportPresetResult, String> {
+    let base_dir = {
+        let guard = state.0.lock().expect("state lock");
+        guard.base_dir.clone()
+    };
+    let (data, default_name) = match presets::build_mod_preset_export_data(
+        &base_dir,
+        &game_id,
+        &character_folder,
+        &mod_folder,
+        preset_id.as_deref(),
+    ) {
+        Ok(pair) => pair,
+        Err(err) => {
+            return Ok(ExportPresetResult {
+                ok: false,
+                error: Some(err),
+                file_path: None,
+                count: None,
+            });
+        }
+    };
+    let count = data.presets.len();
+    let app_clone = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let mut builder = app_clone
+            .dialog()
+            .file()
+            .set_title("Export Mod Presets")
+            .set_file_name(default_name)
+            .add_filter("ModDeck Preset", &["json"]);
+        if let Some(win) = app_clone.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        builder.blocking_save_file().and_then(|fp| match fp {
+            FilePath::Path(p) => Some(p),
+            _ => None,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some(save_path) = picked else {
+        return Ok(ExportPresetResult {
+            ok: false,
+            error: None,
+            file_path: None,
+            count: None,
+        });
+    };
+    let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    match fs::write(&save_path, json) {
+        Ok(()) => Ok(ExportPresetResult {
+            ok: true,
+            error: None,
+            file_path: Some(save_path.to_string_lossy().to_string()),
+            count: Some(count),
+        }),
+        Err(err) => Ok(ExportPresetResult {
+            ok: false,
+            error: Some(err.to_string()),
+            file_path: None,
+            count: None,
+        }),
+    }
+}
+
+#[tauri::command]
+async fn import_mod_presets(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+) -> Result<ImportPresetsResult, String> {
+    let app_clone = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let mut builder = app_clone
+            .dialog()
+            .file()
+            .set_title("Import Mod Presets")
+            .add_filter("ModDeck Preset", &["json"]);
+        if let Some(win) = app_clone.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        builder.blocking_pick_file().and_then(|fp| match fp {
+            FilePath::Path(p) => Some(p),
+            _ => None,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some(src_path) = picked else {
+        return Ok(ImportPresetsResult {
+            ok: false,
+            error: None,
+            count: None,
+            names: None,
+        });
+    };
+    let base_dir = {
+        let guard = state.0.lock().expect("state lock");
+        guard.base_dir.clone()
+    };
+    let res = presets::import_mod_presets_from_file(
+        &base_dir,
+        &game_id,
+        &character_folder,
+        &mod_folder,
+        &src_path,
+    );
+    if res.ok {
+        emit_state_changed(&app, Some(&game_id), Some(&character_folder));
+    }
+    Ok(res)
+}
+
+#[tauri::command]
+fn import_mod_presets_from_path(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+    file_path: String,
+) -> ImportPresetsResult {
+    let base_dir = {
+        let guard = state.0.lock().expect("state lock");
+        guard.base_dir.clone()
+    };
+    let res = presets::import_mod_presets_from_file(
+        &base_dir,
+        &game_id,
+        &character_folder,
+        &mod_folder,
+        Path::new(&file_path),
+    );
+    if res.ok {
+        emit_state_changed(&app, Some(&game_id), Some(&character_folder));
+    }
+    res
+}
+
+#[tauri::command]
+fn get_roster_presets(state: State<'_, AppState>, game_id: String) -> Vec<RosterPreset> {
+    let guard = state.0.lock().expect("state lock");
+    presets::get_roster_presets(&guard.base_dir, &game_id)
+}
+
+#[tauri::command]
+fn save_roster_preset(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    input: SaveRosterPresetInput,
+) -> ToggleResult {
+    let guard = state.0.lock().expect("state lock");
+    let res = presets::save_roster_preset(&guard.base_dir, &game_id, &input);
+    drop(guard);
+    if res.ok {
+        emit_state_changed(&app, Some(&game_id), None);
+    }
+    res
+}
+
+#[tauri::command]
+fn apply_roster_preset(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    preset_id: String,
+) -> ToggleResult {
+    let mut guard = state.0.lock().expect("state lock");
+    let base_dir = guard.base_dir.clone();
+    let mods_path = guard
+        .settings
+        .games
+        .get(&game_id)
+        .map(|g| g.mods_path.trim().to_string())
+        .unwrap_or_default();
+    if mods_path.is_empty() {
+        return ToggleResult::err("Mods directory is not configured");
+    }
+    let rules = guard.settings.ui.variable_ignore_rules.clone();
+    let auto_reload = guard.settings.ui.auto_reload_roster_preset;
+    let hints = active_exe_hints(&guard.settings);
+    let reload_key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
+        "F10".to_string()
+    } else {
+        guard.settings.ui.reload_hotkey.trim().to_string()
+    };
+    let res = presets::apply_roster_preset(
+        &base_dir,
+        &game_id,
+        Path::new(&mods_path),
+        &preset_id,
+        &rules,
+        &mut guard.pending_queue,
+    );
+    if res.ok && !auto_reload {
+        guard.pending_queue.record_roster_scheme(&game_id);
+    }
+    drop(guard);
+
+    if res.ok {
+        if auto_reload {
+            let _ = input::send_hotkey(&reload_key, &hints);
+        }
+        emit_state_changed(&app, Some(&game_id), None);
+    }
+    res
+}
+
+#[tauri::command]
+fn delete_roster_preset(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    preset_id: String,
+) -> ToggleResult {
+    let guard = state.0.lock().expect("state lock");
+    let res = presets::delete_roster_preset(&guard.base_dir, &game_id, &preset_id);
+    drop(guard);
+    if res.ok {
+        emit_state_changed(&app, Some(&game_id), None);
+    }
+    res
+}
+
+#[tauri::command]
+async fn export_roster_preset(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    preset_id: String,
+) -> Result<ExportPresetResult, String> {
+    let base_dir = {
+        let guard = state.0.lock().expect("state lock");
+        guard.base_dir.clone()
+    };
+    let (data, default_name) = match presets::build_roster_preset_export_data(
+        &base_dir,
+        &game_id,
+        &preset_id,
+    ) {
+        Ok(pair) => pair,
+        Err(err) => {
+            return Ok(ExportPresetResult {
+                ok: false,
+                error: Some(err),
+                file_path: None,
+                count: None,
+            });
+        }
+    };
+    let app_clone = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let mut builder = app_clone
+            .dialog()
+            .file()
+            .set_title("Export Roster Scheme")
+            .set_file_name(default_name)
+            .add_filter("ModDeck Roster Scheme", &["json"]);
+        if let Some(win) = app_clone.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        builder.blocking_save_file().and_then(|fp| match fp {
+            FilePath::Path(p) => Some(p),
+            _ => None,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some(save_path) = picked else {
+        return Ok(ExportPresetResult {
+            ok: false,
+            error: None,
+            file_path: None,
+            count: None,
+        });
+    };
+    let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    match fs::write(&save_path, json) {
+        Ok(()) => Ok(ExportPresetResult {
+            ok: true,
+            error: None,
+            file_path: Some(save_path.to_string_lossy().to_string()),
+            count: None,
+        }),
+        Err(err) => Ok(ExportPresetResult {
+            ok: false,
+            error: Some(err.to_string()),
+            file_path: None,
+            count: None,
+        }),
+    }
+}
+
+#[tauri::command]
+async fn inspect_roster_preset_file(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+) -> Result<RosterSchemeImportInspection, String> {
+    let app_clone = app.clone();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let mut builder = app_clone
+            .dialog()
+            .file()
+            .set_title("Import Roster Scheme")
+            .add_filter("ModDeck Roster Scheme", &["json"]);
+        if let Some(win) = app_clone.get_webview_window("main") {
+            builder = builder.set_parent(&win);
+        }
+        builder.blocking_pick_file().and_then(|fp| match fp {
+            FilePath::Path(p) => Some(p),
+            _ => None,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some(src_path) = picked else {
+        return Ok(RosterSchemeImportInspection {
+            ok: false,
+            error: None,
+            scheme_name: None,
+            source_game_id: None,
+            target_game_id: None,
+            total_characters: 0,
+            matched_characters: 0,
+            total_mods: 0,
+            matched_mods: 0,
+            missing_characters: Vec::new(),
+            missing_mods: Vec::new(),
+            matched_items: Vec::new(),
+            raw_export: None,
+        });
+    };
+    let mods_path = {
+        let guard = state.0.lock().expect("state lock");
+        guard
+            .settings
+            .games
+            .get(&game_id)
+            .map(|g| g.mods_path.trim().to_string())
+            .unwrap_or_default()
+    };
+    Ok(presets::inspect_roster_preset_file_content(
+        &game_id,
+        Path::new(&mods_path),
+        &src_path,
+    ))
+}
+
+#[tauri::command]
+fn inspect_roster_preset_file_from_path(
+    state: State<'_, AppState>,
+    game_id: String,
+    file_path: String,
+) -> RosterSchemeImportInspection {
+    let mods_path = {
+        let guard = state.0.lock().expect("state lock");
+        guard
+            .settings
+            .games
+            .get(&game_id)
+            .map(|g| g.mods_path.trim().to_string())
+            .unwrap_or_default()
+    };
+    presets::inspect_roster_preset_file_content(
+        &game_id,
+        Path::new(&mods_path),
+        Path::new(&file_path),
+    )
+}
+
+#[tauri::command]
+fn confirm_import_roster_preset(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    game_id: String,
+    raw_export: Value,
+    custom_name: Option<String>,
+) -> ImportRosterResult {
+    let base_dir = {
+        let guard = state.0.lock().expect("state lock");
+        guard.base_dir.clone()
+    };
+    let res = presets::confirm_import_roster_preset(
+        &base_dir,
+        &game_id,
+        &raw_export,
+        custom_name.as_deref(),
+    );
+    if res.ok {
+        emit_state_changed(&app, Some(&game_id), None);
+    }
+    res
 }
 
 fn apply_character_meta_patch(existing: CharacterMeta, patch: &Value) -> CharacterMeta {
@@ -1680,6 +3100,8 @@ pub fn run() {
             registered_hotkey: None,
             last_overlay_toggle: None,
             webview_data_dir: None,
+            import_sessions: imports::ImportSessionManager::default(),
+            pending_queue: presets::PendingQueueState::default(),
         })))
         .register_uri_scheme_protocol("moddeck", |ctx, request| {
             let uri = request.uri();
@@ -1791,6 +3213,8 @@ pub fn run() {
                     }
                 }
             }
+            imports::cleanup_stale_tmp_dirs(&setup_base_dir);
+            spawn_mods_watcher(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1801,6 +3225,8 @@ pub fn run() {
             scan_game,
             get_mods,
             toggle_mod_cmd,
+            delete_mod,
+            delete_mods,
             get_mod_details_cmd,
             open_character_folder,
             open_mod_folder,
@@ -1828,6 +3254,45 @@ pub fn run() {
             pick_game_exe,
             pick_loader,
             pick_cover,
+            pick_import_files,
+            pick_import_folder,
+            pick_import_folders,
+            stage_dropped_file,
+            cleanup_staged_drops,
+            import_parse,
+            import_commit,
+            import_discard,
+            import_run,
+            get_storage_overview,
+            restore_mod_backup,
+            delete_mod_backup,
+            prune_mod_backups,
+            export_config_bundle,
+            inspect_config_bundle,
+            import_config_bundle,
+            analyze_mod_ini,
+            scan_character_hash_conflicts,
+            add_variable_ignore_rule,
+            audit_game_conflicts,
+            export_conflict_audit_report,
+            get_d3dx_auto_save_interval,
+            set_d3dx_auto_save_interval,
+            get_d3dx_sync_status,
+            get_mod_presets,
+            save_mod_preset,
+            apply_mod_preset,
+            delete_mod_preset,
+            export_mod_presets,
+            import_mod_presets,
+            import_mod_presets_from_path,
+            get_roster_presets,
+            save_roster_preset,
+            apply_roster_preset,
+            delete_roster_preset,
+            export_roster_preset,
+            inspect_roster_preset_file,
+            inspect_roster_preset_file_from_path,
+            confirm_import_roster_preset,
             update_character_meta,
             set_character_cover,
             reset_character_meta,

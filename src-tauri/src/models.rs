@@ -531,3 +531,570 @@ pub struct ClearShaderCacheResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportRequest {
+    pub game_id: String,
+    #[serde(default)]
+    pub archive_paths: Option<Vec<String>>,
+    #[serde(default)]
+    pub folder_paths: Option<Vec<String>>,
+    #[serde(default)]
+    pub target_character: Option<String>,
+    #[serde(default)]
+    pub passwords: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportCandidate {
+    pub id: String,
+    pub source_path: String,
+    pub source_name: String,
+    pub mod_name: String,
+    pub extracted_dir: String,
+    pub suggested_character: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_reason: Option<String>,
+    pub has_ini: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportParseRequest {
+    pub game_id: String,
+    pub paths: Vec<String>,
+    #[serde(default)]
+    pub target_character: Option<String>,
+    #[serde(default)]
+    pub passwords: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportParseError {
+    pub source: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportParseResult {
+    pub session_id: String,
+    pub candidates: Vec<ImportCandidate>,
+    pub errors: Vec<ImportParseError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportCommitItem {
+    pub id: String,
+    pub character_folder: String,
+    #[serde(default)]
+    pub mod_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportCommitRequest {
+    pub session_id: String,
+    pub game_id: String,
+    pub items: Vec<ImportCommitItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResultItem {
+    pub source: String,
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub characters: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mods: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    pub items: Vec<ImportResultItem>,
+    pub imported_mods: usize,
+    pub created_characters: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPresetResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageCategoryStat {
+    pub key: String,
+    pub file_count: usize,
+    pub total_bytes: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModBackupEntry {
+    pub id: String,
+    pub timestamp_dir: String,
+    pub created_at: u64,
+    pub game_id: String,
+    pub character_folder: String,
+    pub mod_name: String,
+    pub total_bytes: u64,
+    pub file_count: usize,
+    pub backup_path: String,
+    pub target_exists: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageOverview {
+    pub data_dir: String,
+    pub total_bytes: u64,
+    pub categories: Vec<StorageCategoryStat>,
+    pub backups: Vec<ModBackupEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PruneBackupsResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deleted_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub freed_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigBundleStats {
+    pub custom_games: usize,
+    pub character_meta: usize,
+    pub cover_files: usize,
+    pub mod_preset_files: usize,
+    pub roster_presets: usize,
+    pub language_files: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigBundleManifest {
+    pub moddeck_file_type: String,
+    pub version: u32,
+    pub app_version: String,
+    pub exported_at: u64,
+    pub stats: ConfigBundleStats,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigBundleInspection {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manifest: Option<ConfigBundleManifest>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportConfigBundleOptions {
+    pub preserve_existing_paths: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigBundleRestoredCounts {
+    pub custom_games: usize,
+    pub character_meta: usize,
+    pub cover_files: usize,
+    pub mod_preset_files: usize,
+    pub roster_presets: usize,
+    pub language_files: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportConfigBundleResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snapshot_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restored: Option<ConfigBundleRestoredCounts>,
+}
+
+impl ToggleResult {
+    pub fn ok() -> Self {
+        Self {
+            ok: true,
+            reloaded: None,
+            error: None,
+        }
+    }
+
+    pub fn err(msg: impl Into<String>) -> Self {
+        Self {
+            ok: false,
+            reloaded: None,
+            error: Some(msg.into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveModPresetOptions {
+    #[serde(default)]
+    pub sync_f10: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveModPresetResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reloaded: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub synced_f10: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub possible_stale: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct D3dxSyncStatus {
+    pub exists: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file_path: Option<String>,
+    pub mtime_ms: u64,
+    pub auto_save_interval: i64,
+    pub game_running: bool,
+    pub pending_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IniVariableInfo {
+    pub key: String,
+    pub name: String,
+    pub default_value: String,
+    pub persist: bool,
+    pub ignored: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ignore_source: Option<String>,
+    pub source_file: String,
+    pub driven_by_keys: Vec<String>,
+    pub used_in_sections: Vec<String>,
+    pub linked_vars: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IniCommandDependency {
+    pub trigger_section: String,
+    pub target_section: String,
+    pub relation: String,
+    pub variables: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IniHashDeclaration {
+    pub hash: String,
+    pub kind: String,
+    pub section: String,
+    pub file: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModStaticAnalysis {
+    pub variables: Vec<IniVariableInfo>,
+    pub dependencies: Vec<IniCommandDependency>,
+    pub hashes: Vec<IniHashDeclaration>,
+    pub non_persist_control_vars: Vec<String>,
+    pub local_ignore_rules: Vec<String>,
+    pub has_local_ignore_file: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CharacterHashConflictMod {
+    pub folder_name: String,
+    pub name: String,
+    pub sections: Vec<String>,
+    pub files: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lines: Option<Vec<usize>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CharacterHashConflict {
+    pub hash: String,
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub severity: Option<String>,
+    pub mods: Vec<CharacterHashConflictMod>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictAuditModLocation {
+    pub character_folder: String,
+    pub folder_name: String,
+    pub name: String,
+    pub file: String,
+    pub line: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snippet: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameConflictAuditItem {
+    pub id: String,
+    pub severity: String,
+    pub category: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter_index: Option<String>,
+    pub locations: Vec<ConflictAuditModLocation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictAuditSummary {
+    pub high: usize,
+    pub warning: usize,
+    pub info: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameConflictAuditReport {
+    pub game_id: String,
+    pub mods_path: String,
+    pub scanned_at: u64,
+    pub scanned_mods: usize,
+    pub scanned_ini_files: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub environment: Option<EnvironmentCheck>,
+    pub items: Vec<GameConflictAuditItem>,
+    pub summary: ConflictAuditSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModVariantPreset {
+    pub id: String,
+    pub name: String,
+    pub mod_name: String,
+    pub character_folder: String,
+    #[serde(default)]
+    pub active_ini_files: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub variables: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_pending: Option<bool>,
+    #[serde(default)]
+    pub updated_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModAssignmentItem {
+    pub mod_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CharacterModAssignment {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mod_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mods: Option<Vec<ModAssignmentItem>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterPreset {
+    pub id: String,
+    pub name: String,
+    pub game_id: String,
+    #[serde(default)]
+    pub updated_at: u64,
+    #[serde(default)]
+    pub assignments: HashMap<String, CharacterModAssignment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveRosterPresetInput {
+    pub name: String,
+    pub assignments: HashMap<String, CharacterModAssignment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModPresetExportItem {
+    pub name: String,
+    #[serde(default)]
+    pub active_ini_files: Vec<String>,
+    #[serde(default)]
+    pub variables: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModPresetExportFile {
+    pub moddeck_file_type: String,
+    pub version: u32,
+    pub game_id: String,
+    pub character_folder: String,
+    pub mod_name: String,
+    pub exported_at: u64,
+    pub presets: Vec<ModPresetExportItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterPresetExportMod {
+    pub mod_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset_variables: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset_active_inis: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterPresetExportAssignment {
+    #[serde(default)]
+    pub mods: Vec<RosterPresetExportMod>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterPresetExportScheme {
+    pub name: String,
+    pub game_id: String,
+    #[serde(default)]
+    pub assignments: HashMap<String, RosterPresetExportAssignment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterPresetExportFile {
+    pub moddeck_file_type: String,
+    pub version: u32,
+    pub game_id: String,
+    pub exported_at: u64,
+    pub scheme: RosterPresetExportScheme,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterMissingMod {
+    pub character_folder: String,
+    pub mod_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterMatchedItem {
+    pub character_folder: String,
+    pub mod_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RosterSchemeImportInspection {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheme_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_game_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_game_id: Option<String>,
+    pub total_characters: usize,
+    pub matched_characters: usize,
+    pub total_mods: usize,
+    pub matched_mods: usize,
+    pub missing_characters: Vec<String>,
+    pub missing_mods: Vec<RosterMissingMod>,
+    pub matched_items: Vec<RosterMatchedItem>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub raw_export: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportPresetsResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub names: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportRosterResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheme_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scheme_name: Option<String>,
+}

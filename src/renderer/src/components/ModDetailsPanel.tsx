@@ -14,6 +14,7 @@ import { Modal } from './Modal'
 import { PresetDetailModal } from './PresetDetailModal'
 import { ScrollTitle } from './ScrollTitle'
 import { useI18n } from '../i18n'
+import { resolveDroppedFilePath } from '../tauri-bridge'
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -61,7 +62,7 @@ export function ModDetailsPanel({
   const [syncStatus, setSyncStatus] = useState<D3dxSyncStatus | null>(null)
   const [, setSyncClockTick] = useState(0)
   const [staticAnalysis, setStaticAnalysis] = useState<ModStaticAnalysis | null>(null)
-  const [diagExpanded, setDiagExpanded] = useState(false)
+  const [diagModalOpen, setDiagModalOpen] = useState(false)
 
   const [confirmPreset, setConfirmPreset] = useState<ModVariantPreset | null>(null)
   const [inspectingPreset, setInspectingPreset] = useState<ModVariantPreset | null>(null)
@@ -135,6 +136,7 @@ export function ModDetailsPanel({
     if (!details) {
       setPresets([])
       setStaticAnalysis(null)
+      setDiagModalOpen(false)
       setShowSavePreset(false)
       setNewPresetName('')
       return
@@ -505,14 +507,11 @@ export function ModDetailsPanel({
             ) : null}
           </div>
 
-          <div className="detail-title">
+          <div className="detail-title" title={details.folderName}>
             <ScrollTitle text={details.name} className="detail-title-text" />
             <span className={`chip ${details.enabled ? 'ok' : ''}`}>
               {details.enabled ? t('mod.enabled') : t('mod.disabled')}
             </span>
-          </div>
-          <div className="detail-path" title={details.folderName}>
-            .../{details.characterFolder}/{details.folderName}
           </div>
 
           <div className="detail-stats">
@@ -544,12 +543,12 @@ export function ModDetailsPanel({
                 e.dataTransfer.dropEffect = 'copy'
               }
             }}
-            onDrop={(e) => {
+            onDrop={async (e) => {
               if (!Array.from(e.dataTransfer.types).includes('Files')) return
               e.preventDefault()
               e.stopPropagation()
               const file = e.dataTransfer.files[0]
-              const filePath = file ? window.moddeck.getPathForFile(file) : null
+              const filePath = file ? await resolveDroppedFilePath(file) : ''
               if (filePath) {
                 void handleDropImportPreset(filePath)
               }
@@ -709,10 +708,10 @@ export function ModDetailsPanel({
               <div className="muted small">{t('mod.noHotkeys')}</div>
             ) : (
               <div className="detail-hotkeys">
-                {details.hotkeys.slice(0, 30).map((hotkey, index) => (
+                {details.hotkeys.slice(0, 100).map((hotkey, index) => (
                   <div key={`${hotkey.section}-${index}`}>
                     <code>{hotkey.key}</code>
-                    <span className="muted">{hotkey.section}</span>
+                    <span className="muted" title={hotkey.section}>{hotkey.section}</span>
                   </div>
                 ))}
               </div>
@@ -739,9 +738,10 @@ export function ModDetailsPanel({
                 <button
                   type="button"
                   className="btn ghost tiny-btn"
-                  onClick={() => setDiagExpanded(!diagExpanded)}
+                  onClick={() => setDiagModalOpen(true)}
                 >
-                  {diagExpanded ? t('character.conflictCollapse') : t('character.conflictExpand')}
+                  <Icon name="info" size={12} />
+                  {t('mod.diagViewDetails')}
                 </button>
               </div>
               <div className="diag-summary-pills">
@@ -771,129 +771,16 @@ export function ModDetailsPanel({
                   })}
                 </div>
               ) : null}
-
-              {diagExpanded ? (
-                <div className="diag-details-body">
-                  {staticAnalysis.hasLocalIgnoreFile ? (
-                    <div className="muted small" style={{ marginBottom: '6px' }}>
-                      {t('mod.diagLocalIgnoreHint', { count: staticAnalysis.localIgnoreRules.length })}
-                    </div>
-                  ) : null}
-
-                  {staticAnalysis.variables.length > 0 ? (
-                    <div className="diag-subblock">
-                      <div className="muted small" style={{ fontWeight: 600 }}>
-                        {t('mod.diagVarsTitle', { count: staticAnalysis.variables.length })}
-                      </div>
-                      <div className="diag-list">
-                        {staticAnalysis.variables.slice(0, 24).map((v) => (
-                          <div key={v.key} className={`diag-item${v.ignored ? ' is-ignored' : ''}`}>
-                            <div className="diag-item-main">
-                              <code>${v.name}</code>
-                              <span className={`tag ${v.persist ? 'ok' : 'warn'}`}>
-                                {v.persist ? t('mod.diagPersistBadge') : t('mod.diagNonPersistBadge')}
-                              </span>
-                              {v.ignored ? (
-                                <span className="tag">
-                                  {v.ignoreSource === 'local'
-                                    ? t('mod.diagSourceLocal')
-                                    : v.ignoreSource === 'global'
-                                      ? t('mod.diagSourceGlobal')
-                                      : t('mod.diagSourceBuiltin')}
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="diag-item-meta">
-                              {v.drivenByKeys.length > 0 ? (
-                                <span className="muted small">
-                                  {t('mod.diagDrivenBy', { keys: v.drivenByKeys.slice(0, 2).join(', ') })}
-                                </span>
-                              ) : null}
-                              {v.linkedVars.length > 0 ? (
-                                <span className="muted small">
-                                  {t('mod.diagLinkedWith', {
-                                    vars: v.linkedVars.slice(0, 3).map((x) => `$${x}`).join(', ')
-                                  })}
-                                </span>
-                              ) : null}
-                              {!v.ignored ? (
-                                <div className="diag-ignore-actions">
-                                  <button
-                                    type="button"
-                                    className="btn ghost tiny-btn"
-                                    onClick={() => void handleAddIgnoreRule(v.name, 'global')}
-                                  >
-                                    {t('mod.diagIgnoreGlobal')}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="btn ghost tiny-btn"
-                                    onClick={() => void handleAddIgnoreRule(v.name, 'local')}
-                                  >
-                                    {t('mod.diagIgnoreLocal')}
-                                  </button>
-                                </div>
-                              ) : null}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {staticAnalysis.dependencies.length > 0 ? (
-                    <div className="diag-subblock">
-                      <div className="muted small" style={{ fontWeight: 600 }}>
-                        {t('mod.diagDepsTitle', { count: staticAnalysis.dependencies.length })}
-                      </div>
-                      <div className="diag-list">
-                        {staticAnalysis.dependencies.slice(0, 10).map((dep, idx) => (
-                          <div key={`${dep.triggerSection}-${dep.targetSection}-${idx}`} className="diag-dep-row">
-                            <code>{dep.triggerSection}</code>
-                            <span className="muted">→</span>
-                            <code>{dep.targetSection}</code>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {staticAnalysis.hashes.length > 0 ? (
-                    <div className="diag-subblock">
-                      <div className="muted small" style={{ fontWeight: 600 }}>
-                        {t('mod.diagHashesTitle', { count: staticAnalysis.hashes.length })}
-                      </div>
-                      <div className="diag-list">
-                        {staticAnalysis.hashes.slice(0, 16).map((item, idx) => {
-                          const hit = conflicts.find((c) => c.hash === item.hash)
-                          const others = hit
-                            ? hit.mods.filter((m) => m.folderName !== details.folderName).map((m) => m.name)
-                            : []
-                          return (
-                            <div key={`${item.hash}-${item.section}-${idx}`} className="diag-hash-row">
-                              <code>{item.hash}</code>
-                              <span className="tag">{item.kind}</span>
-                              <span className="muted small">{item.section}</span>
-                              {others.length > 0 ? (
-                                <span className="tag warn">
-                                  {t('mod.diagOverlapWith', { mods: others.join(', ') })}
-                                </span>
-                              ) : null}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
           ) : null}
 
           <div className="detail-actions">
-            <button className="btn primary" onClick={onToggle}>
-              <Icon name="check" size={15} />
-              {details.enabled ? t('common.disabled') : t('common.enabled')}
+            <button
+              className={`btn ${details.enabled ? 'ghost' : 'primary'}`}
+              onClick={onToggle}
+            >
+              <Icon name={details.enabled ? 'close' : 'check'} size={details.enabled ? 14 : 15} />
+              {details.enabled ? t('common.disable') : t('common.enable')}
             </button>
             <button className="btn ghost" onClick={onOpen}>
               <Icon name="folder" size={15} />
@@ -908,6 +795,145 @@ export function ModDetailsPanel({
       ) : (
         <div className="detail-empty muted">{t('mod.selectToView')}</div>
       )}
+
+      {diagModalOpen && staticAnalysis && details ? (
+        <Modal
+          title={`${t('mod.staticDiagTitle')} · ${details.name}`}
+          onClose={() => setDiagModalOpen(false)}
+          width={640}
+          footer={
+            <button className="btn primary" onClick={() => setDiagModalOpen(false)}>
+              {t('common.close')}
+            </button>
+          }
+        >
+          <div className="diag-details-body diag-modal-body">
+            <div className="diag-summary-pills" style={{ marginTop: 0 }}>
+              <span className="chip">{t('mod.diagVarsCount', { count: staticAnalysis.variables.length })}</span>
+              {staticAnalysis.variables.filter((v) => v.ignored).length > 0 ? (
+                <span className="chip">
+                  {t('mod.diagIgnoredCount', {
+                    count: staticAnalysis.variables.filter((v) => v.ignored).length
+                  })}
+                </span>
+              ) : null}
+              <span className="chip">{t('mod.diagHashesCount', { count: staticAnalysis.hashes.length })}</span>
+            </div>
+
+            {staticAnalysis.hasLocalIgnoreFile ? (
+              <div className="muted small">
+                {t('mod.diagLocalIgnoreHint', { count: staticAnalysis.localIgnoreRules.length })}
+              </div>
+            ) : null}
+
+            {staticAnalysis.variables.length > 0 ? (
+              <div className="diag-subblock">
+                <div className="muted small" style={{ fontWeight: 600 }}>
+                  {t('mod.diagVarsTitle', { count: staticAnalysis.variables.length })}
+                </div>
+                <div className="diag-list diag-list-modal">
+                  {staticAnalysis.variables.map((v) => (
+                    <div key={v.key} className={`diag-item${v.ignored ? ' is-ignored' : ''}`}>
+                      <div className="diag-item-main">
+                        <code>${v.name}</code>
+                        <span className={`tag ${v.persist ? 'ok' : 'warn'}`}>
+                          {v.persist ? t('mod.diagPersistBadge') : t('mod.diagNonPersistBadge')}
+                        </span>
+                        {v.ignored ? (
+                          <span className="tag">
+                            {v.ignoreSource === 'local'
+                              ? t('mod.diagSourceLocal')
+                              : v.ignoreSource === 'global'
+                                ? t('mod.diagSourceGlobal')
+                                : t('mod.diagSourceBuiltin')}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="diag-item-meta">
+                        {v.drivenByKeys.length > 0 ? (
+                          <span className="muted small">
+                            {t('mod.diagDrivenBy', { keys: v.drivenByKeys.slice(0, 2).join(', ') })}
+                          </span>
+                        ) : null}
+                        {v.linkedVars.length > 0 ? (
+                          <span className="muted small">
+                            {t('mod.diagLinkedWith', {
+                              vars: v.linkedVars.slice(0, 3).map((x) => `$${x}`).join(', ')
+                            })}
+                          </span>
+                        ) : null}
+                        {!v.ignored ? (
+                          <div className="diag-ignore-actions">
+                            <button
+                              type="button"
+                              className="btn ghost tiny-btn"
+                              onClick={() => void handleAddIgnoreRule(v.name, 'global')}
+                            >
+                              {t('mod.diagIgnoreGlobal')}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn ghost tiny-btn"
+                              onClick={() => void handleAddIgnoreRule(v.name, 'local')}
+                            >
+                              {t('mod.diagIgnoreLocal')}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {staticAnalysis.dependencies.length > 0 ? (
+              <div className="diag-subblock">
+                <div className="muted small" style={{ fontWeight: 600 }}>
+                  {t('mod.diagDepsTitle', { count: staticAnalysis.dependencies.length })}
+                </div>
+                <div className="diag-list diag-list-modal">
+                  {staticAnalysis.dependencies.map((dep, idx) => (
+                    <div key={`${dep.triggerSection}-${dep.targetSection}-${idx}`} className="diag-dep-row">
+                      <code>{dep.triggerSection}</code>
+                      <span className="muted">→</span>
+                      <code>{dep.targetSection}</code>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {staticAnalysis.hashes.length > 0 ? (
+              <div className="diag-subblock">
+                <div className="muted small" style={{ fontWeight: 600 }}>
+                  {t('mod.diagHashesTitle', { count: staticAnalysis.hashes.length })}
+                </div>
+                <div className="diag-list diag-list-modal">
+                  {staticAnalysis.hashes.map((item, idx) => {
+                    const hit = conflicts.find((c) => c.hash === item.hash)
+                    const others = hit
+                      ? hit.mods.filter((m) => m.folderName !== details.folderName).map((m) => m.name)
+                      : []
+                    return (
+                      <div key={`${item.hash}-${item.section}-${idx}`} className="diag-hash-row">
+                        <code>{item.hash}</code>
+                        <span className="tag">{item.kind}</span>
+                        <span className="muted small">{item.section}</span>
+                        {others.length > 0 ? (
+                          <span className="tag warn">
+                            {t('mod.diagOverlapWith', { mods: others.join(', ') })}
+                          </span>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </Modal>
+      ) : null}
 
       {inspectingPreset ? (
         <PresetDetailModal
