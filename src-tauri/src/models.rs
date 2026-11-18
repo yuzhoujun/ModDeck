@@ -246,6 +246,10 @@ pub struct ModInfo {
 pub struct ModHotkey {
     pub section: String,
     pub key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint_kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

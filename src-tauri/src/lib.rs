@@ -3,6 +3,7 @@ mod games;
 mod imports;
 mod ini_analysis;
 mod input;
+mod launcher;
 mod library;
 mod metadata;
 mod models;
@@ -34,6 +35,8 @@ use models::{
     SaveModPresetResult, SaveRosterPresetInput, Settings, SimpleResult, StateChangedEvent,
     StorageOverview, ToggleResult, ToggleVisibilityResult,
 };
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use serde::Deserialize;
 use serde_json::Value;
 use settings::{
     is_non_zh_effective_locale, load_custom_locales, load_settings, merge_settings_patch,
@@ -42,15 +45,46 @@ use settings::{
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::http::{header::CONTENT_TYPE, Response, StatusCode};
-use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size, State, Url,
+    WindowEvent,
+};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 static SUPPRESS_WATCHER_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
+static IS_QUITTING: AtomicBool = AtomicBool::new(false);
+static RELOAD_GEN: AtomicU64 = AtomicU64::new(0);
+static POST_SYNC_GEN: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OverlayDetailRequest {
+    game_id: String,
+    character_folder: String,
+    mod_folder: String,
+}
+
+fn file_mtime_and_size(path: &Path) -> (u64, u64) {
+    match fs::metadata(path) {
+        Ok(meta) => {
+            let mtime = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            (mtime, meta.len())
+        }
+        Err(_) => (0, 0),
+    }
+}
 
 fn now_epoch_ms() -> u64 {
     SystemTime::now()
@@ -74,6 +108,7 @@ fn spawn_mods_watcher(app: AppHandle) {
     };
     use windows::Win32::System::Threading::WaitForSingleObject;
 
+    let d3dx_app = app.clone();
     std::thread::Builder::new()
         .name("moddeck-mods-watcher".to_string())
         .spawn(move || {
@@ -154,6 +189,132 @@ fn spawn_mods_watcher(app: AppHandle) {
                         }
                         watched_path.clear();
                     }
+                }
+            }
+        })
+        .ok();
+    spawn_d3dx_watcher(d3dx_app);
+}
+
+#[cfg(windows)]
+fn spawn_d3dx_watcher(app: AppHandle) {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{HANDLE, WAIT_OBJECT_0};
+    use windows::Win32::Storage::FileSystem::{
+        FindCloseChangeNotification, FindFirstChangeNotificationW, FindNextChangeNotification,
+        FILE_NOTIFY_CHANGE_FILE_NAME, FILE_NOTIFY_CHANGE_LAST_WRITE, FILE_NOTIFY_CHANGE_SIZE,
+    };
+    use windows::Win32::System::Threading::WaitForSingleObject;
+
+    std::thread::Builder::new()
+        .name("moddeck-d3dx-watcher".to_string())
+        .spawn(move || {
+            let mut watched_dir = PathBuf::new();
+            let mut watched_mods = String::new();
+            let mut watched_game = String::new();
+            let mut last_sig = (0u64, 0u64);
+            let mut handle: Option<HANDLE> = None;
+
+            loop {
+                let target = app
+                    .state::<AppState>()
+                    .0
+                    .try_lock()
+                    .ok()
+                    .map(|g| {
+                        let gid = g.settings.active_game_id.clone();
+                        let mp = g
+                            .settings
+                            .games
+                            .get(&gid)
+                            .map(|cfg| cfg.mods_path.trim().to_string())
+                            .unwrap_or_default();
+                        (gid, mp)
+                    });
+
+                if let Some((gid, mp)) = target {
+                    let watch_dir = if mp.is_empty() {
+                        PathBuf::new()
+                    } else {
+                        presets::find_d3dx_user_ini_path(Path::new(&mp))
+                            .and_then(|p| p.parent().map(Path::to_path_buf))
+                            .or_else(|| Path::new(&mp).parent().map(Path::to_path_buf))
+                            .unwrap_or_default()
+                    };
+
+                    if watch_dir != watched_dir || mp != watched_mods || gid != watched_game {
+                        if let Some(h) = handle.take() {
+                            unsafe {
+                                let _ = FindCloseChangeNotification(h);
+                            }
+                        }
+                        watched_dir = watch_dir.clone();
+                        watched_mods = mp.clone();
+                        watched_game = gid.clone();
+                        last_sig = if watched_mods.is_empty() {
+                            (0, 0)
+                        } else {
+                            presets::find_d3dx_user_ini_path(Path::new(&watched_mods))
+                                .map(|p| file_mtime_and_size(&p))
+                                .unwrap_or((0, 0))
+                        };
+
+                        if !watched_dir.as_os_str().is_empty() && watched_dir.is_dir() {
+                            let wide: Vec<u16> = watched_dir
+                                .as_os_str()
+                                .encode_wide()
+                                .chain(Some(0))
+                                .collect();
+                            if let Ok(h) = unsafe {
+                                FindFirstChangeNotificationW(
+                                    PCWSTR(wide.as_ptr()),
+                                    false,
+                                    FILE_NOTIFY_CHANGE_LAST_WRITE
+                                        | FILE_NOTIFY_CHANGE_SIZE
+                                        | FILE_NOTIFY_CHANGE_FILE_NAME,
+                                )
+                            } {
+                                handle = Some(h);
+                            }
+                        }
+                    }
+                }
+
+                let Some(h) = handle else {
+                    std::thread::sleep(Duration::from_millis(600));
+                    continue;
+                };
+
+                let wait = unsafe { WaitForSingleObject(h, 450) };
+                if wait == WAIT_OBJECT_0 {
+                    let _ = unsafe { FindNextChangeNotification(h) };
+                    std::thread::sleep(Duration::from_millis(120));
+                    while unsafe { WaitForSingleObject(h, 20) } == WAIT_OBJECT_0 {
+                        let _ = unsafe { FindNextChangeNotification(h) };
+                    }
+                    let next_sig = if watched_mods.is_empty() {
+                        (0, 0)
+                    } else {
+                        presets::find_d3dx_user_ini_path(Path::new(&watched_mods))
+                            .map(|p| file_mtime_and_size(&p))
+                            .unwrap_or((0, 0))
+                    };
+                    if next_sig != last_sig && (next_sig.0 > 0 || next_sig.1 > 0) {
+                        last_sig = next_sig;
+                        if now_epoch_ms() >= SUPPRESS_WATCHER_UNTIL_MS.load(Ordering::Relaxed)
+                            && !watched_game.is_empty()
+                        {
+                            emit_state_changed(&app, Some(&watched_game), None);
+                        }
+                    }
+                } else if !watched_dir.as_os_str().is_empty() && !watched_dir.is_dir() {
+                    if let Some(h) = handle.take() {
+                        unsafe {
+                            let _ = FindCloseChangeNotification(h);
+                        }
+                    }
+                    watched_dir.clear();
                 }
             }
         })
@@ -256,28 +417,184 @@ fn do_toggle_overlay(app: &AppHandle) {
             guard.webview_data_dir.clone(),
         )
     };
-    let win = match app.get_webview_window("overlay") {
-        Some(win) => Some(win),
-        None => match create_window_from_config(app, "overlay", data_dir.as_deref()) {
-            Ok(win) => Some(win),
-            Err(err) => {
-                append_crash_log(&base_dir, &format!("overlay lazy init failed: {err}"));
-                None
+    let app_handle = app.clone();
+    // Run off the event-handler / sync-command thread so lazy WebView2 init cannot deadlock on Windows.
+    tauri::async_runtime::spawn(async move {
+        let win = match app_handle.get_webview_window("overlay") {
+            Some(win) => Some(win),
+            None => {
+                let app_bg = app_handle.clone();
+                let data_dir_bg = data_dir.clone();
+                let base_dir_bg = base_dir.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    match create_window_from_config(&app_bg, "overlay", data_dir_bg.as_deref()) {
+                        Ok(win) => Some(win),
+                        Err(err) => {
+                            append_crash_log(&base_dir_bg, &format!("overlay lazy init failed: {err}"));
+                            None
+                        }
+                    }
+                })
+                .await
+                .unwrap_or(None)
             }
-        },
+        };
+        if let Some(win) = win {
+            let visible = win.is_visible().unwrap_or(false);
+            let focused = win.is_focused().unwrap_or(false);
+            // Hide immediately when pinned on top so toggle works after F10 returns focus to the game.
+            if visible && (focused || pinned) {
+                let _ = win.hide();
+                if let Some(detail) = app_handle.get_webview_window("overlay-detail") {
+                    let _ = detail.hide();
+                }
+            } else {
+                let _ = win.show();
+                let _ = win.set_always_on_top(pinned);
+                let _ = win.set_focus();
+            }
+        }
+    });
+}
+
+fn show_main_window(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.unminimize();
+        let _ = win.show();
+        let _ = win.set_focus();
+    }
+}
+
+fn build_tray_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let prefer_en = app
+        .state::<AppState>()
+        .0
+        .try_lock()
+        .ok()
+        .map(|g| is_non_zh_effective_locale(&g.settings.ui.language))
+        .unwrap_or(false);
+    let (open_lbl, overlay_lbl, quit_lbl) = if prefer_en {
+        ("Open ModDeck", "Toggle Quick Overlay", "Quit ModDeck")
+    } else {
+        ("打开主界面", "显示/隐藏快捷浮窗", "退出 ModDeck")
     };
-    if let Some(win) = win {
-        let visible = win.is_visible().unwrap_or(false);
-        let focused = win.is_focused().unwrap_or(false);
-        // Hide immediately when pinned on top so toggle works after F10 returns focus to the game.
-        if visible && (focused || pinned) {
-            let _ = win.hide();
-        } else {
-            let _ = win.show();
-            let _ = win.set_always_on_top(pinned);
-            let _ = win.set_focus();
+    let open_item = MenuItem::with_id(app, "tray-open", open_lbl, true, None::<&str>)?;
+    let overlay_item = MenuItem::with_id(app, "tray-overlay", overlay_lbl, true, None::<&str>)?;
+    let sep = PredefinedMenuItem::separator(app)?;
+    let quit_item = MenuItem::with_id(app, "tray-quit", quit_lbl, true, None::<&str>)?;
+    Menu::with_items(app, &[&open_item, &overlay_item, &sep, &quit_item])
+}
+
+fn update_tray_menu(app: &AppHandle) {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        if let Ok(menu) = build_tray_menu(app) {
+            let _ = tray.set_menu(Some(menu));
         }
     }
+}
+
+fn ensure_tray(app: &AppHandle) {
+    if app.tray_by_id("main-tray").is_some() {
+        update_tray_menu(app);
+        return;
+    }
+    let Ok(menu) = build_tray_menu(app) else {
+        return;
+    };
+    let mut builder = TrayIconBuilder::with_id("main-tray")
+        .tooltip("ModDeck")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "tray-open" => show_main_window(app),
+            "tray-overlay" => do_toggle_overlay(app),
+            "tray-quit" => {
+                IS_QUITTING.store(true, Ordering::Relaxed);
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::DoubleClick {
+                button: MouseButton::Left,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon().cloned() {
+        builder = builder.icon(icon);
+    }
+    if let Err(err) = builder.build(app) {
+        let base_dir = app
+            .state::<AppState>()
+            .0
+            .lock()
+            .expect("state lock")
+            .base_dir
+            .clone();
+        append_crash_log(&base_dir, &format!("tray init failed: {err}"));
+    }
+}
+
+fn place_overlay_detail(overlay: &tauri::WebviewWindow, detail: &tauri::WebviewWindow) {
+    let Ok(bounds_pos) = overlay.outer_position() else {
+        return;
+    };
+    let Ok(bounds_size) = overlay.outer_size() else {
+        return;
+    };
+    let Ok(Some(monitor)) = overlay.current_monitor() else {
+        return;
+    };
+    let scale = monitor.scale_factor().max(1.0);
+    let area = monitor.work_area();
+    let area_x = area.position.x;
+    let area_y = area.position.y;
+    let area_w = area.size.width as i32;
+    let area_h = area.size.height as i32;
+
+    let default_w = (320.0 * scale).round() as i32;
+    let default_h = (460.0 * scale).round() as i32;
+    let min_w = (280.0 * scale).round() as i32;
+    let min_h = (300.0 * scale).round() as i32;
+    let cur_size = detail.outer_size().ok();
+    let width = cur_size
+        .map(|s| s.width as i32)
+        .filter(|&w| w >= min_w)
+        .unwrap_or(default_w);
+    let margin = (8.0 * scale).round() as i32;
+    let gap = (10.0 * scale).round() as i32;
+    let pad = (12.0 * scale).round() as i32;
+    let max_h = (area_h - (24.0 * scale).round() as i32).max(min_h);
+    let height = cur_size
+        .map(|s| s.height as i32)
+        .filter(|&h| h >= min_h)
+        .unwrap_or(default_h)
+        .min(max_h);
+
+    let right_space = (area_x + area_w) - (bounds_pos.x + bounds_size.width as i32);
+    let left_space = bounds_pos.x - area_x;
+    let raw_x = if right_space >= width + pad {
+        bounds_pos.x + bounds_size.width as i32 + gap
+    } else if left_space >= width + pad {
+        bounds_pos.x - width - gap
+    } else if right_space >= left_space {
+        bounds_pos.x + bounds_size.width as i32 + gap
+    } else {
+        bounds_pos.x - width - gap
+    };
+    let min_x = area_x + margin;
+    let max_x = (area_x + area_w - width - margin).max(min_x);
+    let x = raw_x.clamp(min_x, max_x);
+
+    let min_y = area_y + margin;
+    let max_y = (area_y + area_h - height - margin).max(min_y);
+    let y = bounds_pos.y.clamp(min_y, max_y);
+
+    let _ = detail.set_size(Size::Physical(PhysicalSize::new(width as u32, height as u32)));
+    let _ = detail.set_position(Position::Physical(PhysicalPosition::new(x, y)));
 }
 
 fn normalize_shortcut_for_tauri(raw: &str) -> String {
@@ -298,9 +615,15 @@ fn normalize_shortcut_for_tauri(raw: &str) -> String {
         .join("+")
 }
 
-fn active_exe_hints(settings: &Settings) -> Vec<String> {
+fn hotkey_conflict_eq(a: &str, b: &str) -> bool {
+    let na = normalize_shortcut_for_tauri(a).to_ascii_lowercase();
+    let nb = normalize_shortcut_for_tauri(b).to_ascii_lowercase();
+    !na.is_empty() && na == nb
+}
+
+fn exe_hints_for_game(settings: &Settings, game_id: &str) -> Vec<String> {
     let mut hints = Vec::new();
-    if let Some(game) = get_game(settings, &settings.active_game_id) {
+    if let Some(game) = get_game(settings, game_id) {
         if let Some(hint) = game.exe_hint {
             for part in hint.split('|') {
                 let p = part.trim().to_string();
@@ -318,6 +641,160 @@ fn active_exe_hints(settings: &Settings) -> Vec<String> {
         }
     }
     hints
+}
+
+fn active_exe_hints(settings: &Settings) -> Vec<String> {
+    exe_hints_for_game(settings, &settings.active_game_id)
+}
+
+#[derive(Clone, Copy)]
+enum AutoReloadKind {
+    ModToggle,
+    ModPreset,
+    RosterPreset,
+}
+
+fn schedule_post_reload_preset_sync(app: &AppHandle, game_id: &str) {
+    let configured_sec = {
+        let state = app.state::<AppState>();
+        let guard = state.0.lock().expect("state lock");
+        let sec = guard.settings.ui.post_reload_sync_delay;
+        if sec.is_finite() && sec > 0.0 {
+            sec
+        } else {
+            6.0
+        }
+    };
+    let delay_ms = configured_sec.clamp(1.0, 30.0) * 1000.0;
+    let gen = POST_SYNC_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let app_handle = app.clone();
+    let gid = game_id.to_string();
+
+    std::thread::Builder::new()
+        .name("moddeck-post-sync".to_string())
+        .spawn(move || {
+            std::thread::sleep(Duration::from_millis(delay_ms.round() as u64));
+            if POST_SYNC_GEN.load(Ordering::Relaxed) != gen {
+                return;
+            }
+            let (pending, active_mods) = {
+                let state = app_handle.state::<AppState>();
+                let mut guard = state.0.lock().expect("state lock");
+                let entries = guard.pending_queue.take_entries_for_game(&gid);
+                guard.pending_queue.clear_all(Some(&gid));
+                let active_mods = guard
+                    .settings
+                    .games
+                    .get(&gid)
+                    .map(|g| g.mods_path.trim().to_string())
+                    .unwrap_or_default();
+                (entries, active_mods)
+            };
+
+            let mut touched_paths: Vec<String> = Vec::new();
+            mark_internal_fs_mutation();
+            for entry in &pending {
+                if !entry.mods_path.trim().is_empty()
+                    && !touched_paths.iter().any(|p| p == &entry.mods_path)
+                {
+                    touched_paths.push(entry.mods_path.clone());
+                }
+                presets::apply_variables_to_d3dx_user_ini(
+                    Path::new(&entry.mods_path),
+                    &entry.variables,
+                    &entry.character_folder,
+                    &entry.clean_mod_name,
+                );
+            }
+            if !active_mods.is_empty() && !touched_paths.iter().any(|p| p == &active_mods) {
+                touched_paths.push(active_mods);
+            }
+            for mp in touched_paths {
+                presets::clear_preset_bridge_ini(Path::new(&mp));
+            }
+            emit_state_changed(&app_handle, Some(&gid), None);
+        })
+        .ok();
+}
+
+fn reload_f10_for_game(app: &AppHandle, target_game_id: Option<&str>) -> SimpleResult {
+    let (hints, reload_key, gid, has_pending) = {
+        let state = app.state::<AppState>();
+        let guard = state.0.lock().expect("state lock");
+        let gid = target_game_id
+            .map(str::to_string)
+            .unwrap_or_else(|| guard.settings.active_game_id.clone());
+        let hints = exe_hints_for_game(&guard.settings, &gid);
+        let reload_key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
+            "F10".to_string()
+        } else {
+            guard.settings.ui.reload_hotkey.trim().to_string()
+        };
+        let active_mods = guard
+            .settings
+            .games
+            .get(&gid)
+            .map(|g| g.mods_path.trim().to_string())
+            .unwrap_or_default();
+        let has_pending = guard.pending_queue.pending_count(Some(&gid)) > 0
+            || (!active_mods.is_empty()
+                && presets::has_active_preset_bridge(Path::new(&active_mods)));
+        (hints, reload_key, gid, has_pending)
+    };
+
+    match input::send_hotkey(&reload_key, &hints) {
+        Ok(()) => {
+            if has_pending {
+                {
+                    let state = app.state::<AppState>();
+                    let mut guard = state.0.lock().expect("state lock");
+                    guard.pending_queue.mark_reloading(&gid);
+                    guard.pending_queue.clear_mod_toggles(Some(&gid));
+                    guard.pending_queue.clear_roster_schemes(Some(&gid));
+                }
+                schedule_post_reload_preset_sync(app, &gid);
+                emit_state_changed(app, Some(&gid), None);
+            }
+            SimpleResult {
+                ok: true,
+                error: None,
+            }
+        }
+        Err(e) => SimpleResult {
+            ok: false,
+            error: Some(e),
+        },
+    }
+}
+
+fn schedule_auto_reload(app: &AppHandle, kind: AutoReloadKind, game_id: &str) -> bool {
+    let should_reload = {
+        let state = app.state::<AppState>();
+        let guard = state.0.lock().expect("state lock");
+        let ui = &guard.settings.ui;
+        match kind {
+            AutoReloadKind::ModToggle => ui.auto_reload_mod_toggle || ui.auto_reload_f10,
+            AutoReloadKind::ModPreset => ui.auto_reload_mod_preset,
+            AutoReloadKind::RosterPreset => ui.auto_reload_roster_preset,
+        }
+    };
+    if !should_reload {
+        return false;
+    }
+    let gen = RELOAD_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    let app_handle = app.clone();
+    let gid = game_id.to_string();
+    std::thread::Builder::new()
+        .name("moddeck-auto-reload".to_string())
+        .spawn(move || {
+            std::thread::sleep(Duration::from_millis(600));
+            if RELOAD_GEN.load(Ordering::Relaxed) != gen {
+                return;
+            }
+            let _ = reload_f10_for_game(&app_handle, Some(&gid));
+        })
+        .ok();
+    true
 }
 
 fn snapshot_for_game(state: &InnerState, game_id: &str) -> Result<Option<GameSnapshot>, String> {
@@ -398,6 +875,7 @@ fn save_settings_cmd(
     guard.settings = next.clone();
     let active_id = guard.settings.active_game_id.clone();
     drop(guard);
+    update_tray_menu(&app);
     emit_state_changed(&app, Some(&active_id), None);
     Ok(next)
 }
@@ -517,24 +995,16 @@ fn toggle_mod_cmd(
                 &base_name,
             );
             let _ = save_settings_atomic(&guard.base_dir, &guard.settings);
-            let auto_reload = guard.settings.ui.auto_reload_mod_toggle;
+            let auto_reload =
+                guard.settings.ui.auto_reload_mod_toggle || guard.settings.ui.auto_reload_f10;
             if !auto_reload {
                 guard
                     .pending_queue
                     .record_mod_toggle(&game_id, &character_folder, &mod_folder, enable);
             }
-            let hints = active_exe_hints(&guard.settings);
-            let reload_key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
-                "F10".to_string()
-            } else {
-                guard.settings.ui.reload_hotkey.trim().to_string()
-            };
             drop(guard);
-            let reloaded = if auto_reload {
-                Some(input::send_hotkey(&reload_key, &hints).is_ok())
-            } else {
-                Some(false)
-            };
+            let scheduled = schedule_auto_reload(&app, AutoReloadKind::ModToggle, &game_id);
+            let reloaded = Some(scheduled);
             emit_state_changed(&app, Some(&game_id), Some(&character_folder));
             ToggleResult {
                 ok: true,
@@ -615,17 +1085,50 @@ fn open_mod_folder(
 fn open_path(state: State<'_, AppState>, kind: String, game_id: Option<String>) -> SimpleResult {
     let guard = state.0.lock().expect("state lock");
     let target = match kind.as_str() {
-        "userData" | "logs" | "languages" => guard.base_dir.clone(),
-        "mods" => {
-            let gid = game_id.unwrap_or_else(|| guard.settings.active_game_id.clone());
-            guard
-                .settings
-                .games
-                .get(&gid)
-                .map(|g| PathBuf::from(&g.mods_path))
-                .unwrap_or_default()
+        "data" | "userData" => guard.base_dir.clone(),
+        "logs" => {
+            let dir = guard.base_dir.join("logs");
+            let _ = fs::create_dir_all(&dir);
+            dir
         }
-        _ => guard.base_dir.clone(),
+        "languages" | "locales" => {
+            let exe_langs = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.join("languages")));
+            let data_langs = guard.base_dir.join("languages");
+            if let Some(p) = exe_langs.filter(|p| p.exists()) {
+                p
+            } else if data_langs.exists() {
+                data_langs
+            } else {
+                let _ = fs::create_dir_all(&data_langs);
+                data_langs
+            }
+        }
+        "mods" | "game" | "loader" => {
+            let gid = game_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .unwrap_or(&guard.settings.active_game_id);
+            let Some(gs) = guard.settings.games.get(gid) else {
+                return SimpleResult {
+                    ok: false,
+                    error: Some(format!("Unknown game: {gid}")),
+                };
+            };
+            match kind.as_str() {
+                "mods" => PathBuf::from(gs.mods_path.trim()),
+                "game" => PathBuf::from(gs.game_path.as_deref().unwrap_or("").trim()),
+                _ => PathBuf::from(gs.loader_path.as_deref().unwrap_or("").trim()),
+            }
+        }
+        other => {
+            return SimpleResult {
+                ok: false,
+                error: Some(format!("Unknown path kind: {other}")),
+            };
+        }
     };
     open_in_explorer(&target)
 }
@@ -637,7 +1140,20 @@ fn open_in_explorer(target: &Path) -> SimpleResult {
             error: Some("Target path does not exist".into()),
         };
     }
-    match Command::new("explorer.exe").arg(target).spawn() {
+    #[cfg(windows)]
+    let spawned = if target.is_file() {
+        use std::os::windows::process::CommandExt;
+        let escaped = target.to_string_lossy().replace('"', "");
+        Command::new("explorer.exe")
+            .raw_arg(format!("/select,\"{escaped}\""))
+            .spawn()
+    } else {
+        Command::new("explorer.exe").arg(target).spawn()
+    };
+    #[cfg(not(windows))]
+    let spawned = Command::new("explorer.exe").arg(target).spawn();
+
+    match spawned {
         Ok(_) => SimpleResult {
             ok: true,
             error: None,
@@ -650,39 +1166,13 @@ fn open_in_explorer(target: &Path) -> SimpleResult {
 }
 
 #[tauri::command]
-fn reload_f10(app: AppHandle, state: State<'_, AppState>) -> SimpleResult {
-    let mut guard = state.0.lock().expect("state lock");
-    let hints = active_exe_hints(&guard.settings);
-    let reload_key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
-        "F10".to_string()
-    } else {
-        guard.settings.ui.reload_hotkey.trim().to_string()
-    };
-    let active_id = guard.settings.active_game_id.clone();
-    let active_mods = guard
-        .settings
-        .games
-        .get(&active_id)
-        .map(|g| g.mods_path.clone())
-        .unwrap_or_default();
-    guard.pending_queue.clear_all(Some(&active_id));
-    drop(guard);
-    match input::send_hotkey(&reload_key, &hints) {
-        Ok(()) => {
-            if !active_mods.trim().is_empty() {
-                presets::clear_preset_bridge_ini(Path::new(&active_mods));
-            }
-            emit_state_changed(&app, Some(&active_id), None);
-            SimpleResult {
-                ok: true,
-                error: None,
-            }
-        }
-        Err(e) => SimpleResult {
+async fn reload_f10(app: AppHandle) -> SimpleResult {
+    tauri::async_runtime::spawn_blocking(move || reload_f10_for_game(&app, None))
+        .await
+        .unwrap_or_else(|e| SimpleResult {
             ok: false,
-            error: Some(e),
-        },
-    }
+            error: Some(e.to_string()),
+        })
 }
 
 #[tauri::command]
@@ -698,6 +1188,16 @@ fn set_reload_hotkey(
         trimmed.to_string()
     };
     let mut guard = state.0.lock().expect("state lock");
+    if hotkey_conflict_eq(&value, &guard.settings.ui.overlay_hotkey) {
+        return HotkeyResult {
+            ok: false,
+            hotkey: None,
+            error: Some(format!(
+                "Reload hotkey conflicts with overlay hotkey ({})",
+                guard.settings.ui.overlay_hotkey
+            )),
+        };
+    }
     guard.settings.ui.reload_hotkey = value.clone();
     if let Err(err) = save_settings(&guard.base_dir, &guard.settings) {
         return HotkeyResult {
@@ -717,24 +1217,53 @@ fn set_reload_hotkey(
 }
 
 #[tauri::command]
-fn send_mod_hotkey(state: State<'_, AppState>, key: String) -> SimpleResult {
-    let guard = state.0.lock().expect("state lock");
-    let hints = active_exe_hints(&guard.settings);
-    drop(guard);
-    match input::send_hotkey(&key, &hints) {
-        Ok(()) => SimpleResult {
-            ok: true,
-            error: None,
-        },
-        Err(e) => SimpleResult {
+async fn send_mod_hotkey(state: State<'_, AppState>, key: String) -> Result<SimpleResult, String> {
+    let (allowed, hints) = {
+        let guard = state.0.lock().expect("state lock");
+        (
+            guard.settings.ui.allow_hotkey_send,
+            active_exe_hints(&guard.settings),
+        )
+    };
+    if !allowed {
+        return Ok(SimpleResult {
             ok: false,
-            error: Some(e),
-        },
+            error: Some("Hotkey sending is disabled in settings".into()),
+        });
     }
+    Ok(tauri::async_runtime::spawn_blocking(move || {
+        match input::send_hotkey(&key, &hints) {
+            Ok(()) => SimpleResult {
+                ok: true,
+                error: None,
+            },
+            Err(e) => SimpleResult {
+                ok: false,
+                error: Some(e),
+            },
+        }
+    })
+    .await
+    .unwrap_or_else(|e| SimpleResult {
+        ok: false,
+        error: Some(e.to_string()),
+    }))
 }
 
 #[tauri::command]
-fn toggle_overlay(app: AppHandle) -> SimpleResult {
+fn launch_game(state: State<'_, AppState>, game_id: String) -> SimpleResult {
+    let settings = state.0.lock().expect("state lock").settings.clone();
+    launcher::launch_configured(&settings, &game_id, "game")
+}
+
+#[tauri::command]
+fn launch_loader(state: State<'_, AppState>, game_id: String) -> SimpleResult {
+    let settings = state.0.lock().expect("state lock").settings.clone();
+    launcher::launch_configured(&settings, &game_id, "loader")
+}
+
+#[tauri::command]
+async fn toggle_overlay(app: AppHandle) -> SimpleResult {
     do_toggle_overlay(&app);
     SimpleResult {
         ok: true,
@@ -743,22 +1272,12 @@ fn toggle_overlay(app: AppHandle) -> SimpleResult {
 }
 
 #[tauri::command]
-fn overlay_hide(app: AppHandle) -> SimpleResult {
+async fn overlay_hide(app: AppHandle) -> SimpleResult {
     if let Some(win) = app.get_webview_window("overlay") {
         let _ = win.hide();
     }
-    SimpleResult {
-        ok: true,
-        error: None,
-    }
-}
-
-#[tauri::command]
-fn overlay_open_manager(app: AppHandle) -> SimpleResult {
-    if let Some(win) = app.get_webview_window("main") {
-        let _ = win.unminimize();
-        let _ = win.show();
-        let _ = win.set_focus();
+    if let Some(detail) = app.get_webview_window("overlay-detail") {
+        let _ = detail.hide();
     }
     SimpleResult {
         ok: true,
@@ -767,17 +1286,125 @@ fn overlay_open_manager(app: AppHandle) -> SimpleResult {
 }
 
 #[tauri::command]
-fn set_overlay_pinned(app: AppHandle, state: State<'_, AppState>, pinned: bool) -> SimpleResult {
+async fn show_overlay_detail(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    request: OverlayDetailRequest,
+) -> Result<ToggleResult, String> {
+    let Some(overlay) = app.get_webview_window("overlay") else {
+        return Ok(ToggleResult::err("Overlay window is not available"));
+    };
+    let (pinned, data_dir) = {
+        let guard = state.0.lock().expect("state lock");
+        (guard.settings.ui.overlay_pinned, guard.webview_data_dir.clone())
+    };
+    let query = format!(
+        "mode=overlay-detail&gameId={}&character={}&mod={}",
+        utf8_percent_encode(&request.game_id, NON_ALPHANUMERIC),
+        utf8_percent_encode(&request.character_folder, NON_ALPHANUMERIC),
+        utf8_percent_encode(&request.mod_folder, NON_ALPHANUMERIC),
+    );
+
+    let detail = match app.get_webview_window("overlay-detail") {
+        Some(win) => {
+            let navigated = match win.url() {
+                Ok(mut url) if url.scheme() != "about" => {
+                    url.set_query(Some(&query));
+                    win.navigate(url)
+                }
+                _ => match Url::parse(&format!("http://tauri.localhost/index.html?{query}")) {
+                    Ok(fallback) => win.navigate(fallback),
+                    Err(e) => return Ok(ToggleResult::err(format!("Invalid detail URL: {e}"))),
+                },
+            };
+            if let Err(err) = navigated {
+                return Ok(ToggleResult::err(format!(
+                    "Failed to navigate detail window: {err}"
+                )));
+            }
+            win
+        }
+        None => {
+            let app_clone = app.clone();
+            let query_clone = query.clone();
+            let built = tauri::async_runtime::spawn_blocking(move || {
+                let Some(mut cfg) = app_clone
+                    .config()
+                    .app
+                    .windows
+                    .iter()
+                    .find(|w| w.label == "overlay-detail")
+                    .cloned()
+                else {
+                    return Err("Window config 'overlay-detail' not found".to_string());
+                };
+                cfg.url = tauri::WebviewUrl::App(PathBuf::from(format!("index.html?{query_clone}")));
+                let mut builder = tauri::WebviewWindowBuilder::from_config(&app_clone, &cfg)
+                    .map_err(|err| format!("from_config('overlay-detail'): {err}"))?;
+                if let Some(dir) = data_dir {
+                    builder = builder.data_directory(dir);
+                }
+                builder
+                    .build()
+                    .map_err(|err| format!("build('overlay-detail'): {err}"))
+            })
+            .await
+            .map_err(|err| format!("overlay-detail spawn failed: {err}"))?;
+            match built {
+                Ok(win) => win,
+                Err(msg) => return Ok(ToggleResult::err(msg)),
+            }
+        }
+    };
+
+    place_overlay_detail(&overlay, &detail);
+    let _ = detail.set_always_on_top(pinned);
+    let _ = detail.show();
+    let _ = detail.set_focus();
+    Ok(ToggleResult::ok())
+}
+
+#[tauri::command]
+async fn hide_overlay_detail(app: AppHandle) -> SimpleResult {
+    if let Some(detail) = app.get_webview_window("overlay-detail") {
+        let _ = detail.hide();
+    }
+    SimpleResult {
+        ok: true,
+        error: None,
+    }
+}
+
+#[tauri::command]
+async fn overlay_open_manager(app: AppHandle) -> SimpleResult {
+    show_main_window(&app);
+    SimpleResult {
+        ok: true,
+        error: None,
+    }
+}
+
+#[tauri::command]
+async fn set_overlay_pinned(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    pinned: bool,
+) -> Result<SimpleResult, String> {
+    {
+        let mut guard = state.0.lock().expect("state lock");
+        guard.settings.ui.overlay_pinned = pinned;
+        let _ = save_settings(&guard.base_dir, &guard.settings);
+    }
     if let Some(win) = app.get_webview_window("overlay") {
         let _ = win.set_always_on_top(pinned);
     }
-    let mut guard = state.0.lock().expect("state lock");
-    guard.settings.ui.overlay_pinned = pinned;
-    let _ = save_settings(&guard.base_dir, &guard.settings);
-    SimpleResult {
+    if let Some(detail) = app.get_webview_window("overlay-detail") {
+        let _ = detail.set_always_on_top(pinned);
+    }
+    Ok(SimpleResult {
         ok: true,
         error: None,
-    }
+    })
 }
 
 #[tauri::command]
@@ -800,6 +1427,18 @@ fn set_overlay_hotkey(
 ) -> HotkeyResult {
     let display_value = hotkey.trim().to_string();
     let mut guard = state.0.lock().expect("state lock");
+    if !display_value.is_empty()
+        && hotkey_conflict_eq(&display_value, &guard.settings.ui.reload_hotkey)
+    {
+        return HotkeyResult {
+            ok: false,
+            hotkey: None,
+            error: Some(format!(
+                "Overlay hotkey conflicts with reload hotkey ({})",
+                guard.settings.ui.reload_hotkey
+            )),
+        };
+    }
     let prev_registered = guard.registered_hotkey.clone();
 
     if let Some(prev) = prev_registered.as_deref() {
@@ -1922,10 +2561,12 @@ fn get_d3dx_sync_status(state: State<'_, AppState>, game_id: String) -> D3dxSync
         .settings
         .games
         .get(&game_id)
-        .map(|g| g.mods_path.trim())
-        .unwrap_or("");
+        .map(|g| g.mods_path.trim().to_string())
+        .unwrap_or_default();
     let pending_count = guard.pending_queue.pending_count(Some(&game_id));
-    presets::get_d3dx_sync_status(Path::new(mods_path), pending_count)
+    let game_running = launcher::is_game_process_running(&guard.settings, Some(&game_id));
+    drop(guard);
+    presets::get_d3dx_sync_status(Path::new(&mods_path), pending_count, game_running)
 }
 
 #[tauri::command]
@@ -1968,8 +2609,31 @@ fn get_mod_presets(
     )
 }
 
+fn wait_for_d3dx_user_ini_update(
+    mods_path: &Path,
+    prev_mtime_ms: u64,
+    prev_size: u64,
+    timeout_ms: u64,
+) -> bool {
+    let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+    while Instant::now() < deadline {
+        if let Some(ini_path) = presets::find_d3dx_user_ini_path(mods_path) {
+            let (mtime_ms, size) = file_mtime_and_size(&ini_path);
+            let changed = (prev_mtime_ms == 0 && size > 0)
+                || mtime_ms > prev_mtime_ms.saturating_add(10)
+                || size != prev_size;
+            if changed {
+                std::thread::sleep(Duration::from_millis(180));
+                return true;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(120));
+    }
+    false
+}
+
 #[tauri::command]
-fn save_mod_preset(
+async fn save_mod_preset(
     app: AppHandle,
     state: State<'_, AppState>,
     game_id: String,
@@ -1977,71 +2641,160 @@ fn save_mod_preset(
     mod_folder: String,
     preset_name: String,
     options: Option<SaveModPresetOptions>,
-) -> SaveModPresetResult {
-    let sync_f10 = options.and_then(|o| o.sync_f10).unwrap_or(false);
-    let (hints, reload_key, auto_reload) = {
+) -> Result<SaveModPresetResult, String> {
+    let (
+        base_dir,
+        mods_path,
+        mod_dir,
+        rules,
+        settings_snap,
+        should_sync_f10,
+        pending_count,
+        configured_sec,
+    ) = {
         let guard = state.0.lock().expect("state lock");
-        let hints = active_exe_hints(&guard.settings);
-        let key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
-            "F10".to_string()
-        } else {
-            guard.settings.ui.reload_hotkey.trim().to_string()
+        let base_dir = guard.base_dir.clone();
+        let mods_path = guard
+            .settings
+            .games
+            .get(&game_id)
+            .map(|g| g.mods_path.trim().to_string())
+            .unwrap_or_default();
+        if mods_path.is_empty() {
+            return Ok(SaveModPresetResult {
+                ok: false,
+                reloaded: None,
+                error: Some("Mods directory is not configured".to_string()),
+                synced_f10: Some(false),
+                possible_stale: None,
+                stale_reason: None,
+            });
+        }
+        let Ok(mod_dir) =
+            resolve_mod_target_dir(Path::new(&mods_path), &character_folder, &mod_folder)
+        else {
+            return Ok(SaveModPresetResult {
+                ok: false,
+                reloaded: None,
+                error: Some("Invalid mod directory".to_string()),
+                synced_f10: Some(false),
+                possible_stale: None,
+                stale_reason: None,
+            });
         };
-        (hints, key, guard.settings.ui.allow_hotkey_send)
-    };
-    let synced_f10 = if sync_f10 && auto_reload {
-        input::send_hotkey(&reload_key, &hints).is_ok()
-    } else {
-        false
+        let rules = guard.settings.ui.variable_ignore_rules.clone();
+        let settings_snap = guard.settings.clone();
+        let should_sync_f10 = options
+            .and_then(|o| o.sync_f10)
+            .unwrap_or(guard.settings.ui.auto_sync_before_save_preset);
+        let pending_count = guard.pending_queue.pending_count(Some(&game_id));
+        let configured_sec = if guard.settings.ui.post_reload_sync_delay.is_finite()
+            && guard.settings.ui.post_reload_sync_delay > 0.0
+        {
+            guard.settings.ui.post_reload_sync_delay
+        } else {
+            6.0
+        };
+        (
+            base_dir,
+            mods_path,
+            mod_dir,
+            rules,
+            settings_snap,
+            should_sync_f10,
+            pending_count,
+            configured_sec,
+        )
     };
 
-    let mut guard = state.0.lock().expect("state lock");
-    let base_dir = guard.base_dir.clone();
-    let mods_path = guard
-        .settings
-        .games
-        .get(&game_id)
-        .map(|g| g.mods_path.trim().to_string())
-        .unwrap_or_default();
-    if mods_path.is_empty() {
-        return SaveModPresetResult {
-            ok: false,
-            reloaded: None,
-            error: Some("Mods directory is not configured".to_string()),
-            synced_f10: Some(synced_f10),
-            possible_stale: None,
-            stale_reason: None,
-        };
+    let mut synced_f10 = false;
+    let mut d3dx_updated_after_f10 = false;
+
+    if should_sync_f10 {
+        if pending_count > 0 || presets::has_active_preset_bridge(Path::new(&mods_path)) {
+            return Ok(SaveModPresetResult {
+                ok: false,
+                reloaded: None,
+                error: Some(
+                    "Pending preset or reload sync is still in progress; wait a moment and try again."
+                        .to_string(),
+                ),
+                synced_f10: Some(false),
+                possible_stale: None,
+                stale_reason: Some("pending-queue".to_string()),
+            });
+        }
+        if launcher::is_game_process_running(&settings_snap, Some(&game_id)) {
+            let (prev_mtime, prev_size) = presets::find_d3dx_user_ini_path(Path::new(&mods_path))
+                .map(|p| file_mtime_and_size(&p))
+                .unwrap_or((0, 0));
+            let app_clone = app.clone();
+            let gid_clone = game_id.clone();
+            let mp_clone = mods_path.clone();
+            let (did_sync, did_update) = tauri::async_runtime::spawn_blocking(move || {
+                let reload_res = reload_f10_for_game(&app_clone, Some(&gid_clone));
+                if !reload_res.ok {
+                    return (false, false);
+                }
+                let wait_ms = (configured_sec.clamp(3.0, 8.0) * 1000.0).round() as u64;
+                let updated = wait_for_d3dx_user_ini_update(
+                    Path::new(&mp_clone),
+                    prev_mtime,
+                    prev_size,
+                    wait_ms,
+                );
+                (true, updated)
+            })
+            .await
+            .unwrap_or((false, false));
+            synced_f10 = did_sync;
+            d3dx_updated_after_f10 = did_update;
+        }
     }
-    let Ok(mod_dir) = resolve_mod_target_dir(Path::new(&mods_path), &character_folder, &mod_folder)
-    else {
-        return SaveModPresetResult {
-            ok: false,
-            reloaded: None,
-            error: Some("Invalid mod directory".to_string()),
-            synced_f10: Some(synced_f10),
-            possible_stale: None,
-            stale_reason: None,
-        };
+
+    let mut res = {
+        let mut guard = state.0.lock().expect("state lock");
+        presets::save_mod_preset(
+            &base_dir,
+            &game_id,
+            &character_folder,
+            &mod_folder,
+            &mod_dir,
+            Path::new(&mods_path),
+            &preset_name,
+            &rules,
+            &mut guard.pending_queue,
+        )
     };
-    let rules = guard.settings.ui.variable_ignore_rules.clone();
-    let mut res = presets::save_mod_preset(
-        &base_dir,
-        &game_id,
-        &character_folder,
-        &mod_folder,
-        &mod_dir,
-        Path::new(&mods_path),
-        &preset_name,
-        &rules,
-        &mut guard.pending_queue,
-    );
     res.synced_f10 = Some(synced_f10);
-    drop(guard);
+
+    if !res.ok && res.stale_reason.as_deref() == Some("unsynced-game-running") {
+        if synced_f10 && !d3dx_updated_after_f10 {
+            res.possible_stale = Some(true);
+            res.stale_reason = Some("f10-timeout".to_string());
+        } else if !synced_f10 {
+            let running = launcher::is_game_process_running(&settings_snap, Some(&game_id));
+            let user_mtime = presets::find_d3dx_user_ini_path(Path::new(&mods_path))
+                .map(|p| file_mtime_and_size(&p).0)
+                .unwrap_or(0);
+            if running && (user_mtime == 0 || now_epoch_ms().saturating_sub(user_mtime) > 10_000)
+            {
+                res.possible_stale = Some(true);
+                res.stale_reason = Some("unsynced-game-running".to_string());
+            } else {
+                res.possible_stale = None;
+                res.stale_reason = None;
+            }
+        } else {
+            res.possible_stale = None;
+            res.stale_reason = None;
+        }
+    }
+
     if res.ok {
         emit_state_changed(&app, Some(&game_id), Some(&character_folder));
     }
-    res
+    Ok(res)
 }
 
 #[tauri::command]
@@ -2069,13 +2822,6 @@ fn apply_mod_preset(
         return ToggleResult::err("Invalid mod directory");
     };
     let rules = guard.settings.ui.variable_ignore_rules.clone();
-    let auto_reload = guard.settings.ui.auto_reload_mod_preset;
-    let hints = active_exe_hints(&guard.settings);
-    let reload_key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
-        "F10".to_string()
-    } else {
-        guard.settings.ui.reload_hotkey.trim().to_string()
-    };
 
     let res = presets::apply_mod_preset(
         &base_dir,
@@ -2092,9 +2838,7 @@ fn apply_mod_preset(
     drop(guard);
 
     if res.ok {
-        if auto_reload {
-            let _ = input::send_hotkey(&reload_key, &hints);
-        }
+        let _ = schedule_auto_reload(&app, AutoReloadKind::ModPreset, &game_id);
         emit_state_changed(&app, Some(&game_id), Some(&character_folder));
     }
     res
@@ -2318,12 +3062,6 @@ fn apply_roster_preset(
     }
     let rules = guard.settings.ui.variable_ignore_rules.clone();
     let auto_reload = guard.settings.ui.auto_reload_roster_preset;
-    let hints = active_exe_hints(&guard.settings);
-    let reload_key = if guard.settings.ui.reload_hotkey.trim().is_empty() {
-        "F10".to_string()
-    } else {
-        guard.settings.ui.reload_hotkey.trim().to_string()
-    };
     let res = presets::apply_roster_preset(
         &base_dir,
         &game_id,
@@ -2338,9 +3076,7 @@ fn apply_roster_preset(
     drop(guard);
 
     if res.ok {
-        if auto_reload {
-            let _ = input::send_hotkey(&reload_key, &hints);
-        }
+        let _ = schedule_auto_reload(&app, AutoReloadKind::RosterPreset, &game_id);
         emit_state_changed(&app, Some(&game_id), None);
     }
     res
@@ -3149,9 +3885,34 @@ pub fn run() {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 match window.label() {
                     "main" => {
+                        if !IS_QUITTING.load(Ordering::Relaxed) {
+                            let minimize_to_tray = window
+                                .app_handle()
+                                .state::<AppState>()
+                                .0
+                                .try_lock()
+                                .ok()
+                                .map(|g| g.settings.ui.close_behavior == "minimize")
+                                .unwrap_or(false);
+                            if minimize_to_tray {
+                                api.prevent_close();
+                                let _ = window.hide();
+                                ensure_tray(window.app_handle());
+                                return;
+                            }
+                        }
+                        IS_QUITTING.store(true, Ordering::Relaxed);
                         window.app_handle().exit(0);
                     }
                     "overlay" => {
+                        api.prevent_close();
+                        let _ = window.hide();
+                        if let Some(detail) = window.app_handle().get_webview_window("overlay-detail")
+                        {
+                            let _ = detail.hide();
+                        }
+                    }
+                    "overlay-detail" => {
                         api.prevent_close();
                         let _ = window.hide();
                     }
@@ -3201,6 +3962,17 @@ pub fn run() {
                 );
             }
 
+            if let Err(detail_err) = create_window_from_config(
+                app.handle(),
+                "overlay-detail",
+                active_data_dir.as_deref(),
+            ) {
+                append_crash_log(
+                    &setup_base_dir,
+                    &format!("overlay-detail window startup init failed (non-fatal): {detail_err}"),
+                );
+            }
+
             if !initial_hotkey.is_empty() {
                 match app.global_shortcut().register(initial_hotkey.as_str()) {
                     Ok(()) => {
@@ -3234,8 +4006,12 @@ pub fn run() {
             reload_f10,
             set_reload_hotkey,
             send_mod_hotkey,
+            launch_game,
+            launch_loader,
             toggle_overlay,
             overlay_hide,
+            show_overlay_detail,
+            hide_overlay_detail,
             overlay_open_manager,
             set_overlay_pinned,
             get_overlay_hotkey,

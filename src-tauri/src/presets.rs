@@ -88,7 +88,6 @@ pub struct PendingPresetEntry {
     pub preset_id: String,
     pub character_folder: String,
     pub clean_mod_name: String,
-    #[allow(dead_code)]
     pub mods_path: String,
     pub variables: HashMap<String, String>,
     pub reloading: bool,
@@ -160,6 +159,15 @@ impl PendingQueueState {
         self.roster_schemes.insert(game_id.to_string());
     }
 
+    pub fn clear_roster_schemes(&mut self, game_id: Option<&str>) {
+        match game_id {
+            None => self.roster_schemes.clear(),
+            Some(gid) => {
+                self.roster_schemes.remove(gid);
+            }
+        }
+    }
+
     pub fn clear_all(&mut self, game_id: Option<&str>) {
         match game_id {
             None => {
@@ -208,6 +216,32 @@ impl PendingQueueState {
             .filter(|(k, _)| k.starts_with(&prefix))
             .map(|(_, v)| v)
             .collect()
+    }
+
+    pub fn mark_reloading(&mut self, game_id: &str) {
+        let prefix = format!("{game_id}:");
+        for (k, entry) in &mut self.preset_queue {
+            if k.starts_with(&prefix) {
+                entry.reloading = true;
+            }
+        }
+    }
+
+    pub fn take_entries_for_game(&mut self, game_id: &str) -> Vec<PendingPresetEntry> {
+        let prefix = format!("{game_id}:");
+        let keys: Vec<String> = self
+            .preset_queue
+            .keys()
+            .filter(|k| k.starts_with(&prefix))
+            .cloned()
+            .collect();
+        let mut out = Vec::with_capacity(keys.len());
+        for k in keys {
+            if let Some(entry) = self.preset_queue.remove(&k) {
+                out.push(entry);
+            }
+        }
+        out
     }
 }
 
@@ -364,7 +398,19 @@ pub fn set_d3dx_auto_save_interval(mods_path: &Path, interval: i64) -> ToggleRes
     }
 }
 
-pub fn get_d3dx_sync_status(mods_path: &Path, pending_count: usize) -> D3dxSyncStatus {
+pub fn has_active_preset_bridge(mods_path: &Path) -> bool {
+    let bridge_file = mods_path.join(BRIDGE_FOLDER_NAME).join(BRIDGE_FILE_NAME);
+    let Ok(raw) = fs::read_to_string(bridge_file) else {
+        return false;
+    };
+    raw.contains("[Constants]") || raw.contains("$\\_bridge_applied") || raw.contains("$\\")
+}
+
+pub fn get_d3dx_sync_status(
+    mods_path: &Path,
+    pending_count: usize,
+    game_running: bool,
+) -> D3dxSyncStatus {
     let interval = if mods_path.as_os_str().is_empty() {
         60
     } else {
@@ -374,6 +420,18 @@ pub fn get_d3dx_sync_status(mods_path: &Path, pending_count: usize) -> D3dxSyncS
         None
     } else {
         find_d3dx_user_ini_path(mods_path)
+    };
+    let bridge_active = if mods_path.as_os_str().is_empty() {
+        false
+    } else {
+        has_active_preset_bridge(mods_path)
+    };
+    let effective_pending = if pending_count > 0 {
+        pending_count
+    } else if bridge_active {
+        1
+    } else {
+        0
     };
     if let Some(p) = user_ini {
         let mtime_ms = fs::metadata(&p)
@@ -387,8 +445,8 @@ pub fn get_d3dx_sync_status(mods_path: &Path, pending_count: usize) -> D3dxSyncS
             file_path: Some(p.to_string_lossy().to_string()),
             mtime_ms,
             auto_save_interval: interval,
-            game_running: false,
-            pending_count,
+            game_running,
+            pending_count: effective_pending,
         }
     } else {
         D3dxSyncStatus {
@@ -396,8 +454,8 @@ pub fn get_d3dx_sync_status(mods_path: &Path, pending_count: usize) -> D3dxSyncS
             file_path: None,
             mtime_ms: 0,
             auto_save_interval: interval,
-            game_running: false,
-            pending_count,
+            game_running,
+            pending_count: effective_pending,
         }
     }
 }

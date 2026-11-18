@@ -708,12 +708,31 @@ export function ModDetailsPanel({
               <div className="muted small">{t('mod.noHotkeys')}</div>
             ) : (
               <div className="detail-hotkeys">
-                {details.hotkeys.slice(0, 100).map((hotkey, index) => (
-                  <div key={`${hotkey.section}-${index}`}>
-                    <code>{hotkey.key}</code>
-                    <span className="muted" title={hotkey.section}>{hotkey.section}</span>
-                  </div>
-                ))}
+                {details.hotkeys.slice(0, 100).map((hotkey, index) => {
+                  const badge =
+                    hotkey.hintKind === 'mouse'
+                      ? t('mod.hotkeyMouseBadge')
+                      : hotkey.hintKind
+                        ? t('mod.hotkeyHoldBadge')
+                        : null
+                  const tip =
+                    hotkey.hintKind === 'mouse'
+                      ? `${hotkey.section} · ${t('mod.hotkeyMouseTip')}`
+                      : hotkey.hintKind === 'modifier-hold'
+                        ? `${hotkey.section} · ${t('mod.hotkeyModifierHoldTip')}`
+                        : hotkey.hintKind === 'hold'
+                          ? `${hotkey.section} · ${t('mod.hotkeyHoldTip')}`
+                          : hotkey.section
+                  return (
+                    <div key={`${hotkey.section}-${index}`} title={tip}>
+                      <div className="detail-hotkey-left">
+                        <code>{hotkey.key}</code>
+                        {badge ? <em className="hotkey-hint-badge">{badge}</em> : null}
+                      </div>
+                      <span className="muted">{hotkey.section}</span>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

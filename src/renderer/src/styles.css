@@ -1590,6 +1590,27 @@ input[type='range'].setting-range::-webkit-slider-thumb:active {
   flex-shrink: 0;
 }
 
+.detail-hotkey-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.hotkey-hint-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1.4;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  flex-shrink: 0;
+}
+
 .detail-ini {
   display: flex;
   flex-direction: column;
@@ -2131,9 +2152,29 @@ input[type='range'].setting-range::-webkit-slider-thumb:active {
   text-align: left;
 }
 
-.hotkey-pill:hover {
+.hotkey-pill:hover:not(:disabled) {
   border-color: #2f7d5f;
   background: #101c19;
+}
+
+.hotkey-pill.is-passive {
+  cursor: default;
+  opacity: 0.82;
+  border-style: dashed;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+.hotkey-pill.is-passive kbd {
+  color: #fcd34d;
+  flex-shrink: 0;
+}
+
+.hotkey-pill-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .hotkey-pill kbd {

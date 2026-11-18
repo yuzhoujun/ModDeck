@@ -120,6 +120,22 @@ export function OverlayApp() {
   }, [])
 
   useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        target?.blur()
+        return
+      }
+      e.preventDefault()
+      void window.moddeck.overlayHide()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  useEffect(() => {
     if (loading) return
     let active = true
     const unsubscribe = window.moddeck.onStateChanged((evt) => {

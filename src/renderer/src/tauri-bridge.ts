@@ -27,6 +27,7 @@ import type {
   RosterSyncStatus,
   SaveModPresetResult,
   Settings,
+  SimpleResult,
   StorageOverview,
   ToggleResult
 } from '../../shared/types'
@@ -62,20 +63,10 @@ export async function cleanupStagedDrops(paths: string[]): Promise<void> {
   }
 }
 
-function notMigrated<T>(feature: string, fallback: T): Promise<T> {
-  console.warn(`[ModDeck Tauri POC] "${feature}" is scheduled for a later migration stage.`)
-  return Promise.resolve(fallback)
-}
-
 export function ensureTauriBridge(): void {
   if (typeof window === 'undefined') return
   if (window.moddeck) return
   if (!('__TAURI_INTERNALS__' in window)) return
-
-  const pocError = (feature: string) => ({
-    ok: false as const,
-    error: `Stage 0 POC: ${feature} not yet migrated`
-  })
 
   const api: ModDeckApi = {
     bootstrap: () => invoke<Bootstrap>('bootstrap'),
@@ -141,8 +132,10 @@ export function ensureTauriBridge(): void {
       return { ok: true }
     },
     setOverlayPinned: (pinned) => invoke('set_overlay_pinned', { pinned }),
-    showOverlayDetail: () => notMigrated('showOverlayDetail', pocError('showOverlayDetail')),
-    hideOverlayDetail: () => notMigrated('hideOverlayDetail', undefined),
+    showOverlayDetail: (request) => invoke<ToggleResult>('show_overlay_detail', { request }),
+    hideOverlayDetail: async () => {
+      await invoke('hide_overlay_detail')
+    },
     sendModHotkey: (key) => invoke('send_mod_hotkey', { key }),
     getRosterPresets: (gameId) => invoke<RosterPreset[]>('get_roster_presets', { gameId }),
     saveRosterPreset: (gameId, input) =>
@@ -236,8 +229,8 @@ export function ensureTauriBridge(): void {
       invoke<ToggleResult>('reorder_characters', { gameId, folders }),
     reorderMods: (gameId, characterFolder, folders) =>
       invoke<ToggleResult>('reorder_mods', { gameId, characterFolder, folders }),
-    launchGame: () => notMigrated('launchGame', pocError('launchGame')),
-    launchLoader: () => notMigrated('launchLoader', pocError('launchLoader')),
+    launchGame: (gameId) => invoke<SimpleResult>('launch_game', { gameId }),
+    launchLoader: (gameId) => invoke<SimpleResult>('launch_loader', { gameId }),
     getOverlayHotkey: () => invoke<string>('get_overlay_hotkey'),
     setOverlayHotkey: (hotkey) => invoke('set_overlay_hotkey', { hotkey }),
     overlayHide: async () => {

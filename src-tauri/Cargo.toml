@@ -1,6 +1,6 @@
 [package]
 name = "moddeck"
-version = "3.0.0-alpha.3"
+version = "3.0.0-alpha.4"
 description = "Open-source local mod manager for 3DMigoto / XXMI games"
 authors = ["yuzhoujun <2445665133@qq.com>"]
 license = "MIT"
@@ -14,7 +14,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -38,8 +38,10 @@ windows = { version = "0.58", features = [
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Storage_FileSystem",
+  "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Threading",
   "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
 ] }
 

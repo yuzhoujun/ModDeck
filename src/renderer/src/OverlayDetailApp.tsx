@@ -86,6 +86,26 @@ export function OverlayDetailApp() {
     return () => clearInterval(timer)
   }, [showSaveBox, gameId])
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      if (confirmPreset) {
+        e.preventDefault()
+        setConfirmPreset(null)
+        return
+      }
+      if (showSaveBox) {
+        e.preventDefault()
+        setShowSaveBox(false)
+        return
+      }
+      e.preventDefault()
+      void window.moddeck.hideOverlayDetail()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [confirmPreset, showSaveBox])
+
   // 发送热键
   async function send(key: string) {
     setSent(null)
@@ -315,19 +335,49 @@ export function OverlayDetailApp() {
                   {t('overlay.noIngameHotkeys')}
                 </div>
               ) : (
-                <div className="hotkey-grid">
-                  {details.hotkeys.map((hotkey, index) => (
-                    <button
-                      key={`${hotkey.section}-${index}`}
-                      className="hotkey-pill"
-                      onClick={() => void send(hotkey.key)}
-                      title={t('overlay.clickToSendHotkeyTooltip', { section: hotkey.section })}
-                    >
-                      <kbd>{hotkey.key}</kbd>
-                      <span>{hotkey.section}</span>
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="hotkey-grid">
+                    {details.hotkeys.map((hotkey, index) => {
+                      const isPassive = Boolean(hotkey.hintKind)
+                      const badge =
+                        hotkey.hintKind === 'mouse'
+                          ? t('mod.hotkeyMouseBadge')
+                          : hotkey.hintKind
+                            ? t('mod.hotkeyHoldBadge')
+                            : null
+                      const tip =
+                        hotkey.hintKind === 'mouse'
+                          ? `${hotkey.section} · ${t('mod.hotkeyMouseTip')}`
+                          : hotkey.hintKind === 'modifier-hold'
+                            ? `${hotkey.section} · ${t('mod.hotkeyModifierHoldTip')}`
+                            : hotkey.hintKind === 'hold'
+                              ? `${hotkey.section} · ${t('mod.hotkeyHoldTip')}`
+                              : t('overlay.clickToSendHotkeyTooltip', { section: hotkey.section })
+                      return (
+                        <button
+                          key={`${hotkey.section}-${index}`}
+                          className={`hotkey-pill${isPassive ? ' is-passive' : ''}`}
+                          disabled={isPassive}
+                          onClick={() => {
+                            if (!isPassive) void send(hotkey.key)
+                          }}
+                          title={tip}
+                        >
+                          <div className="hotkey-pill-left">
+                            <kbd>{hotkey.key}</kbd>
+                            {badge ? <em className="hotkey-hint-badge">{badge}</em> : null}
+                          </div>
+                          <span>{hotkey.section}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {details.hotkeys.some((hotkey) => Boolean(hotkey.hintKind)) ? (
+                    <div className="muted small" style={{ marginTop: '6px' }}>
+                      {t('mod.hotkeyPassiveNote')}
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
 

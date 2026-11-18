@@ -1,6 +1,6 @@
 use crate::models::{
     CharacterInfo, CharacterMeta, GameDef, GameSettings, GameSnapshot, MetadataStore, ModDetails,
-    ModInfo, Settings,
+    ModHotkey, ModInfo, Settings,
 };
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
@@ -836,6 +836,8 @@ pub fn get_mod_details(
         }
     }
 
+    ini_files.sort();
+    let hotkeys = extract_ini_hotkeys(&mod_path, &ini_files);
     let enabled = is_mod_effectively_enabled(&actual_folder, &mod_path);
     let preview_url = find_mod_preview(&mod_path).map(|p| asset_url(&p));
     let updated_at = mtime_ms(&mod_path);
@@ -850,9 +852,164 @@ pub fn get_mod_details(
         size_bytes,
         updated_at,
         ini_files,
-        hotkeys: Vec::new(),
+        hotkeys,
         preview_url,
     })
+}
+
+fn decode_ini_text_lossy(bytes: &[u8]) -> String {
+    if bytes.starts_with(&[0xFF, 0xFE]) && bytes.len() >= 2 {
+        let mut units = Vec::with_capacity((bytes.len() - 2) / 2);
+        for chunk in bytes[2..].chunks_exact(2) {
+            units.push(u16::from_le_bytes([chunk[0], chunk[1]]));
+        }
+        return String::from_utf16_lossy(&units);
+    }
+    let text = String::from_utf8_lossy(bytes);
+    text.strip_prefix('\u{FEFF}').unwrap_or(&text).to_string()
+}
+
+fn classify_hotkey_hint(key: &str, key_type: Option<&str>) -> Option<&'static str> {
+    let cleaned = key.split(';').next().unwrap_or("").trim();
+    let mut has_non_modifier = false;
+    for chunk in cleaned.split_whitespace() {
+        let parts: Vec<&str> = if chunk == "+" {
+            vec!["+"]
+        } else if chunk.contains('+') {
+            chunk.split('+').filter(|s| !s.is_empty()).collect()
+        } else {
+            vec![chunk]
+        };
+        for raw in parts {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let lower = trimmed.to_ascii_lowercase();
+            if lower.starts_with("no_") {
+                continue;
+            }
+            let stripped = if lower.starts_with("vk_") {
+                &lower[3..]
+            } else {
+                lower.as_str()
+            };
+            if matches!(
+                stripped,
+                "lbutton" | "rbutton" | "mbutton" | "xbutton1" | "xbutton2"
+            ) {
+                return Some("mouse");
+            }
+            if !matches!(
+                stripped,
+                "ctrl"
+                    | "control"
+                    | "lctrl"
+                    | "rctrl"
+                    | "lcontrol"
+                    | "rcontrol"
+                    | "alt"
+                    | "lalt"
+                    | "ralt"
+                    | "menu"
+                    | "lmenu"
+                    | "rmenu"
+                    | "shift"
+                    | "lshift"
+                    | "rshift"
+                    | "win"
+                    | "lwin"
+                    | "rwin"
+            ) {
+                has_non_modifier = true;
+            }
+        }
+    }
+    if !has_non_modifier {
+        return Some("modifier-hold");
+    }
+    if key_type
+        .map(|t| t.trim().eq_ignore_ascii_case("hold"))
+        .unwrap_or(false)
+    {
+        return Some("hold");
+    }
+    None
+}
+
+fn flush_section_hotkeys(
+    hotkeys: &mut Vec<ModHotkey>,
+    section: &str,
+    keys: &mut Vec<String>,
+    key_type: &mut Option<String>,
+) {
+    let sec_type = key_type.take().filter(|s| !s.is_empty());
+    if section.is_empty() {
+        keys.clear();
+        return;
+    }
+    for k in keys.drain(..) {
+        let hint_kind = classify_hotkey_hint(&k, sec_type.as_deref()).map(str::to_string);
+        hotkeys.push(ModHotkey {
+            section: section.to_string(),
+            key: k,
+            key_type: sec_type.clone(),
+            hint_kind,
+        });
+    }
+}
+
+fn extract_ini_hotkeys(mod_path: &Path, ini_files: &[String]) -> Vec<ModHotkey> {
+    let mut hotkeys = Vec::new();
+    for rel in ini_files.iter().take(20) {
+        let full = mod_path.join(rel);
+        let Ok(meta) = fs::metadata(&full) else {
+            continue;
+        };
+        if meta.len() > 2 * 1024 * 1024 {
+            continue;
+        }
+        let Ok(bytes) = fs::read(&full) else {
+            continue;
+        };
+        let text = decode_ini_text_lossy(&bytes);
+        let mut section = String::new();
+        let mut sec_keys: Vec<String> = Vec::new();
+        let mut sec_type: Option<String> = None;
+
+        for raw_line in text.lines() {
+            let trimmed = raw_line.trim();
+            if trimmed.is_empty() || trimmed.starts_with(';') {
+                continue;
+            }
+            if let Some(after_open) = trimmed.strip_prefix('[') {
+                if let Some(end_idx) = after_open.find(']') {
+                    flush_section_hotkeys(&mut hotkeys, &section, &mut sec_keys, &mut sec_type);
+                    section = after_open[..end_idx].trim().to_string();
+                    continue;
+                }
+            }
+            if section.is_empty() {
+                continue;
+            }
+            let Some((lhs, rhs)) = trimmed.split_once('=') else {
+                continue;
+            };
+            let prop = lhs.trim();
+            let val = rhs.split(';').next().unwrap_or("").trim();
+            if prop.eq_ignore_ascii_case("key") || prop.eq_ignore_ascii_case("back") {
+                if !val.is_empty() {
+                    sec_keys.push(val.to_string());
+                }
+            } else if prop.eq_ignore_ascii_case("type") {
+                if !val.is_empty() {
+                    sec_type = Some(val.to_ascii_lowercase());
+                }
+            }
+        }
+        flush_section_hotkeys(&mut hotkeys, &section, &mut sec_keys, &mut sec_type);
+    }
+    hotkeys
 }
 
 #[cfg(test)]
@@ -1485,6 +1642,47 @@ mod stage1_tests {
         set_mod_preview_file(&mods_path, "NewHero", "CoolMod", &data_url).unwrap();
         assert!(!mod_dir.join("preview.webp").exists());
         assert_eq!(fs::read(mod_dir.join("preview.png")).unwrap(), b"png-bytes");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn extracts_mod_details_hotkeys_with_sections_and_punctuation() {
+        let root = std::env::temp_dir().join(format!("moddeck-hotkeys-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let mods_path = root.join("Mods");
+        let mod_dir = mods_path.join("Arclight").join("TestMod");
+        fs::create_dir_all(&mod_dir).unwrap();
+        fs::write(
+            mod_dir.join("mod.ini"),
+            "; header\r\n[Key$Makeup]\r\nkey = 0 ; toggle\r\n[Key$Skin]\r\nkey = ,\r\nback = /\r\ntype = cycle\r\n[KeyCombo]\r\nkey = no_modifiers .\r\n[KeyToggleUI]\r\ncondition = $ActiveCharacter\r\nkey = CTRL ALT\r\ntype = hold\r\n[KeyHoldAlt]\r\ntype = hold\r\nkey = Alt 1\r\n[KeyMouse]\r\nkey = VK_LBUTTON\r\ntype = hold\r\n",
+        )
+        .unwrap();
+
+        let details = get_mod_details(&mods_path, "Arclight", "TestMod").unwrap();
+        assert_eq!(details.hotkeys.len(), 7);
+        assert_eq!(details.hotkeys[0].section, "Key$Makeup");
+        assert_eq!(details.hotkeys[0].key, "0");
+        assert_eq!(details.hotkeys[0].hint_kind, None);
+        assert_eq!(details.hotkeys[1].section, "Key$Skin");
+        assert_eq!(details.hotkeys[1].key, ",");
+        assert_eq!(details.hotkeys[1].key_type.as_deref(), Some("cycle"));
+        assert_eq!(details.hotkeys[1].hint_kind, None);
+        assert_eq!(details.hotkeys[2].section, "Key$Skin");
+        assert_eq!(details.hotkeys[2].key, "/");
+        assert_eq!(details.hotkeys[3].section, "KeyCombo");
+        assert_eq!(details.hotkeys[3].key, "no_modifiers .");
+        assert_eq!(details.hotkeys[3].hint_kind, None);
+        assert_eq!(details.hotkeys[4].section, "KeyToggleUI");
+        assert_eq!(details.hotkeys[4].key, "CTRL ALT");
+        assert_eq!(details.hotkeys[4].key_type.as_deref(), Some("hold"));
+        assert_eq!(details.hotkeys[4].hint_kind.as_deref(), Some("modifier-hold"));
+        assert_eq!(details.hotkeys[5].section, "KeyHoldAlt");
+        assert_eq!(details.hotkeys[5].key, "Alt 1");
+        assert_eq!(details.hotkeys[5].hint_kind.as_deref(), Some("hold"));
+        assert_eq!(details.hotkeys[6].section, "KeyMouse");
+        assert_eq!(details.hotkeys[6].key, "VK_LBUTTON");
+        assert_eq!(details.hotkeys[6].hint_kind.as_deref(), Some("mouse"));
 
         let _ = fs::remove_dir_all(&root);
     }

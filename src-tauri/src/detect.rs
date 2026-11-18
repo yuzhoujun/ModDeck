@@ -216,7 +216,7 @@ pub fn query_registry_apps() -> Vec<RegistryAppEntry> {
     Vec::new()
 }
 
-fn find_xxmi_launcher_exe(xxmi_root: &Path) -> Option<PathBuf> {
+pub fn find_xxmi_launcher_exe(xxmi_root: &Path) -> Option<PathBuf> {
     let bin_exe = xxmi_root
         .join("Resources")
         .join("Bin")
@@ -282,7 +282,7 @@ fn exe_candidates_for_game(game: &GameDef) -> Vec<String> {
     out
 }
 
-fn launcher_exe_candidates() -> Vec<String> {
+pub fn launcher_exe_candidates() -> Vec<String> {
     [
         "Launcher.exe",
         "launcher.exe",
@@ -297,7 +297,7 @@ fn launcher_exe_candidates() -> Vec<String> {
     .collect()
 }
 
-fn find_exe_in_dir(dir: &Path, exe_names: &[String]) -> Option<PathBuf> {
+pub fn find_exe_in_dir(dir: &Path, exe_names: &[String]) -> Option<PathBuf> {
     find_exe_in_dir_depth(dir, exe_names, 2)
 }
 

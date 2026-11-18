@@ -163,6 +163,8 @@ export interface ModInfo {
 export interface ModHotkey {
   section: string
   key: string
+  keyType?: string
+  hintKind?: 'hold' | 'mouse' | 'modifier-hold'
 }
 
 export interface CreateCharacterInput {

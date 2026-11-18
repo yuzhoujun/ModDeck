@@ -125,70 +125,224 @@ mod win_impl {
         }
     }
 
-    fn parse_token_to_vk(token: &str) -> Option<u16> {
-        let upper = token.trim().to_ascii_uppercase();
-        if upper.is_empty() {
+    fn vk_for_token(token: &str) -> Option<(u16, bool)> {
+        let trimmed = token.trim();
+        let no_vk = if trimmed.len() >= 3 && trimmed[..3].eq_ignore_ascii_case("vk_") {
+            &trimmed[3..]
+        } else {
+            trimmed
+        };
+        let upper = no_vk.to_ascii_uppercase();
+        if upper.is_empty()
+            || matches!(
+                upper.as_str(),
+                "LBUTTON" | "RBUTTON" | "MBUTTON" | "XBUTTON1" | "XBUTTON2"
+            )
+        {
             return None;
         }
-        match upper.as_str() {
-            "ALT" | "MENU" | "LALT" => Some(0x12),
-            "CTRL" | "CONTROL" | "LCTRL" => Some(0x11),
-            "SHIFT" | "LSHIFT" => Some(0x10),
-            "TAB" => Some(0x09),
-            "ENTER" | "RETURN" => Some(0x0D),
-            "ESC" | "ESCAPE" => Some(0x1B),
-            "SPACE" => Some(0x20),
-            "UP" => Some(0x26),
-            "DOWN" => Some(0x28),
-            "LEFT" => Some(0x25),
-            "RIGHT" => Some(0x27),
-            "BACKSPACE" | "BACK" => Some(0x08),
-            "DELETE" | "DEL" => Some(0x2E),
-            "INSERT" | "INS" => Some(0x2D),
-            "HOME" => Some(0x24),
-            "END" => Some(0x23),
-            "PGUP" | "PAGEUP" => Some(0x21),
-            "PGDN" | "PAGEDOWN" => Some(0x22),
-            _ => {
-                if let Some(rest) = upper.strip_prefix('F') {
-                    if let Ok(n) = rest.parse::<u16>() {
-                        if (1..=12).contains(&n) {
-                            return Some(0x6F + n);
-                        }
+        if let Some(hex) = upper.strip_prefix("0X") {
+            if !hex.is_empty() && hex.len() <= 2 {
+                if let Ok(parsed) = u16::from_str_radix(hex, 16) {
+                    if (1..=0xFF).contains(&parsed) {
+                        return Some((parsed, false));
                     }
                 }
-                if upper.len() == 1 {
-                    let b = upper.as_bytes()[0];
-                    if b.is_ascii_alphanumeric() {
-                        return Some(b as u16);
-                    }
-                }
-                None
             }
         }
+        if upper.len() == 1 {
+            let b = upper.as_bytes()[0];
+            if b.is_ascii_alphanumeric() {
+                return Some((b as u16, false));
+            }
+        }
+        if let Some(rest) = upper.strip_prefix('F') {
+            if let Ok(n) = rest.parse::<u16>() {
+                if (1..=24).contains(&n) {
+                    return Some((0x6F + n, false));
+                }
+            }
+        }
+        let punct = match no_vk {
+            "/" => Some((0xBF, false)),
+            "." => Some((0xBE, false)),
+            "," => Some((0xBC, false)),
+            ";" => Some((0xBA, false)),
+            "'" => Some((0xDE, false)),
+            "[" => Some((0xDB, false)),
+            "]" => Some((0xDD, false)),
+            "-" => Some((0xBD, false)),
+            "=" => Some((0xBB, false)),
+            "\\" => Some((0xDC, false)),
+            "`" => Some((0xC0, false)),
+            "<" => Some((0xBC, true)),
+            ">" => Some((0xBE, true)),
+            "?" => Some((0xBF, true)),
+            ":" => Some((0xBA, true)),
+            "\"" => Some((0xDE, true)),
+            "{" => Some((0xDB, true)),
+            "}" => Some((0xDD, true)),
+            "|" => Some((0xDC, true)),
+            "~" => Some((0xC0, true)),
+            "_" => Some((0xBD, true)),
+            "+" => Some((0xBB, true)),
+            "!" => Some((0x31, true)),
+            "@" => Some((0x32, true)),
+            "#" => Some((0x33, true)),
+            "$" => Some((0x34, true)),
+            "%" => Some((0x35, true)),
+            "^" => Some((0x36, true)),
+            "&" => Some((0x37, true)),
+            "*" => Some((0x38, true)),
+            "(" => Some((0x39, true)),
+            ")" => Some((0x30, true)),
+            _ => None,
+        };
+        if punct.is_some() {
+            return punct;
+        }
+        let named = match upper.as_str() {
+            "BACK" | "BACKSPACE" => 0x08,
+            "TAB" => 0x09,
+            "RETURN" | "ENTER" => 0x0D,
+            "SHIFT" | "LSHIFT" | "RSHIFT" => 0x10,
+            "CONTROL" | "CTRL" | "LCONTROL" | "RCONTROL" | "LCTRL" | "RCTRL" => 0x11,
+            "MENU" | "ALT" | "LMENU" | "RMENU" | "LALT" | "RALT" => 0x12,
+            "PAUSE" => 0x13,
+            "CAPITAL" | "CAPSLOCK" => 0x14,
+            "ESCAPE" | "ESC" => 0x1B,
+            "SPACE" | "SPACEBAR" => 0x20,
+            "PRIOR" | "PAGEUP" | "PGUP" => 0x21,
+            "NEXT" | "PAGEDOWN" | "PGDN" => 0x22,
+            "END" => 0x23,
+            "HOME" => 0x24,
+            "LEFT" => 0x25,
+            "UP" => 0x26,
+            "RIGHT" => 0x27,
+            "DOWN" => 0x28,
+            "SNAPSHOT" | "PRINTSCREEN" => 0x2C,
+            "INSERT" | "INS" => 0x2D,
+            "DELETE" | "DEL" => 0x2E,
+            "LWIN" | "WIN" => 0x5B,
+            "RWIN" => 0x5C,
+            "APPS" => 0x5D,
+            "NUMPAD0" => 0x60,
+            "NUMPAD1" => 0x61,
+            "NUMPAD2" => 0x62,
+            "NUMPAD3" => 0x63,
+            "NUMPAD4" => 0x64,
+            "NUMPAD5" => 0x65,
+            "NUMPAD6" => 0x66,
+            "NUMPAD7" => 0x67,
+            "NUMPAD8" => 0x68,
+            "NUMPAD9" => 0x69,
+            "MULTIPLY" => 0x6A,
+            "ADD" => 0x6B,
+            "SEPARATOR" => 0x6C,
+            "SUBTRACT" => 0x6D,
+            "DECIMAL" => 0x6E,
+            "DIVIDE" => 0x6F,
+            "NUMLOCK" => 0x90,
+            "SCROLL" => 0x91,
+            "OEM_1" => 0xBA,
+            "OEM_PLUS" | "PLUS" => 0xBB,
+            "OEM_COMMA" | "COMMA" => 0xBC,
+            "OEM_MINUS" | "MINUS" => 0xBD,
+            "OEM_PERIOD" | "PERIOD" => 0xBE,
+            "OEM_2" => 0xBF,
+            "OEM_3" => 0xC0,
+            "OEM_4" => 0xDB,
+            "OEM_5" => 0xDC,
+            "OEM_6" => 0xDD,
+            "OEM_7" => 0xDE,
+            "OEM_8" => 0xDF,
+            "OEM_102" => 0xE2,
+            _ => return None,
+        };
+        Some((named, false))
     }
 
-    pub fn send_hotkey(hotkey: &str, exe_hints: &[String]) -> Result<(), String> {
-        let mut modifiers = Vec::new();
-        let mut keys = Vec::new();
-        for part in hotkey.split(&['+', ' '][..]) {
-            if let Some(vk) = parse_token_to_vk(part) {
-                if matches!(vk, 0x10 | 0x11 | 0x12) {
-                    modifiers.push(vk);
-                } else {
-                    keys.push(vk);
+    pub(crate) fn build_key_plan(hotkey: &str) -> Result<(Vec<u16>, Vec<u16>, Vec<u16>), String> {
+        let cleaned = hotkey.split(';').next().unwrap_or("").trim();
+        let mut raw_tokens = Vec::new();
+        for chunk in cleaned.split_whitespace() {
+            if chunk == "+" {
+                raw_tokens.push("+");
+            } else if chunk.contains('+') {
+                for sub in chunk.split('+').filter(|s| !s.is_empty()) {
+                    raw_tokens.push(sub);
                 }
+            } else {
+                raw_tokens.push(chunk);
             }
         }
-        if keys.is_empty() {
+        if raw_tokens.is_empty() {
             return Err(format!("Unsupported hotkey format: {hotkey}"));
         }
 
+        let mut modifiers = Vec::new();
+        let mut released = Vec::new();
+        let mut keys = Vec::new();
+        let push_unique = |vec: &mut Vec<u16>, val: u16| {
+            if !vec.contains(&val) {
+                vec.push(val);
+            }
+        };
+
+        for part in raw_tokens {
+            let lower = part.to_ascii_lowercase();
+            match lower.as_str() {
+                "ctrl" | "control" | "lctrl" | "rctrl" | "lcontrol" | "rcontrol" | "vk_ctrl"
+                | "vk_control" => push_unique(&mut modifiers, 0x11),
+                "alt" | "lalt" | "ralt" | "menu" | "lmenu" | "rmenu" | "vk_alt" | "vk_menu" => {
+                    push_unique(&mut modifiers, 0x12)
+                }
+                "shift" | "lshift" | "rshift" | "vk_shift" => push_unique(&mut modifiers, 0x10),
+                "win" | "lwin" | "rwin" => push_unique(&mut modifiers, 0x5B),
+                "no_modifiers" => {
+                    push_unique(&mut released, 0x10);
+                    push_unique(&mut released, 0x11);
+                    push_unique(&mut released, 0x12);
+                }
+                "no_ctrl" | "no_control" | "no_vk_ctrl" | "no_vk_control" => {
+                    push_unique(&mut released, 0x11)
+                }
+                "no_alt" | "no_menu" | "no_vk_alt" | "no_vk_menu" => {
+                    push_unique(&mut released, 0x12)
+                }
+                "no_shift" | "no_vk_shift" => push_unique(&mut released, 0x10),
+                _ if lower.starts_with("no_") => {}
+                _ => match vk_for_token(part) {
+                    Some((vk, need_shift)) => {
+                        if need_shift {
+                            push_unique(&mut modifiers, 0x10);
+                        }
+                        keys.push(vk);
+                    }
+                    None => return Err(format!("Unsupported hotkey format: {hotkey}")),
+                },
+            }
+        }
+        released.retain(|vk| !modifiers.contains(vk));
+        if keys.is_empty() {
+            return Err(format!("Unsupported hotkey format: {hotkey}"));
+        }
+        Ok((modifiers, released, keys))
+    }
+
+    pub fn send_hotkey(hotkey: &str, exe_hints: &[String]) -> Result<(), String> {
+        let (modifiers, released, keys) = build_key_plan(hotkey)?;
+
         focus_game_window(exe_hints);
 
-        // Release potentially stuck modifiers (e.g. Shift/Alt held from overlay hotkey)
+        // Release potentially stuck modifiers (e.g. Shift/Alt held from overlay hotkey) or no_* exclusions
         for &vk in &[0x10u16, 0x11u16, 0x12u16] {
             if !modifiers.contains(&vk) {
+                send_single(vk, true);
+            }
+        }
+        for &vk in &released {
+            if !matches!(vk, 0x10 | 0x11 | 0x12) && !modifiers.contains(&vk) {
                 send_single(vk, true);
             }
         }
@@ -272,5 +426,27 @@ pub fn send_hotkey(hotkey: &str, exe_hints: &[String]) -> Result<(), String> {
     {
         let _ = (hotkey, exe_hints);
         Err("SendInput is only supported on Windows".into())
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::win_impl::build_key_plan;
+
+    #[test]
+    fn parses_ini_punctuation_and_no_modifiers_hotkeys() {
+        assert_eq!(build_key_plan(",").unwrap(), (vec![], vec![], vec![0xBC]));
+        assert_eq!(build_key_plan(".").unwrap(), (vec![], vec![], vec![0xBE]));
+        assert_eq!(build_key_plan("/").unwrap(), (vec![], vec![], vec![0xBF]));
+        assert_eq!(
+            build_key_plan("no_modifiers VK_F10").unwrap(),
+            (vec![], vec![0x10, 0x11, 0x12], vec![0x79])
+        );
+        assert_eq!(
+            build_key_plan("Alt+Shift+M").unwrap(),
+            (vec![0x12, 0x10], vec![], vec![0x4D])
+        );
+        assert!(build_key_plan("VK_LBUTTON").is_err());
+        assert!(build_key_plan("CTRL ALT").is_err());
     }
 }

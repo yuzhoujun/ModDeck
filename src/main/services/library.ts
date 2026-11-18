@@ -517,6 +517,49 @@ export async function getModDetails(
   }
   await walk(modPath, '')
 
+  const classifyHint = (rawKey: string, secType?: string): ModHotkey['hintKind'] => {
+    const cleaned = rawKey.split(';')[0].trim()
+    let hasNonModifier = false
+    for (const chunk of cleaned.split(/\s+/)) {
+      const parts = chunk === '+' ? ['+'] : chunk.includes('+') ? chunk.split('+').filter(Boolean) : [chunk]
+      for (const token of parts) {
+        const lower = token.trim().toLowerCase()
+        if (!lower || lower.startsWith('no_')) continue
+        const stripped = lower.startsWith('vk_') ? lower.slice(3) : lower
+        if (['lbutton', 'rbutton', 'mbutton', 'xbutton1', 'xbutton2'].includes(stripped)) {
+          return 'mouse'
+        }
+        if (
+          ![
+            'ctrl',
+            'control',
+            'lctrl',
+            'rctrl',
+            'lcontrol',
+            'rcontrol',
+            'alt',
+            'lalt',
+            'ralt',
+            'menu',
+            'lmenu',
+            'rmenu',
+            'shift',
+            'lshift',
+            'rshift',
+            'win',
+            'lwin',
+            'rwin'
+          ].includes(stripped)
+        ) {
+          hasNonModifier = true
+        }
+      }
+    }
+    if (!hasNonModifier) return 'modifier-hold'
+    if (secType === 'hold') return 'hold'
+    return undefined
+  }
+
   const hotkeys: ModHotkey[] = []
   for (const iniFile of iniFiles.slice(0, 20)) {
     try {
@@ -525,18 +568,48 @@ export async function getModDetails(
       if (stat.size > 2 * 1024 * 1024) continue
       const text = await fs.readFile(full, 'utf8')
       let section = ''
+      let secKeys: string[] = []
+      let secType: string | undefined
+      const flush = () => {
+        if (!section) {
+          secKeys = []
+          secType = undefined
+          return
+        }
+        for (const cleanKey of secKeys) {
+          const hintKind = classifyHint(cleanKey, secType)
+          hotkeys.push({
+            section,
+            key: cleanKey,
+            ...(secType ? { keyType: secType } : {}),
+            ...(hintKind ? { hintKind } : {})
+          })
+        }
+        secKeys = []
+        secType = undefined
+      }
       for (const rawLine of text.split(/\r?\n/)) {
-        const sectionMatch = rawLine.match(/^\s*\[([^\]]+)\]/)
+        const trimmed = rawLine.trim()
+        if (!trimmed || trimmed.startsWith(';')) continue
+        const sectionMatch = trimmed.match(/^\[([^\]]+)\]/)
         if (sectionMatch) {
+          flush()
           section = sectionMatch[1].trim()
           continue
         }
-        const keyMatch = rawLine.match(/^\s*(?:key|back)\s*=\s*(.+?)\s*$/i)
+        const keyMatch = trimmed.match(/^(?:key|back)\s*=\s*(.+?)\s*$/i)
         if (keyMatch && section) {
           const cleanKey = keyMatch[1].split(';')[0].trim()
-          if (cleanKey) hotkeys.push({ section, key: cleanKey })
+          if (cleanKey) secKeys.push(cleanKey)
+          continue
+        }
+        const typeMatch = trimmed.match(/^type\s*=\s*(.+?)\s*$/i)
+        if (typeMatch && section) {
+          const cleanType = typeMatch[1].split(';')[0].trim().toLowerCase()
+          if (cleanType) secType = cleanType
         }
       }
+      flush()
     } catch {
       // ignore unreadable ini
     }
