@@ -17,7 +17,7 @@ body:
         - 游戏内快捷窗口 (Overlay) 呼出或置顶疑问 / In-Game Overlay
         - 变体预设 (Presets) 或阵容方案 (Schemes) 使用疑问 / Presets & Schemes
         - 压缩包智能拖拽导入与识别疑问 / Archive Import
-        - 便携包运行与 Chromium 沙箱兼容疑问 / Portable & Antivirus Sandbox
+        - 便携包运行与 WebView2 运行库兼容疑问 / Portable & WebView2 Runtime
         - 其他使用疑难 / Other
     validations:
       required: true

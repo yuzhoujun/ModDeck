@@ -354,7 +354,7 @@ fn default_all() -> String {
     "all".to_string()
 }
 fn default_overlay_hotkey() -> String {
-    "Alt+Shift+M".to_string()
+    "Alt+\\".to_string()
 }
 fn default_reload_hotkey() -> String {
     "F10".to_string()
@@ -601,6 +601,8 @@ pub struct ImportCommitItem {
     pub character_folder: String,
     #[serde(default)]
     pub mod_name: Option<String>,
+    #[serde(default)]
+    pub overwrite_target: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

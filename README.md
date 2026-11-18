@@ -1,365 +1,162 @@
 # ModDeck
 
-[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D4?logo=windows&logoColor=white)](#五环境要求与兼容说明)
-[![Arch](https://img.shields.io/badge/Arch-Electron%20%7C%20React%20%7C%20TypeScript-3178C6?logo=typescript&logoColor=white)](docs/ARCHITECTURE.md)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D4?logo=windows&logoColor=white)](#5-system-requirements--compatibility)
+[![Stack](https://img.shields.io/badge/Arch-Tauri%202%20%7C%20Rust%20%7C%20React%20%7C%20TypeScript-FFC131?logo=tauri&logoColor=white)](docs/ARCHITECTURE.md)
 [![Mode](https://img.shields.io/badge/Mode-Local--First-8B5CF6)](docs/ARCHITECTURE.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml/badge.svg)](https://github.com/yuzhoujun/ModDeck/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/yuzhoujun/ModDeck?label=release&cacheSeconds=300)](https://github.com/yuzhoujun/ModDeck/releases/latest)
 
-[English Documentation (README_EN.md)](README_EN.md)
+[简体中文文档 (README.zh-CN.md)](README.zh-CN.md) | [v2 -> v3 Migration Guide](docs/MIGRATION_V2_TO_V3.md)
 
-面向 3DMigoto / XXMI 系游戏的开源、现代、本地优先（Local-First）Windows Mod 管理器与游戏内全功能快捷悬浮工作台。
+An open-source, Local-First Windows mod manager and in-game floating overlay built with Tauri 2 and Rust for 3DMigoto / XXMI games.
 
-ModDeck 专职接管游戏 `Mods` 目录：秒级启停、全格式智能导入、单 Mod 变体预设引擎、全角色阵容方案管理、`[Present]` 一次性帧桥接、重载行为流控与游戏内沉浸式快捷窗（Overlay）。游戏底层 Direct3D 注入与 Shader 处理严格交由 3DMigoto / XXMI 负责，ModDeck **仅在磁盘与配置层面辅助管理，绝不侵入游戏内存、绝不修改游戏本体客户端与可执行文件**。
+ModDeck manages game `Mods` directories directly on disk: toggling (`DISABLED_`), batch archive imports, single-mod variant presets, whole-roster outfit schemes, one-frame `[Present]` bridge injection, reload flow control, static INI diagnostics, conflict auditing, and a topmost quick overlay. Direct3D hooking and shader rendering remain solely within 3DMigoto / XXMI—ModDeck **never injects DLLs, hooks game memory, or modifies game executables**.
 
 ---
 
-## 一、下载与快速上手
+## 1. Download & Quick Start
 
 > [!IMPORTANT]
-> **前置说明与使用要求**：
-> 本软件为 Mod 资源管理与快捷操作台，**不提供 XXMI 及各游戏分管 MI 的安装及基础使用教学**。如需了解或下载安装对应 MI 环境，请参考官方项目 [SpectrumQT/XXMI-Launcher: Modding platform for GI, HSR, WW and ZZZ](https://github.com/SpectrumQT/XXMI-Launcher)，使用本软件需要用户具备一定的 XXMI 使用经验与基础环境配置。
+> **Prerequisites & Scope**:
+> ModDeck manages mods and presets; **it does not bundle or teach initial setup of XXMI or game-specific model importers**. Please obtain XXMI from [SpectrumQT/XXMI-Launcher](https://github.com/SpectrumQT/XXMI-Launcher) first. Basic familiarity with 3DMigoto/XXMI directory layouts is expected.
 
-- **最新正式版发布包**：前往 [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest) 下载最新发布的便携包压缩文件（如 `ModDeck-<x.x.x>-win-x64.zip`，或使用本地构建生成的便携包）；
-- **运行方式**：
-  1. 将 ZIP 压缩包完整解压至任意目录（建议非系统只读盘，路径避免特殊符号）；
-  2. **双击 `ModDeck.exe` 即可直接启动**；
-  3. （备用兼容）若系统安全软件拦截了 Chromium 沙箱进程导致直接双击无窗口，可双击同目录下的 **`ModDeck.cmd`** 脚本启动（内部自动携带 `--no-sandbox` 兼容参数）；
-  4. 初次打开进入「设置 → 路径」，配置对应游戏的 `Mods` 或 MI 根目录及启动程序（支持自动探测识别与手动配置）：
-     ![游戏与目录路径配置](docs/ModDeck.Paths.png)
-  5. **角色库远端同步设置**：进入「设置 → 导入」，支持配置远程角色词库 JSON 地址与镜像源（支持官方 Raw、GitHub 原始文件、jsDelivr CDN、ghproxy 代理源及自定义地址），用于一键更新并同步各游戏最新角色的中英文官方译名、拼音与别名匹配字典，确保解压导入 Mod 时自动精准归属角色分类与规范命名：
-     ![角色库远端同步设置](docs/ModDeck.ModCharacterDictionarySet.png)
+1. Download the portable archive (`ModDeck-<version>-win-x64.zip`) from [GitHub Releases](https://github.com/yuzhoujun/ModDeck/releases/latest).
+2. Extract the full ZIP into a writable folder (avoid launching inside the archive preview or system-protected read-only folders).
+3. Double-click `ModDeck.exe` to launch:
+   - Requires Microsoft Edge WebView2 Runtime (pre-installed on Windows 11 and updated Windows 10; if missing on stripped Windows builds, ModDeck prompts on startup and offers Microsoft's Evergreen installer page).
+4. Open **Settings -> Paths** to configure each game's `Mods` or XXMI root folder and optional launcher/game executables (supports auto-detection and manual selection):
+
+   ![Game and Directory Paths](docs/ModDeck.Paths.en.png)
+
+5. Optional **Remote Character Dictionary**: in **Settings -> Import**, configure character dictionary JSON URLs or mirrors to update bilingual official names, aliases, and Pinyin mappings:
+
+   ![Remote Character Dictionary Settings](docs/ModDeck.ModCharacterDictionarySet.en.png)
+
+Upgrading from ModDeck v2 (Electron)? See [docs/MIGRATION_V2_TO_V3.md](docs/MIGRATION_V2_TO_V3.md) — your existing `%APPDATA%\ModDeck\` settings, presets, covers, and schemes carry over automatically.
 
 ---
 
-## 二、软件功能总览
+## 2. Core Features
 
-### 1. 现代化 Mod 库与多维分类管理
+### 1. Mod Library & Category Management
 
-- **磁盘真实结构接管**：分类项与 Mod 直接扫描自磁盘真实结构，不强制绑定外部服务器或写死名单；
-- **多维分类筛选**：支持「全部分类」、「仅角色」、「仅功能 / UI / 其他」、「仅有 Mod」及「仅无 Mod」快速过滤；
-- **直观概览统计**：顶部实时统计分类项总数、角色与功能项细分占比、Mod 总量及激活启用数；
-- **视觉化拖拽排序**：支持卡片一键拖拽自定义排序（顺序本机持久化存储），支持模糊搜索角色名、别名、拼音与目录名；
-- **专属封面编辑器**：支持拖入任意图片，内置 1:1 视口自由平移与滚轮缩放裁剪，自动生成无损 `.preview.png`。
+- **Disk as Source of Truth**: Scans categories and mods directly from your `Mods` directory (`DISABLED_` prefix toggling with file-lock fallback onto internal `.ini` files while a game is running).
+- **Filtering & Search**: Filter by All, Characters Only, Utility / UI / Other, With Mods, or Without Mods; search across localized names, aliases, Pinyin, and folder names.
+- **Drag-and-Drop Ordering & Cover Editor**: Customize category/mod ordering locally and crop 1:1 `.preview.png` category covers via pan/zoom preview.
+- **Native Folder Watcher**: Monitors the active `Mods` tree and `d3dx_user.ini` for external additions, deletions, recycle-bin restores, and in-game F10 writes.
 
-![Mod 库主界面](docs/ModDeck.ModLibrary.png)
+![Mod Library](docs/ModDeck.ModLibrary.en.png)
 
-### 2. 批量智能导入与全格式混合拖拽
+### 2. Batch Archive Import & Upgrade Target Selection
 
-- **整页全格式混合拖拽（Drag & Drop）**：支持直接从 Windows 资源管理器将任意数量的 `.zip` / `.7z` / `.rar` 压缩包与已解压的 Mod 文件夹拖拽到 ModDeck 页面中，自动识别并触发批量导入；
-- **统一导入分割按钮（ImportDropdown）**：主界面与角色详情页全面统一为操作规范的分割按钮，支持一键选取压缩包或下拉菜单切换文件夹导入；
-- **离线角色智能匹配**：内置 5 大游戏全量中英/别名/拼音离线词典，自动识别解压包归属分类；
-- **乱码自动修复引擎**：内置 CP437 -> GB18030 字符集无损解码引擎，自动纠正历史压缩包解压后的中文目录与乱码文件名。
+- **Full-Page Drag & Drop / File Picker**: Supports `.zip`, `.7z`, `.rar`, and unpacked folders simultaneously, including streaming decompression, multi-charset header auto-repair (UTF-8 / CP437 / GB18030 / Big5 / Shift-JIS / EUC-KR), and interactive password prompts for encrypted archives.
+- **Editable Target Names & Explicit Upgrade Targets**: In the import preview modal, rename destination folder names inline or hand-pick an existing mod (including disabled `DISABLED_*` folders) to back up and replace safely—preventing version suffixes or tags such as `efmittl` from leaving stale duplicates or overwriting the wrong mod.
+- **Offline & Remote Character Matching**: Auto-assigns candidates using built-in + remote-synced character dictionaries across 5 built-in games plus custom games.
 
-### 3. 单 Mod 变体预设引擎（Mod Variant Presets）
-
-现代 3DMigoto Mod 通常包含丰富的服装配色、配件开关与形态滑动条。
+### 3. Single-Mod Variant Presets Engine
 
 > [!NOTE]
-> **变体引擎适用边界与已知局限说明（未来探索方向）**：  
-> 目前 ModDeck 的变体预设引擎主要面向并深度优化了 **声明了 `persist` 的标准离散型外观开关**（例如服装配色、发型切换、配饰显隐等离散布尔或枚举变量）。  
-> 对于部分特殊 Mod 采用的**无级连续滑条（Sliders，如通过动态浮点增量计算体型或高度）、多变量联动互斥与复杂条件钳制（Clamps/Conditionals，如通过 3DMigoto `[CommandList]` 脚本动态计算的联动变量），或未声明 `persist` 的循环切换按键**，软件目前可能无法准确捕获其实机快照或产生预设切换冲突。此类高阶复杂逻辑的深度解析已被列为**未来版本持续探索的演进方向**。
+> **Engine Scope**:
+> ModDeck's Variant Presets Engine targets **discrete cosmetic toggle variables declared with `persist`** (e.g., colorways, hairstyles, clothing pieces). Non-persisted control variables or continuous floating-point calculations computed dynamically inside complex `[CommandList]` blocks may not capture reliably in `d3dx_user.ini` snapshots; INI Static Diagnostics highlights non-persisted control variables directly in Mod Details.
 
-- **出厂基线快照保护**：自动深度解析作者原生 `.ini` 声明的全部持久化外观变量，生成永久内置的「默认（Default）」预设基线，随时一键还原；
-- **树状分级解耦存储**：所有预设以独立 JSON 存储于 `%APPDATA%/ModDeck/presets/{gameId}/{character}/{modName}.json`，读写微秒级响应且互不干扰；
-- **现场实机快照**：在主界面或游戏内悬浮快捷窗口现场调好造型后，直接输入名称即可一键保存为新预设；
-- **变体详情结构化透视**：双击或点击信息图标即可展开预设详情抽屉，直观查看各个持久化变量设定值与对应 `.ini` 归属；
-- **瞬态变量过滤（Transient Var Filter）**：智能识别并过滤非外观临时变量（如菜单开启 `$ui_menu`、页码、鼠标抓手坐标等），只比对和覆盖真正的服装与体型参数。
+- **Factory Baseline (`Default`)**: Parses author `.ini` initial persistent values to maintain a built-in `Default` snapshot.
+- **Live In-Game Capture & F10 Sync**: Displays live `d3dx_user.ini` write status (`gameRunning`, mtime, auto-save interval) and offers async `F10 & Save` synchronization with stale-detection feedback (`pending-queue`, `f10-timeout`, `unsynced-game-running`).
+- **Variable Ignore Rules**: Exclude transient state variables globally (exact match, wildcard, or regex) or per-mod via `.moddeck-ignore`.
 
-#### 💡 实机外观抓取与预设保存推荐工作流（Workflow Guide）
+![Mod Details & Variant Presets](docs/ModDeck.ModDetials.en.png)
 
-许多 3DMigoto Mod 支持在游戏内通过热键自由切换服装与形态。若想将当前满意的造型永久固化为 ModDeck 预设，建议遵循以下完整闭环流程：
+### 4. Dual-Pool Roster Schemes Workspace
 
-```mermaid
-flowchart LR
-    A["  1. 游戏内按键调造型  "] --> B["  2. 触发变量写盘 (F10)  "]
-    B --> C["  3. ModDeck 自动采样  "]
-    C --> D["  4. 快捷窗口保存预设  "]
-```
+- **Character + Utility Separation**: Splits configurations into **Character Presets** and **Utility / UI / World** pools so global UI mods do not interfere with character skins.
+- **Per-Card Single / Multi Mode & Fingerprinting**: Choose mutually exclusive or multi-mod combinations per category, batch enable or reset per pool, detect unsaved live modifications, and block duplicate saves.
 
-1. **游戏内现场调造型**：在游戏内通过 Mod 原作者设定的快捷键调好满意的服装配色与配件显隐；
-2. **触发 3DMigoto 变量刷盘**：3DMigoto 默认在显存/内存中维护按键状态，需通过以下任一方式刷入磁盘 `d3dx_user.ini`：
-   - **方式 A（推荐，最快捷）**：在游戏内直接按一下 **`F10`**，3DMigoto 会立即将显存中的最新外观变量强制刷入 `d3dx_user.ini`；
-   - **方式 B**：静候 3DMigoto 运行时变量自动刷盘（Auto-Save Interval 倒计时，可在「设置 → 高级」中查看与微调）；
-   - **方式 C**：正常退出/关闭游戏，3DMigoto 会在进程关闭时自动将当前状态写盘。
-3. **ModDeck 自动感知采样**：ModDeck 背景监听器会自动检测并读取 `d3dx_user.ini` 的物理变更，实时解析当前实机外观快照；
-4. **一键存为专属预设**：按下快捷键 **`Alt+Shift+M`** 呼出游戏内悬浮快捷窗口（或切回 ModDeck 主界面进入该 Mod 详情页），点击 **「+ 存为新预设」** 并输入名称，即可永久保存为可随时一键换装的专属预设。
+![Roster Scheme Workspace](docs/ModDeck.ModsPersetPool.en.png)
 
-![Mod 详情与变体预设](docs/ModDeck.ModDetials.png)
+### 5. In-Game Quick Overlay, Hotkey Sidecar & Native Input
 
-### 4. 全角色池方案工作台（Roster Scheme Workspace）
+- **Global Summon & Tray Mode**: Summon `ModDeck Quick` with `Alt+\` (customizable; validated against `reloadHotkey`), close to system tray when `closeBehavior` is `minimize`, and dismiss overlays with `Escape`.
+- **Adjacent `overlay-detail` Sidecar**: Click any mod card in Quick Overlay to inspect presets and INI hotkeys (`hotkey` + `back`), with `type = hold`, modifier-only combos (`CTRL ALT`), and mouse buttons (`VK_LBUTTON`) labeled cleanly to prevent accidental single-tap triggers.
+- **Hardware Scan-Code Injection**: Built directly into the Rust backend (`SendInput` with extended keys, OEM punctuation, `VK_*`, hex virtual keys, and `no_modifiers` release handling) without spawning external key-helper executables.
+- **Game & Loader Launch**: Launches `XXMI Launcher.exe --nogui --xxmi <CODE>`, custom loaders, or official game launchers (including quoted `launchArgs` and Win32 `ShellExecuteW` UAC elevation fallback).
 
-- **全队阵容一键批量换装**：主界面顶部「预设方案」大工作台，集中配置全队所有角色当前激活的 Mod 及其各自选定的变体预设，方案一键切换同帧全量批量生效；
-- **角色池与功能/UI池双分池治理**：方案工作台自动拆分为「🎭 角色预设」与「🧩 功能/UI/世界其他」双分池，彻底避免全局 UI、大世界场景等通用 Mod 与角色皮肤混杂；
-- **分池专属一键批处理与物理热键**：各分池提供「⚪ 一键全部不启用 (保持原生) [Alt+U]」与「🟢 一键选中当前使用中 [Alt+R]」，支持秒级清空或快照实机状态；
-- **独立单选 (互斥) 与多选 (共存) 模式**：每个卡片独立支持单选与多选自由切换，兼顾角色皮肤模型互斥与功能 UI 多项共存需求，并根据当前激活数量智能自适应初始默认模式；
-- **方案指纹防重与未保存实机改动拦截**：当选中状态与已有方案完全一致时自动禁用「存为新方案」；若检测到某 Mod 实机参数未保存，自动标亮橙色「⚠️ 当前实机 (未保存改动)」并提供二次确认或一键替换为 Default 安全入库。
+![In-Game Quick Overlay](docs/ModDeck.Quick.en.png)
 
-![全角色池方案工作台](docs/ModDeck.ModsPersetPool.png)
+### 6. Preset / Scheme Sharing, Static INI Audit & Config Migration
 
-### 5. 游戏内快捷操作台（Overlay）与原生按键驱动
+- **Import/Export Sharing**: Share single-mod presets (`.moddeck-preset.json`) or full roster schemes (`.moddeck-scheme.json`) with automated local matching and missing variant reconstruction (`ImportSchemeModal`).
+- **Static INI Diagnostics & Conflict Audit**: Scans `[Key*]`/`[CommandList]` persist declarations, per-character Shader/Texture Hash overlaps, duplicate FX preloads (`RabbitFX`, `CrossIBClassifier.ini`, `KatFXMatcap`), `[ShaderRegex]`, `[ShaderOverride]` risk levels, and cross-mod Hash collisions with one-click disable, `ShaderCache` cleanup, and `.txt` export.
+- **Storage Manager & Full Bundle Migration (`.moddeck-bundle`)**: Tracks storage usage, restores/prunes mod overwrite backups (including `DISABLED_*` backups), and exports/imports complete backups of settings, custom games, covers, presets, and schemes.
 
-- **游戏沉浸呼出**：默认全局快捷键 `Alt+Shift+M`（支持自定义），无需切屏即可在全屏（适配顶级置顶）或窗口化游戏上层直接呼出；
-- **Mod 状态秒级同步**：常驻监听底层的 `Mods` 与 `d3dx_user.ini`，游戏内热键调完造型外部毫秒级同步；
-- **硬件级按键助手**：内置轻量原生按键助手 `ModDeckKeyHelper-v2.exe`，向游戏前台精准模拟硬件级 DirectInput/RawInput 键盘扫描码；
-- **快捷侧栏现场操作台**：点击 Mod 侧栏展开变体与热键工作台，支持现场挑选预设、存为新预设及点击预设胶囊即刻换装；
-- **悬浮方案抽屉与实机测速**：底部配备全角色池方案抽屉与「⏱️ 测速校准」秒表工具，无需切屏即可全队换装或精确测量重载耗时。
+### 7. Localization & Custom Games
 
-![游戏内快捷操作台](docs/ModDeck.Quick.png)
-
-### 6. 中英双语切换与多语言兼容系统（Multi-Language & i18n）
-
-- **中英双语即时切换**：内置 `zh-CN`（简体中文）与 `en-US`（English）两套完整词典（结构 100% 对齐，当前已涵盖 **890+** 项词条），支持“跟随系统 (Auto) / 简体中文 / English”即时热切换，修改后主界面、快捷悬浮窗与各弹窗无需重启立即生效；
-- **角色英文译名支持**：离线词库全面收录各角色标准英文名（`canonicalEnName`），英文界面自动呈现英文官方名，中文界面呈现中文名，全局检索无缝兼容中英文、拼音与别名；
-- **独立语言包目录（`languages/`）**：便携包根目录独立输出 `languages/` 文件夹（与底层 Chromium 系统的 50+ 个底层 `.pak` 资源物理分离），支持一键定位目录并随时放置社区语言包（如 `ja-JP.json`、`ko-KR.json`），软件启动自动扫描并热加载；
-- **完善的本地化工具链**：工程内自带 `scripts/i18n.mjs`，支持未翻译中文代码全自动抽取（`npm run i18n:extract`）、一键增量合并与待翻译对齐（`npm run i18n:extract:apply`）、词条对称性与代码调用校验（`npm run i18n:check`）与自动化结构同步（`npm run i18n:sync`）。
-
-### 7. 预设方案与变体预设导入导出分享（Preset & Scheme Sharing）
-
-- **单 Mod 变体预设导出与导入分享（`.moddeck-preset.json`）**：支持在 Mod 详情抽屉中一键将当前 Mod 的单个变体预设或全部自定义预设导出为轻量规范文件；支持从文件导入或直接拖拽预设文件至详情面板，自动校验参数结构并合并入目标 Mod，同名预设智能追加后缀避免覆盖；
-- **全角色池方案跨机导出分享（`.moddeck-scheme.json`）**：支持在全角色池预设方案管理弹窗中一键将整套阵容搭配导出为分享文件；方案导出时自动深度封装各角色的已选 Mod 标识、变体预设名称、出厂默认标识及变量快照，脱离单机预设 ID 束缚；
-- **全角色池方案导入匹配检查与自动变体重建（`ImportSchemeModal`）**：导入方案时提供交互式匹配预览弹窗，自动比对本地已安装角色与 Mod 目录，呈现匹配率与缺失 Mod 清单；支持跨游戏导入检测与警示，支持在导入时自定义重命名方案；确认导入后若方案包含自定义变体参数且本地 Mod 尚未建立该预设，ModDeck 自动为对应 Mod 生成并绑定该变体预设，实现一键穿戴零门槛分享。
-
-### 8. 自定义通用游戏扩展与侧边栏治理（Custom Games）
-
-- **自定义游戏模块**：支持在侧边栏 `+` 按钮与「设置 → 配置」中新增、编辑或删除自定义 3DMigoto / XXMI 游戏，完整兼容分类扫描、Mod 启停、预设与悬浮快捷窗；
-- **多语言游戏名称**：支持为自定义游戏配置主语言与多语言扩展名称/简称（`locales`），随界面语言切换自动匹配；
-- **侧边栏显隐与过滤**：支持「侧边栏仅显示已配置 Mods 目录的游戏」一键切换，并支持对各游戏单独控制侧边栏显隐；
-- **点号前缀封面兼容**：扫描分类与 Mod 预览图时自动识别 `.preview.*`、`_cover.*` 及 `.JASM_Cover.*` 等第三方点号前缀封面（排除 `._*` 临时文件）。
-
-### 9. 预设写盘同步、`.ini` 静态诊断与冲突审计
-
-- **`d3dx_user.ini` 写盘同步控制**：自动监听 `d3dx_user.ini` 与其父目录创建事件，保存新预设时实时展示最近写盘时间并提供「F10 并保存」快捷操作；设置页支持开启「保存新预设前自动触发 F10 写盘」（默认关闭）；
-- **变量捕获过滤规则**：支持在设置页配置精确变量名、通配符或正则过滤规则，并读取 Mod 根目录 `.moddeck-ignore` 文件；
-- **`.ini` 静态诊断**：扫描变量 `persist` 属性与 `[CommandList]` 浅层联动关系，对未声明 `persist` 的控制变量给出提醒；
-- **原生冲突审计与环境清理**：角色页支持同分类 Shader / Texture Hash 重叠初筛；Mod 库工具栏「冲突审计」弹窗支持检测重复/互斥 FX 前置插件（`RabbitFX` / `CrossIBClassifier.ini` / `KatFXMatcap`）、内嵌 `[ShaderRegex]`、`[ShaderOverride]` 风险分级与带 `.ini` 行号的跨 Mod Hash 重叠，支持一键禁用冲突 Mod、清理 `ShaderCache` 并导出 `.txt` 报告。
-
-### 10. 存储管理、覆盖备份与配置迁移（`.moddeck-bundle`）
-
-- **存储空间概览**：「设置 → 存储与备份」实时统计配置与预设、分类封面（含已配置游戏 `Mods` 分类目录内的 `.preview.*` / `_cover.*`，不在本机额外复制副本）、覆盖备份与运行日志占用；
-- **本地覆盖备份管理**：集中管理覆盖导入产生的历史备份，支持一键还原至游戏目录（目标存在同名目录时先自动备份当前版本）、删除单条或按时间清理；
-- **全量配置迁移归档（`.moddeck-bundle`）**：将设置、自定义游戏、分类别名与元数据、分类封面（含游戏 `Mods` 目录封面）、单 Mod 预设与全队方案打包为单个迁移文件；导入时提供清单预览、保留本机物理路径选项与自动配置快照。
+- **Built-in Bilingual UI (`zh-CN` / `en-US`)**: Instant language switching (`Auto`, `zh-CN`, `en-US`) backed by 921 aligned dictionary keys (`scripts/i18n.mjs`), canonical English character names, and automatic discovery of drop-in `.json` packs under `languages/` next to `ModDeck.exe` or inside `%APPDATA%\ModDeck\languages\`.
+- **Custom Games & Sidebar Controls**: Add, edit, or hide custom 3DMigoto/XXMI games with per-locale names and optional "Configured Games Only" filtering.
 
 ---
 
-## 三、进阶功能与高级操作指南
+## 3. Architecture & Reload Mechanics (Summary)
 
-<details open>
-<summary><strong>👉 点击展开高级功能详述（帧桥接架构、重载流控、待生效队列、实机测速与刷盘机理）</strong></summary>
+1. **One-Frame Bridge + Safe Deferred Flush**: Applying presets writes active variables into `Mods/_ModDeck_Preset_Bridge/bridge.ini` (`[Present]` self-lock `$md_preset_applied = 1`), triggers `F10`, waits for `postReloadSyncDelay` (configurable in `Settings -> Advanced` or calibrated via the floating Stopwatch Benchmark), persists values to `d3dx_user.ini`, and clears `bridge.ini`.
+2. **Pending Preset Queue**: When auto-reload is off, changes accumulate in memory per `game:character:mod` until you click **Apply Now (N)** or trigger F10.
+3. **Process Monitoring**: Native Win32 process snapshots (`CreateToolhelp32Snapshot`) drive live game status badges without shell `tasklist` overhead.
 
-### 1. 变体预设切换底层生命周期：`[Present]` 一次性帧桥接与双通道机理
-
-在 3DMigoto 原版机制中，按下 F10 重载的第 1 毫秒会先执行 `SavePersistentSettings()` 将当前旧显存中的变量强制刷入 `d3dx_user.ini`，导致外部软件直接写入配置文件的操作被 3DMigoto 瞬间覆盖回滚。
-
-为了实现 100% 稳定的预设切换，ModDeck 打造了双通道协同换装架构：
-1. **`[Present]` 一次性帧桥接（`bridge.ini`）**：
-   - 切换预设时，ModDeck 在游戏 `Mods/_ModDeck_Preset_Bridge/bridge.ini` 中动态生成帧桥接配置（以 `_` 开头在分类库中自动隐身）；
-   - 在 3DMigoto 完成 F10 重载跨入下一帧（`[Present]` 阶段）的微秒瞬间，直接将目标预设变量注入 Direct3D 显存并立即设置 `$md_preset_applied = 1` 自锁；
-   - **效果**：确保玩家按下 F10 后实机画面**第 1 帧即刻呈现换装变身**，且自锁后绝不干扰游戏内后续按键与 GUI 调节。
-2. **`d3dx_user.ini` 延迟安全补写**：
-   - 重载缓冲时间结束后（由用户配置的延迟控制，默认 6s），ModDeck 自动在后台静默将预设持久化补写回 `d3dx_user.ini`，并同步清空 `bridge.ini`；
-   - **效果**：实现游戏在线期间显存直通换装，并同时保全游戏关闭或崩溃后的**冷启动数据一致性**（下次进游戏依然保持该预设）。
-
-### 2. 自动重载三向独立拆分与待生效聚合队列（Pending Preset Queue）
-
-为了适应不同硬件配置，ModDeck 将重载行为细分为三个独立维度（可在「设置 → 高级」中自由配置）：
-- **切换普通 Mod 启停后自动重载**：默认关闭。避免在 Mod 库批量启用/禁用 Mod 时导致游戏画面频繁停顿卡顿；
-- **切换单 Mod 变体预设后自动重载**：推荐常开。点击预设胶囊即刻驱动游戏画面换装；
-- **切换全角色池方案后自动重载**：推荐常开。一键切换整套阵容即刻换装。
-
-#### 待生效聚合队列（关闭自动重载时的多预设打包模式）：
-
-当您关闭了预设自动重载时，ModDeck 会自动启用**待生效聚合队列**：
-1. 您可以在离线或游戏中连续挑选多位角色的不同预设，无需每次停顿；
-2. 每次选择都会在内存队列中以 `character:mod` 自动覆盖去重，保持最终意图；
-3. 待生效预设胶囊显示**蓝色脉冲光晕**，游戏内浮动快捷窗口（Overlay）底部的「重载 F10」按钮会自动升级为高亮脉冲并带计数引导（例如 **`● 立即生效 (3)`**）；
-4. 挑选完毕后，点击该按钮或按下键盘重载键，ModDeck 将所有角色的预设一次性合成至全局桥接脚本，**单次 F10 让全队所有角色同帧瞬间集体变身**！
-
-> **⚠️ 物理键盘 F10 vs 快捷窗口重载按钮说明**：
-> - 若您在待生效状态下直接按键盘物理 `F10`，游戏画面会**立即变身换装生效**（桥接配置已被 3DMigoto 读取），但 ModDeck UI 状态由于 Windows 进程隔离无法自动截获物理按键并转绿；
-> - **强烈推荐**：随时按快捷键呼出快捷窗口点击底部的 **「● 立即生效 (N)」** 按钮，让画面换装、延迟写盘与 UI 绿灯完成完美闭环。
-
-### 3. 重载缓冲同步延迟可配置（2s ~ 25s）与「⏱️ 测速校准」秒表
-
-由于不同玩家的电脑硬件性能及启用的 Mod 数量/材质贴图大小差异巨大，3DMigoto 执行 F10 重载的实际耗时分布在 `1.1s` 到 `18s+` 不等。
-- **缓冲延迟的作用**：ModDeck 需要等待 3DMigoto 编译完 Shader 并跨过 Present 帧后，才能安全补写 `d3dx_user.ini` 并清除桥接；
-- **纯热生效参数**：在「设置 → 高级」中提供的「3DMigoto 重载缓冲同步延迟」滑动条为纯内存定时器，修改后无需按 F10 或重启，下一次重载即刻按新设时长计时；
-- **游戏内浮动秒表测速（推荐）**：
-  1. 在游戏运行中按 `Alt+Shift+M` 呼出快捷窗口，点击底部的 **「⏱️ 测速」** 按钮；
-  2. 点击「开始测速」，ModDeck 将向游戏发送 F10 并毫秒级启动计时；
-  3. 观察游戏画面：当重载卡顿结束、画面恢复流畅时，立即点击「停止计时」；
-  4. 软件自动根据实测耗时按 `实测时间 + 1.5 秒安全余量` 一键计算并应用最适延迟，杜绝 Shader 编译未完提前清理桥接导致的预设失效。
-
-### 4. 3DMigoto 运行时变量自动刷盘间隔（Settings Auto Save Interval）
-
-- **原生刷盘机制**：3DMigoto 内部原生配置 `settings_auto_save_interval = 60`（每 60 秒自动将游戏内按键调整的内存外观变量刷入 `d3dx_user.ini`）；
-- **自定义选项**：ModDeck 支持在设置中将其调整为 `10 秒（极速同步，推荐实机热键调造型时使用）`、`30 秒（均衡）`、`60 秒（官方默认）` 或 `-1（禁用定时）`；
-- **需 F10 重载生效**：3DMigoto 仅在游戏冷启动与 F10 重载时才会重新解析 `d3dx.ini` 中的周期。在设置中修改后，可直接点击配套的 **「立即 F10 生效」** 按钮一键向游戏发送重载指令。
-
-### 5. 3DMigoto `DISABLED_` 状态机制与文件锁智能降级
-
-- 3DMigoto 官方通过 `exclude_recursive = DISABLED*` 忽略被禁用的 Mod 资源；
-- **免退游戏热启停**：当游戏运行导致 Mod 外部文件夹被 Windows 系统进程锁定时（无法重命名目录），ModDeck 会智能降级重命名内部主 `.ini` 为 `DISABLED_*.ini`，配合 F10 重载无需退出游戏即可立刻生效。
-
-### 6. 自定义游戏启动程序与命令行参数
-
-- 在游戏配置面板中支持为游戏主程序自定义追加启动参数（Launch Arguments），如 `-dx11`、`-window-mode exclusive` 或其他调试参数；
-- ModDeck 自身启动支持 `--no-sandbox`（跳过沙箱）、`--smoke-test`（自检测试）等调试标识。
-
-</details>
+For full subsystem details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
-## 四、游戏实测与集成状态
+## 4. Game Compatibility & Verification Status
 
 > [!IMPORTANT]
-> **实机验证特别说明**：
-> 目前本软件**仅有《明日方舟：终末地》（EFMI）经过了作者在真实游戏环境中的大规模深入实验与实测适配**（已完整跑通单 Mod 变体解析、`[Present]` 帧桥接换装、待生效重载队列、实机秒表延迟校准与全队双池方案）。  
-> 至于其他游戏（如《鸣潮》WWMI、《崩坏：星穹铁道》SRMI、《绝区零》ZZMI、《异环》NEMI 等），目前仅基于同属 3DMigoto 架构的目录规则（`DISABLED_`）与 `.ini` 语法进行了**同逻辑代码迁移与理论兼容，尚未在对应真实游戏客户端内进行充分的实机验证**。欢迎其他游戏的玩家在实测中反馈实际效果。
+> **Live Verification Scope**:
+> Extensive live gameplay testing (including variant capture, `[Present]` bridge injection, benchmark calibration, and full launcher integration) has been conducted primarily on **Arknights: Endfield (EFMI)**.
+> Built-in entries for **Wuthering Waves (WWMI)**, **Honkai: Star Rail (SRMI)**, **Zenless Zone Zero (ZZMI)**, and **Neverness to Everness (NEMI)** implement the same 3DMigoto/XXMI directory and `.ini` rules, pending broader community testing in live sessions.
 
-| 游戏平台 | 推荐 MI 注入分支 | 兼容与集成状态 | 说明 |
-| :--- | :--- | :--- | :--- |
-| **明日方舟：终末地** | **EFMI** | **✅ 深度实测验证（大量实验适配）** | 作者主力实机测试平台，完整跑通全部预设引擎、帧桥接与重载流控 |
-| **鸣潮** | **WWMI** | ⚠️ 规则迁移（尚未实机验证） | 基于同类 3DMigoto 树型结构与 `DISABLED_` 逻辑迁移，未做深入实验 |
-| **崩坏：星穹铁道** | **SRMI** | ⚠️ 规则迁移（尚未实机验证） | 基于同类 3DMigoto 逻辑迁移，未做深入实验 |
-| **绝区零** | **ZZMI** | ⚠️ 规则迁移（尚未实机验证） | 基于同类 3DMigoto 逻辑迁移，未做深入实验 |
-| **异环** | **NEMI** | ⚠️ 规则迁移（尚未实机验证） | 基于同类 3DMigoto 逻辑迁移，未做深入实验 |
-
----
-
-## 五、环境要求与兼容说明
-
-- **操作系统**：Windows 10 / Windows 11 64 位（x64）；
-- **运行环境**：无需安装 Python、无需全局 Node.js，发布包内已自包含完整运行环境与 native 依赖；
-- **游戏显示与置顶适配**：快捷窗口（Overlay）全面适配置顶于**游戏全屏**运行模式，在全屏游戏体验中可无缝直接覆顶呼出，同时无边框窗口化与常规窗口化模式亦作为备选完全兼容；
-- **本地优先（Local-First）与数据隐私**：所有预设、角色封面及配置数据严格保存在本地 `%APPDATA%/ModDeck/`，离线断网完全可用，绝不上传玩家任何本地游戏资产。
+| Game | MI Branch | Status | Notes |
+| --- | --- | --- | --- |
+| **Arknights: Endfield** | **EFMI** | Verified in live sessions | Primary test environment across import, presets, overlay, and launcher flows |
+| **Wuthering Waves** | **WWMI** | Migrated (pending live test) | Standard XXMI/3DMigoto directory and `.ini` handling |
+| **Honkai: Star Rail** | **SRMI** | Migrated (pending live test) | Standard XXMI/3DMigoto directory and `.ini` handling |
+| **Zenless Zone Zero** | **ZZMI** | Migrated (pending live test) | Standard XXMI/3DMigoto directory and `.ini` handling |
+| **Neverness to Everness** | **NEMI** | Migrated (pending live test) | Standard XXMI/3DMigoto directory and `.ini` handling |
 
 ---
 
-## 六、本地数据目录结构说明
+## 5. System Requirements & Compatibility
 
-ModDeck 运行时数据完全保存在本地 `%APPDATA%/ModDeck/`（可在「设置 → 关于」中一键打开）：
-
-```text
-%APPDATA%/ModDeck/
-├── settings.json                   # [核心] 基础设置、游戏路径、快捷键与行为开关
-├── roster-presets.json             # [核心] 全角色池阵容预设方案存储
-├── presets/                        # [数据] 单 Mod 变体预设树状分级目录
-│   └── {gameId}/{character}/       # [解耦] 单 Mod 独立 JSON (presets/{gameId}/{character}/{mod}.json)
-├── characters.json                 # [数据] 用户自定义角色别名、显示名与覆盖配置
-├── roster-cache.json               # [缓存] 角色中英文词典增量缓存与云端同步镜像
-├── covers/                         # [媒体] 用户自定义裁切的分类头像封面（1:1 方形 png）
-├── backups/                        # [备份] Mod 覆盖前自动备份及配置迁移快照
-├── languages/                      # [扩展] 外部自定义语言包目录（与便携包根目录互通）
-├── tmp/                            # [临时] 压缩包导入解析时的临时暂存目录（导入后自动清理）
-└── logs/                           # [诊断] 软件启动与运行排错日志
-    └── startup.log                 # [诊断] 核心排错日志文件
-```
-
-| 文件 / 目录 | 用途说明 | 属性 |
-| :--- | :--- | :--- |
-| `settings.json` | 基础设置、游戏路径、快捷键与行为开关 | 核心配置 |
-| `roster-presets.json` | 全角色池阵容预设方案存储 | 核心配置 |
-| `presets/` | 单 Mod 变体预设分级目录（`presets/{gameId}/{character}/{mod}.json`） | 核心数据 |
-| `characters.json` | 用户自定义分类别名、显示名与覆盖配置 | 核心数据 |
-| `roster-cache.json` | 角色中英文词典增量缓存 | 核心数据 |
-| `covers/` | 用户自定义裁切的分类头像封面（未自定义时初始为空） | 用户媒体 |
-| `backups/` | Mod 同名覆盖导入前的历史备份与配置迁移前自动快照 | 容灾备份 |
-| `languages/` | 外部自定义语言包目录（与便携包根目录语言包互通） | 本地化扩展 |
-| `tmp/` | 压缩包导入解析时的临时暂存目录（导入完成后自动清理为空） | 临时缓存 |
-| `logs/` | 软件启动与运行排错日志 | 诊断日志 |
-| `bin/` | 绿色解压工具二进制套件 | 辅助程序 |
-| `Cache / GPUCache / ...` | Chromium / Electron 渲染引擎原生硬件加速与网页缓存 | 运行时环境 |
-
-> 💡 **备份与迁移提示**：可在「设置 → 存储与备份」直接导出 `.moddeck-bundle` 一键迁移全量配置（含各 `Mods` 分类封面），或整体复制 `%APPDATA%/ModDeck/` 目录保留本地数据。
+- **OS**: Windows 10 / Windows 11 64-bit (`x64`).
+- **WebView2**: Microsoft Edge WebView2 Runtime (built into Windows 11 and modern Windows 10; checked at startup).
+- **Local-First & Offline**: All settings, covers, presets, and backups reside in `%APPDATA%\ModDeck\` (falling back to `ModDeck-data\` beside `ModDeck.exe` if AppData is restricted). Zero telemetry or external uploads.
 
 ---
 
-## 七、从源码构建
-
-<details>
-<summary><strong>👉 点击展开开发者编译与打包说明</strong></summary>
-
-### 1. 开发环境准备
-
-- Windows 10 / 11 x64
-- Node.js 22+（推荐 Node 24）& npm
-- Git
-
-### 2. 获取代码与依赖安装
+## 6. Building from Source
 
 ```bash
 git clone https://github.com/yuzhoujun/ModDeck.git
 cd ModDeck
 npm install
-```
 
-### 3. 常用开发与构建指令
-
-```bash
-# 启动热重载开发调试模式
-npm run dev
-
-# 完整静态类型检查（主进程 + Preload + 渲染层）
 npm run typecheck
-
-# 检查多语言一致性、代码 t/tMain 调用与未翻译硬编码中文
 npm run i18n:check
-
-# 深度提取代码中未翻译中文字符串并生成结构化 JSON 树与详表
-npm run i18n:extract
-
-# 一键安全增量合并提取词条至 zh-CN 并同步 en-US 待翻译占位符（支持 git diff 快速对比）
-npm run i18n:extract:apply
-
-# 自动以中文基准递归同步并排序所有语言包结构（当前包含 890+ 项词条）
-npm run i18n:sync
-
-# 生产环境编译构建（生成 out/）
-npm run build
-
-# 打包便携绿色免安装 ZIP 分发包（生成 release/ModDeck-<version>-win-x64.zip）
+cargo test --manifest-path src-tauri/Cargo.toml
 npm run package:portable
 ```
 
-更多底层构建与打包机制请参阅 [docs/BUILD.md](docs/BUILD.md)。
-
-</details>
+See [docs/BUILD.md](docs/BUILD.md) for prerequisites (Node.js 24, Rust stable + MSVC Build Tools) and release workflow details.
 
 ---
 
-## 八、版本历史与更新日志
+## 7. Changelog
 
-详细版本迭代记录、功能改进与各测试修复版本说明请查阅完整更新日志：
-👉 **[CHANGELOG.md](CHANGELOG.md)**
+- Current development log: [CHANGELOG.md](CHANGELOG.md) ([简体中文](CHANGELOG.zh-CN.md))
+- v1.0.0 - v2.5.0 Electron archive: [docs/CHANGELOG_V2_ARCHIVE.md](docs/CHANGELOG_V2_ARCHIVE.md)
 
 ---
 
-## 九、安全性、风险权责与免责声明
+## 8. Security, Disclaimer & Contributing
 
-### 1. 软件功能职责与非侵入机制
-
-- **纯外部文件管理**：ModDeck 本质上为本地优先的磁盘文件与文本配置辅助管理器。其 Mod 启停原理与玩家手动在资源管理器中为文件夹添加/移除 `DISABLED_` 前缀完全一致；变体预设切换仅通过读写 `d3dx_user.ini` 与 `bridge.ini` 文本参数实现。
-- **独立进程与零内存干预**：ModDeck 作为独立的桌面应用程序运行，**不注入任何 DLL、不读取或劫持游戏进程句柄、不读写游戏内存空间、不修改游戏客户端二进制可执行文件与资源包**，亦不具备或提供任何反作弊规避能力。
-
-### 2. Mod 游玩环境的客观风险警示与权责划分
-
-完整的游戏 Mod 游玩环境由 **「游戏本体客户端 + 3DMigoto/XXMI 底层挂载框架 + 第三方 Mod 资源 + ModDeck 管理器」** 共同构成。请玩家知悉以下客观风险与权责边界：
-
-1. **第三方 Mod 资源风险**：ModDeck 无法亦不会审查或背书第三方 Mod 文件本身的合规性与质量。若玩家使用了来源不明的野生 Mod、未经减面与碰撞优化的高面数 MMD 模型移植（易引发显存溢出或渲染崩溃）、异常着色器（Shader）或可能触碰反作弊特征的内容，均存在导致游戏闪退甚至引发账号受限或处罚的风险。
-2. **底层挂载与游戏厂商策略**：3DMigoto/XXMI 对 Direct3D 的 Shader 拦截机制属于第三方底层行为，各游戏厂商针对 Mod 的安全策略各异且可能随版本更新而调整。
-3. **免责界定**：ModDeck 仅对本软件自身代码的功能完整性与非侵入性负责。因第三方 Mod 缺陷、MMD 模型异常、3DMigoto 底层挂载或游戏官方安全机制引发的任何游戏异常、崩溃报错或账号处罚风险，均由使用者自行评估与承担，与 ModDeck 软件本身无关。
-
-### 3. 社区协作模式、Fork 与衍生版本免责声明
-
-- **仅接收 Issue 交流与反馈**：欢迎玩家通过 [GitHub Issues](https://github.com/yuzhoujun/ModDeck/issues) 提交使用疑难、Bug 报告、功能建议与远程角色词库补全。
-- **暂不接收外部代码 PR（Closed PR Policy）**：为防范供应链代码安全风险、保证主干架构的稳定性，并考虑到个人业余精力有限、无法逐行审计外部代码逻辑，本项目**暂不接受任何外部代码 Pull Request（PR）**。未事先沟通提交的代码 PR 将被直接礼貌关闭。
-- **Fork 自由与不背书声明**：在遵循 MIT 协议的前提下，任何人均可自由 Fork、研究或定制衍生版本；但**任何第三方 Fork、二次打包或衍生版本均属其独立行为，本仓库及作者不对任何第三方分支的安全性、合规性及行为承担任何连带责任，亦不为其做任何背书**。玩家如需下载便携包，请认准本官方仓库 Releases。
-
-### 4. 项目初心、开源许可与致谢
-
-- **项目发起与初心**：本项目由 **yuzhoujun** 发起并独立维护。最初缘起于作者在游玩过程中，发现市面上现存且更新中的 Mod 管理器在操作交互与细节习惯上均不太贴合个人习惯，部分核心功能在日常使用中始终不够顺手；出于想要一款真正符合自身操作直觉与审美的工作台，便突发奇想利用业余闲暇时间独立设计并开发了 ModDeck。
-- **版权归属**：所有游戏名称、角色形象及官方资产版权均归属各自官方权利人所有。
-- **开源许可**：本项目基于 **[MIT License](LICENSE)** 开源发布。
-- **开发协助致谢**：在业余开发过程中，作者先后委托 **大肥鱼（DeepSeek）** 与 **哈基米（Gemini）** 协助完成底层软件架构设计、复杂异步状态机流控、跨平台字符集排错、自动化维护工具链编写与测试。
+- **Non-Invasive File Tool**: ModDeck only reads/writes mod folders, `d3dx_user.ini`, `d3dx.ini`, and `bridge.ini` text configurations and dispatches foreground scan-code keystrokes. It never injects DLLs or modifies game binaries.
+- **Third-Party Mods**: Users are responsible for the quality, safety, and compliance of third-party mods and 3DMigoto/XXMI usage under each game's policies.
+- **Issues-Only Contribution Policy**: Bug reports, feature requests, and character dictionary additions are welcome via [GitHub Issues](https://github.com/yuzhoujun/ModDeck/issues). External code PRs are not accepted; see [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
+- **License**: [MIT License](LICENSE) — initiated and maintained by **yuzhoujun**, with technical assistance from DeepSeek and Gemini.

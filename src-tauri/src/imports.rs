@@ -1173,6 +1173,50 @@ pub fn parse_import_sources(
     Ok(result)
 }
 
+fn strip_disabled_prefix_str(name: &str) -> &str {
+    if name
+        .as_bytes()
+        .get(..9)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(b"disabled_"))
+    {
+        &name[9..]
+    } else {
+        name
+    }
+}
+
+fn find_matching_mod_dir(char_dir: &Path, bare_name: &str) -> Option<PathBuf> {
+    let exact = char_dir.join(bare_name);
+    if exact.exists() {
+        return Some(exact);
+    }
+    let disabled_exact = char_dir.join(format!("DISABLED_{bare_name}"));
+    if disabled_exact.exists() {
+        return Some(disabled_exact);
+    }
+    let entries = fs::read_dir(char_dir).ok()?;
+    let mut fallback: Option<PathBuf> = None;
+    for entry in entries.flatten() {
+        let Ok(fname) = entry.file_name().into_string() else {
+            continue;
+        };
+        if strip_disabled_prefix_str(&fname).eq_ignore_ascii_case(bare_name) {
+            let p = entry.path();
+            if !fname
+                .as_bytes()
+                .get(..9)
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(b"disabled_"))
+            {
+                return Some(p);
+            }
+            if fallback.is_none() {
+                fallback = Some(p);
+            }
+        }
+    }
+    fallback
+}
+
 fn backup_existing_mod(base_dir: &Path, game_id: &str, destination: &Path) -> Result<(), String> {
     let parts: Vec<String> = destination
         .components()
@@ -1183,14 +1227,24 @@ fn backup_existing_mod(base_dir: &Path, game_id: &str, destination: &Path) -> Re
     } else {
         &parts[..]
     };
-    let mut target = base_dir
-        .join("backups")
-        .join(format_timestamp_dir_utc())
-        .join(game_id);
-    for seg in tail {
-        target.push(seg);
+    let mut ts_dir = format_timestamp_dir_utc();
+    let backups_dir = base_dir.join("backups");
+    for suffix in 0usize..1000 {
+        let candidate_ts = if suffix == 0 {
+            ts_dir.clone()
+        } else {
+            format!("{ts_dir}-{suffix}")
+        };
+        let mut target = backups_dir.join(&candidate_ts).join(game_id);
+        for seg in tail {
+            target.push(seg);
+        }
+        if !target.exists() {
+            return move_dir_or_copy(destination, &target);
+        }
+        ts_dir = format_timestamp_dir_utc();
     }
-    move_dir_or_copy(destination, &target)
+    Err("Failed to allocate unique backup folder".to_string())
 }
 
 fn place_mod(
@@ -1200,6 +1254,7 @@ fn place_mod(
     mods_root: &Path,
     character_folder: &str,
     mod_name: &str,
+    overwrite_target: Option<&str>,
     source_dir: &Path,
     can_move_direct: bool,
 ) -> Result<String, String> {
@@ -1210,7 +1265,29 @@ fn place_mod(
     fs::create_dir_all(&char_dir)
         .map_err(|e| format!("Failed to create character folder: {e}"))?;
 
+    if let Some(explicit_raw) = overwrite_target.map(str::trim).filter(|s| !s.is_empty()) {
+        if explicit_raw == "." || explicit_raw == ".." || explicit_raw.contains(['/', '\\']) {
+            return Err("Invalid overwrite target folder name".to_string());
+        }
+        let old_path = char_dir.join(explicit_raw);
+        if !is_inside(mods_root, &old_path) {
+            return Err("Overwrite target escapes mods root".to_string());
+        }
+        if old_path.exists() {
+            backup_existing_mod(base_dir, game_id, &old_path)?;
+        }
+    }
+
     let mut name = sanitize_segment(mod_name, "mod");
+    if settings.import.overwrite_existing
+        && overwrite_target.map(str::trim).filter(|s| !s.is_empty()).is_none()
+    {
+        let bare = strip_disabled_prefix_str(&name);
+        if let Some(existing_match) = find_matching_mod_dir(&char_dir, bare) {
+            backup_existing_mod(base_dir, game_id, &existing_match)?;
+        }
+    }
+
     let mut destination = char_dir.join(&name);
     if destination.exists() {
         if settings.import.overwrite_existing {
@@ -1320,6 +1397,7 @@ pub fn commit_import_session_detached(
                 mods_root,
                 &char_folder,
                 final_mod_name,
+                commit_item.overwrite_target.as_deref(),
                 &active.extracted_dir,
                 can_move_direct,
             ) {
@@ -1444,6 +1522,7 @@ pub fn run_import(
                 .filter(|s| !s.trim().is_empty())
                 .unwrap_or_else(|| c.suggested_character.clone()),
             mod_name: Some(c.mod_name.clone()),
+            overwrite_target: None,
         })
         .collect();
 
@@ -1540,6 +1619,7 @@ mod tests {
                     id: parsed.candidates[0].id.clone(),
                     character_folder: parsed.candidates[0].suggested_character.clone(),
                     mod_name: Some(parsed.candidates[0].mod_name.clone()),
+                    overwrite_target: None,
                 }],
             },
         )
@@ -1689,6 +1769,104 @@ mod tests {
             .flatten()
             .collect();
         assert!(remaining_entries.is_empty());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn explicit_overwrite_target_and_disabled_sibling_backup_work() {
+        let root = std::env::temp_dir().join(format!("moddeck-overwrite-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let base_dir = root.join("app_data");
+        let mods_dir = root.join("Mods");
+        let char_dir = mods_dir.join("伊冯");
+        fs::create_dir_all(&base_dir).unwrap();
+        fs::create_dir_all(char_dir.join("DISABLED_Skin-Same")).unwrap();
+        fs::write(char_dir.join("DISABLED_Skin-Same").join("mod.ini"), "old-same").unwrap();
+        fs::create_dir_all(char_dir.join("DISABLED_Skin-v1.0")).unwrap();
+        fs::write(char_dir.join("DISABLED_Skin-v1.0").join("mod.ini"), "old-v1").unwrap();
+
+        let archive_path = root.join("Skin-v1.2-efmittl.zip");
+        {
+            let f = fs::File::create(&archive_path).unwrap();
+            let mut zw = ZipWriter::new(f);
+            let opts = SimpleFileOptions::default();
+            zw.start_file("Skin-Same/mod.ini", opts).unwrap();
+            zw.write_all(b"[Constants]\nx = 2\n").unwrap();
+            zw.start_file("Skin-v1.2-efmittl/mod.ini", opts).unwrap();
+            zw.write_all(b"[Constants]\ny = 3\n").unwrap();
+            zw.finish().unwrap();
+        }
+
+        let mut settings = default_settings();
+        settings.games.get_mut("endfield").unwrap().mods_path =
+            mods_dir.to_string_lossy().to_string();
+        settings.import.overwrite_existing = true;
+        let metadata = MetadataStore::default();
+        let mut sessions = ImportSessionManager::default();
+        let parsed = parse_import_sources(
+            &base_dir,
+            &settings,
+            &metadata,
+            &mut sessions,
+            &ImportParseRequest {
+                game_id: "endfield".to_string(),
+                paths: vec![archive_path.to_string_lossy().to_string()],
+                target_character: Some("伊冯".to_string()),
+                passwords: HashMap::new(),
+            },
+        )
+        .unwrap();
+        assert_eq!(parsed.candidates.len(), 2);
+
+        let same_item = parsed
+            .candidates
+            .iter()
+            .find(|c| c.mod_name == "Skin-Same")
+            .unwrap();
+        let v12_item = parsed
+            .candidates
+            .iter()
+            .find(|c| c.mod_name == "Skin-v1.2-efmittl")
+            .unwrap();
+
+        let res = commit_import_session(
+            &base_dir,
+            &settings,
+            &mut sessions,
+            &ImportCommitRequest {
+                session_id: parsed.session_id.clone(),
+                game_id: "endfield".to_string(),
+                items: vec![
+                    crate::models::ImportCommitItem {
+                        id: same_item.id.clone(),
+                        character_folder: "伊冯".to_string(),
+                        mod_name: Some("Skin-Same".to_string()),
+                        overwrite_target: None,
+                    },
+                    crate::models::ImportCommitItem {
+                        id: v12_item.id.clone(),
+                        character_folder: "伊冯".to_string(),
+                        mod_name: Some("Skin-v1.2-Custom".to_string()),
+                        overwrite_target: Some("DISABLED_Skin-v1.0".to_string()),
+                    },
+                ],
+            },
+        )
+        .unwrap();
+        assert_eq!(res.imported_mods, 2);
+        // Old DISABLED_* dirs were replaced and backed up
+        assert!(!char_dir.join("DISABLED_Skin-Same").exists());
+        assert!(!char_dir.join("DISABLED_Skin-v1.0").exists());
+        assert!(char_dir.join("Skin-Same").join("mod.ini").is_file());
+        assert!(char_dir.join("Skin-v1.2-Custom").join("mod.ini").is_file());
+
+        let backups: Vec<_> = WalkDir::new(base_dir.join("backups"))
+            .into_iter()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().starts_with("DISABLED_Skin-"))
+            .collect();
+        assert_eq!(backups.len(), 2);
 
         let _ = fs::remove_dir_all(&root);
     }

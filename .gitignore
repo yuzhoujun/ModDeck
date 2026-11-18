@@ -18,6 +18,7 @@ Thumbs.db
 
 .agents/
 scripts/*-report.json
+scripts/extracted-*.json
 *gamebanana*
 gamebanana/
 src-tauri/target/

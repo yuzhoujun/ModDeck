@@ -28,7 +28,7 @@ body:
     id: version
     attributes:
       label: ModDeck 软件版本 / Software Version
-      placeholder: 例如 v2.5.0、v2.4.0
+      placeholder: e.g. v3.0.0, v3.0.0-beta.1
     validations:
       required: true
 
@@ -65,11 +65,11 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: 软件启动与运行日志 / Runtime & Startup Logs (重要排错信息)
+      label: 软件启动与运行日志 / Runtime Logs
       description: |
-        请优先提取并粘贴日志文本：
-        - 优先路径：%APPDATA%\ModDeck\logs\startup.log
-        - 便携包路径：解压目录下的 ModDeck-data\logs\startup.log
+        Please paste diagnostic logs if available:
+        - Default path: `%APPDATA%\ModDeck\logs\tauri-crash.log`
+        - Portable fallback: `ModDeck-data\logs\tauri-crash.log`
       render: shell
     validations:
       required: false

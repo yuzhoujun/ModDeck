@@ -38,7 +38,7 @@ export function OverlayApp() {
   const [benchmarkElapsed, setBenchmarkElapsed] = useState(0)
   const benchmarkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const benchmarkStartRef = useRef<number>(0)
-  const [overlayHotkey, setOverlayHotkey] = useState<string>('Alt+Shift+M')
+  const [overlayHotkey, setOverlayHotkey] = useState<string>('Alt+\\')
 
   useEffect(() => {
     return () => {

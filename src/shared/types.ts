@@ -273,6 +273,7 @@ export interface ImportCommitItem {
   id: string
   characterFolder: string
   modName?: string
+  overwriteTarget?: string
 }
 
 export interface ImportCommitRequest {

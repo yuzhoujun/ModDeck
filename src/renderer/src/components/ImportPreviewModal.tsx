@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type {
   CharacterInfo,
   GameDef,
   ImportCommitItem,
-  ImportParseResult
+  ImportParseResult,
+  ModInfo
 } from '../../../shared/types'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
@@ -42,7 +43,50 @@ export function ImportPreviewModal({
     }
     return map
   })
+  const [modNames, setModNames] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {}
+    for (const candidate of parsed.candidates) {
+      map[candidate.id] = candidate.modName
+    }
+    return map
+  })
+  const [overwriteTargets, setOverwriteTargets] = useState<Record<string, string>>({})
+  const [modsByChar, setModsByChar] = useState<Record<string, ModInfo[]>>({})
   const [submitting, setSubmitting] = useState(false)
+
+  const existingFolderSet = useMemo(
+    () => new Set(characters.map((c) => c.folder)),
+    [characters]
+  )
+
+  useEffect(() => {
+    const folders = new Set<string>()
+    for (const candidate of parsed.candidates) {
+      const assigned = charAssignments[candidate.id] || defaultOtherFolder
+      if (existingFolderSet.has(assigned) && !modsByChar[assigned]) {
+        folders.add(assigned)
+      }
+    }
+    if (folders.size === 0) return
+    let cancelled = false
+    for (const folder of folders) {
+      void window.moddeck
+        .getMods(game.id, folder)
+        .then((list) => {
+          if (!cancelled) {
+            setModsByChar((prev) => (prev[folder] ? prev : { ...prev, [folder]: list }))
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setModsByChar((prev) => (prev[folder] ? prev : { ...prev, [folder]: [] }))
+          }
+        })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [charAssignments, defaultOtherFolder, existingFolderSet, game.id, modsByChar, parsed.candidates])
 
   const otherLabel = t('common.other')
 
@@ -133,6 +177,15 @@ export function ImportPreviewModal({
       }
       return next
     })
+    setOverwriteTargets((current) => {
+      const next = { ...current }
+      for (const candidate of parsed.candidates) {
+        if (selectedIds.has(candidate.id)) {
+          delete next[candidate.id]
+        }
+      }
+      return next
+    })
   }
 
   async function handleConfirm() {
@@ -141,11 +194,16 @@ export function ImportPreviewModal({
     try {
       const items: ImportCommitItem[] = parsed.candidates
         .filter((candidate) => selectedIds.has(candidate.id))
-        .map((candidate) => ({
-          id: candidate.id,
-          characterFolder: charAssignments[candidate.id] || defaultOtherFolder,
-          modName: candidate.modName
-        }))
+        .map((candidate) => {
+          const customName = (modNames[candidate.id] ?? candidate.modName).trim()
+          const overwriteTarget = overwriteTargets[candidate.id]?.trim() || undefined
+          return {
+            id: candidate.id,
+            characterFolder: charAssignments[candidate.id] || defaultOtherFolder,
+            modName: customName || candidate.modName,
+            ...(overwriteTarget ? { overwriteTarget } : {})
+          }
+        })
       await onCommit(items)
     } finally {
       setSubmitting(false)
@@ -285,6 +343,8 @@ export function ImportPreviewModal({
           {parsed.candidates.map((candidate) => {
             const checked = selectedIds.has(candidate.id)
             const assigned = charAssignments[candidate.id] || defaultOtherFolder
+            const existingMods = modsByChar[assigned] ?? []
+            const selectedOverwrite = overwriteTargets[candidate.id] || ''
             return (
               <div
                 key={candidate.id}
@@ -305,6 +365,11 @@ export function ImportPreviewModal({
                 >
                   <div className="import-candidate-title">
                     <strong>{candidate.modName}</strong>
+                    {selectedOverwrite ? (
+                      <span className="tag warn">
+                        {t('importModal.upgradeTargetBadge', { target: selectedOverwrite })}
+                      </span>
+                    ) : null}
                     {!candidate.hasIni ? (
                       <span className="tag warn" title={t('importModal.noIniTooltip')}>
                         {t('importModal.noIni')}
@@ -320,16 +385,66 @@ export function ImportPreviewModal({
                       <span> · {formatMatchReason(candidate.matchReason)}</span>
                     ) : null}
                   </div>
+                  <div
+                    className="import-candidate-controls"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <input
+                      className="input small-input import-name-input"
+                      value={modNames[candidate.id] ?? candidate.modName}
+                      onChange={(event) =>
+                        setModNames((current) => ({
+                          ...current,
+                          [candidate.id]: event.target.value
+                        }))
+                      }
+                      placeholder={t('importModal.targetNamePlaceholder')}
+                      title={t('importModal.targetNameTooltip')}
+                      disabled={submitting}
+                    />
+                    <select
+                      className="select compact-select import-upgrade-select"
+                      value={selectedOverwrite}
+                      onChange={(event) =>
+                        setOverwriteTargets((current) => ({
+                          ...current,
+                          [candidate.id]: event.target.value
+                        }))
+                      }
+                      title={t('importModal.upgradeTargetTooltip')}
+                      disabled={submitting || existingMods.length === 0}
+                    >
+                      <option value="">
+                        {existingMods.length > 0
+                          ? t('importModal.upgradeTargetAuto')
+                          : t('importModal.upgradeTargetNoExisting')}
+                      </option>
+                      {existingMods.map((mod) => (
+                        <option key={mod.folderName} value={mod.folderName}>
+                          {t('importModal.upgradeTargetOption', {
+                            name: mod.name,
+                            status: mod.enabled ? t('common.enabled') : t('common.disabled')
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <select
                   className="select compact-select import-char-select"
                   value={assigned}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const nextChar = event.target.value
                     setCharAssignments((current) => ({
                       ...current,
-                      [candidate.id]: event.target.value
+                      [candidate.id]: nextChar
                     }))
-                  }
+                    setOverwriteTargets((current) => {
+                      const next = { ...current }
+                      delete next[candidate.id]
+                      return next
+                    })
+                  }}
                   disabled={submitting}
                   title={t('importModal.selectCharTooltip')}
                 >

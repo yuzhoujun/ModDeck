@@ -10,7 +10,7 @@
 
 1. **欢迎提交 Issues**：
    - 欢迎通过 [GitHub Issues](https://github.com/yuzhoujun/ModDeck/issues) 提交使用疑难、Bug 报告、体验优化建议或角色译名词库纠错；
-   - 提交 Bug 时请尽量提供复现步骤、游戏名称、操作系统版本以及必要的日志（如 `%APPDATA%\ModDeck\logs\startup.log`）。
+   - 提交 Bug 时请尽量提供复现步骤、游戏名称、操作系统版本以及必要的日志（如 `%APPDATA%\ModDeck\logs\tauri-crash.log`）。
 
 2. **暂不接受外部代码 Pull Request (PR)**：
    - 为防范供应链注入风险（恶意/来路不明代码）并降低代码审核负担，**本项目目前不接收任何外部代码 PR**；
@@ -30,7 +30,7 @@ To protect software integrity and code security, and given limited individual ma
 
 1. **Issues are Welcome**:
    - Please feel free to open a [GitHub Issue](https://github.com/yuzhoujun/ModDeck/issues) for bug reports, questions, feature suggestions, or character dictionary updates.
-   - When reporting a bug, please include reproduction steps, game title, OS version, and relevant logs (`%APPDATA%\ModDeck\logs\startup.log`).
+   - When reporting a bug, please include reproduction steps, game title, OS version, and relevant logs (`%APPDATA%\ModDeck\logs\tauri-crash.log`).
 
 2. **Closed Pull Request Policy**:
    - To guard against supply chain vulnerabilities and avoid unvetted third-party code injection, **we do not accept external code Pull Requests (PRs)**.

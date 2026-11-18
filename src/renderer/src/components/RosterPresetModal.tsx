@@ -595,20 +595,6 @@ export function RosterPresetModal({
     onNotify?.(t('preset.setPoolLiveConfig', { pool: poolName, count: targetChars.length }), 'ok')
   }
 
-  // 快捷键监听：Alt+U 一键不启用，Alt+R 一键选中使用中
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.altKey && e.key.toLowerCase() === 'u') {
-        e.preventDefault()
-        handleBatchSetNative(displayedCharacters)
-      } else if (e.altKey && e.key.toLowerCase() === 'r') {
-        e.preventDefault()
-        handleBatchSetCurrentActive(displayedCharacters)
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [displayedCharacters, characterModsMap, modPresetsMap, activePoolTab])
 
   return (
     <Modal
@@ -812,7 +798,6 @@ export function RosterPresetModal({
               >
                 <Icon name="close" size={12} />
                 <span>{t('preset.disableAllInPool')}</span>
-                <kbd className="kbd-shortcut">Alt+U</kbd>
               </button>
               <button
                 type="button"
@@ -822,7 +807,6 @@ export function RosterPresetModal({
               >
                 <Icon name="refresh" size={12} />
                 <span>{t('preset.selectCurrentInPool')}</span>
-                <kbd className="kbd-shortcut">Alt+R</kbd>
               </button>
             </div>
           </div>

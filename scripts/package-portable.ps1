@@ -3,34 +3,55 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
+if ($env:USERPROFILE) {
+  $cargoBin = Join-Path $env:USERPROFILE '.cargo\bin'
+  if ((Test-Path $cargoBin) -and -not ($env:PATH -split ';' | Where-Object { $_ -eq $cargoBin })) {
+    $env:PATH = "$cargoBin;$env:PATH"
+  }
+}
+
 $version = (Get-Content 'package.json' -Raw | ConvertFrom-Json).version
 $outputDir = Join-Path $root 'release'
-$appDir = Join-Path $outputDir 'win-unpacked'
+$stageDir = Join-Path $outputDir 'win-unpacked'
 $zipPath = Join-Path $outputDir "ModDeck-$version-win-x64.zip"
-$tempRoot = Join-Path $root 'temp'
-$customTmp = Join-Path $tempRoot 'tmp'
-New-Item -ItemType Directory -Force $tempRoot, $outputDir, $customTmp | Out-Null
-$env:TMP = $customTmp
-$env:TEMP = $customTmp
 
-Write-Host "Building ModDeck $version ..."
-node node_modules/electron-vite/bin/electron-vite.js build
-if ($LASTEXITCODE -ne 0) { throw 'electron-vite build failed' }
+New-Item -ItemType Directory -Force $outputDir | Out-Null
 
-$env:ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/'
-$env:ELECTRON_CACHE = Join-Path $tempRoot 'electron-cache'
-$env:ELECTRON_BUILDER_BINARIES_MIRROR = 'https://npmmirror.com/mirrors/electron-builder-binaries/'
-$env:ELECTRON_BUILDER_CACHE = Join-Path $tempRoot 'electron-builder-cache'
-$env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'
-node node_modules/electron-builder/out/cli/cli.js --win --x64 --dir --publish never "--config.directories.output=$outputDir"
-if ($LASTEXITCODE -ne 0) { throw 'electron-builder --dir failed' }
+Write-Host "Running typecheck & i18n verification..."
+npm run typecheck
+if ($LASTEXITCODE -ne 0) { throw 'typecheck failed' }
+npm run i18n:check
+if ($LASTEXITCODE -ne 0) { throw 'i18n:check failed' }
 
-Copy-Item 'packaging\README-portable.txt' (Join-Path $appDir 'README.txt') -Force
-Copy-Item 'packaging\ModDeck.cmd' (Join-Path $appDir 'ModDeck.cmd') -Force
-$langDir = Join-Path $appDir 'languages'
+Write-Host "Running Rust tests..."
+cargo test --manifest-path src-tauri/Cargo.toml
+if ($LASTEXITCODE -ne 0) { throw 'cargo test failed' }
+
+Write-Host "Building ModDeck $version (Tauri 2)..."
+npx tauri build --no-bundle
+if ($LASTEXITCODE -ne 0) { throw 'tauri build failed' }
+
+$candidateExes = @()
+if ($env:CARGO_TARGET_DIR) {
+  $candidateExes += (Join-Path $env:CARGO_TARGET_DIR 'release\moddeck.exe')
+}
+$candidateExes += (Join-Path $root 'src-tauri\target\release\moddeck.exe')
+$builtExe = $candidateExes | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $builtExe) {
+  throw "Built executable not found in candidate paths: $($candidateExes -join ', ')"
+}
+
+if (Test-Path $stageDir) {
+  Remove-Item $stageDir -Recurse -Force
+}
+New-Item -ItemType Directory -Force $stageDir | Out-Null
+
+Copy-Item $builtExe (Join-Path $stageDir 'ModDeck.exe') -Force
+Copy-Item 'packaging\README-portable.txt' (Join-Path $stageDir 'README.txt') -Force
+
+$langDir = Join-Path $stageDir 'languages'
 New-Item -ItemType Directory -Force $langDir | Out-Null
 Copy-Item 'src\shared\i18n\locales\*' $langDir -Force
-if (Test-Path (Join-Path $appDir 'locales\locales')) { Remove-Item (Join-Path $appDir 'locales\locales') -Recurse -Force }
 
 $sevenZipCandidates = @()
 if ($env:ProgramFiles) { $sevenZipCandidates += Join-Path $env:ProgramFiles '7-Zip\7z.exe' }
@@ -41,24 +62,25 @@ if (-not $sevenZip) {
   $found = Get-Command 7z -ErrorAction SilentlyContinue
   if ($found) { $sevenZip = $found.Source }
 }
-if (-not $sevenZip) {
-  throw '7-Zip not found. Install 7-Zip or add 7z.exe to PATH.'
-}
 
 Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-Push-Location $appDir
-try {
-  & $sevenZip a -tzip -mx=5 $zipPath '.\*' | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw '7-Zip compression failed' }
-} finally {
-  Pop-Location
+if ($sevenZip) {
+  Push-Location $stageDir
+  try {
+    & $sevenZip a -tzip -mx=5 $zipPath '.\*' | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw '7-Zip compression failed' }
+  } finally {
+    Pop-Location
+  }
+} else {
+  Add-Type -AssemblyName System.IO.Compression.FileSystem
+  [System.IO.Compression.ZipFile]::CreateFromDirectory(
+    $stageDir,
+    $zipPath,
+    [System.IO.Compression.CompressionLevel]::Optimal,
+    $false
+  )
 }
-
-$finalUnpacked = Join-Path $outputDir 'win-unpacked'
-if (Test-Path $finalUnpacked) {
-  Remove-Item $finalUnpacked -Recurse -Force -ErrorAction SilentlyContinue
-}
-Copy-Item $appDir $finalUnpacked -Recurse -Force -ErrorAction SilentlyContinue
 
 $hash = (Get-FileHash $zipPath -Algorithm SHA256).Hash
 Write-Host ""

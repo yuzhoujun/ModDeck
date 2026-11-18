@@ -658,7 +658,7 @@ export function SettingsView({
                   onKeyDown={captureHotkey}
                   onFocus={(event) => event.target.select()}
                 />
-                <button className="btn ghost" onClick={() => void applyHotkey('Alt+Shift+M')}>
+                <button className="btn ghost" onClick={() => void applyHotkey('Alt+\\')}>
                   {t('common.reset')}
                 </button>
                 <button className="btn ghost" onClick={() => void applyHotkey('')}>
@@ -868,7 +868,7 @@ export function SettingsView({
                     {t('settings.advanced.modalReloadF10Desc1')}<strong>{t('settings.advanced.modalReloadF10Desc2')}</strong>。
                   </div>
                   <div style={{ marginTop: '6px' }}>
-                    {t('settings.advanced.modalReloadF10Desc3', { hotkey: draft.ui.overlayHotkey || 'Alt+Shift+M' })}
+                    {t('settings.advanced.modalReloadF10Desc3', { hotkey: draft.ui.overlayHotkey || 'Alt+\\' })}
                   </div>
                   <div style={{ marginTop: '6px' }}>
                     {t('settings.advanced.modalReloadF10Desc4')}

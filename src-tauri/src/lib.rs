@@ -3810,6 +3810,81 @@ fn install_panic_hook(base_dir: PathBuf) {
     }));
 }
 
+#[cfg(windows)]
+fn has_webview2_runtime() -> bool {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    use winreg::RegKey;
+
+    const SUBKEYS: &[&str] = &[
+        r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+        r"SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+    ];
+    for root in [HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER] {
+        let hive = RegKey::predef(root);
+        for subkey in SUBKEYS {
+            if let Ok(key) = hive.open_subkey(subkey) {
+                if let Ok(pv) = key.get_value::<String, _>("pv") {
+                    let trimmed = pv.trim();
+                    if !trimmed.is_empty() && trimmed != "0.0.0.0" {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+#[cfg(windows)]
+fn prompt_missing_webview2(base_dir: &Path, prefer_en: bool) {
+    use windows::core::{HSTRING, PCWSTR};
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_ICONERROR, MB_YESNO, SW_SHOWNORMAL,
+    };
+
+    append_crash_log(base_dir, "WebView2 Runtime not detected in Windows Registry");
+    let (title_s, body_s) = if prefer_en {
+        (
+            "ModDeck - WebView2 Runtime Missing",
+            "Microsoft Edge WebView2 Runtime was not detected on this Windows system, so ModDeck cannot open its interface.\n\nClick Yes to open Microsoft's official WebView2 download page (install the Evergreen Bootstrapper and relaunch ModDeck).",
+        )
+    } else {
+        (
+            "ModDeck - 缺少 WebView2 运行库",
+            "未检测到系统 Microsoft Edge WebView2 运行库，ModDeck 无法创建界面窗口（常见于精简版 Windows 系统）。\n\n是否立即打开微软官方下载页面（下载并安装 Evergreen Bootstrapper 后重新启动 ModDeck）？",
+        )
+    };
+    let title = HSTRING::from(title_s);
+    let body = HSTRING::from(body_s);
+    let choice = unsafe { MessageBoxW(None, &body, &title, MB_YESNO | MB_ICONERROR) };
+    if choice == IDYES {
+        let op: Vec<u16> = "open\0".encode_utf16().collect();
+        let url: Vec<u16> = "https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section\0"
+            .encode_utf16()
+            .collect();
+        unsafe {
+            let _ = ShellExecuteW(
+                HWND::default(),
+                PCWSTR(op.as_ptr()),
+                PCWSTR(url.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            );
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn has_webview2_runtime() -> bool {
+    true
+}
+
+#[cfg(not(windows))]
+fn prompt_missing_webview2(_base_dir: &Path, _prefer_en: bool) {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let base_dir = resolve_base_dir();
@@ -3818,6 +3893,11 @@ pub fn run() {
         return;
     }
     let settings = normalize_settings(load_settings(&base_dir));
+    if !has_webview2_runtime() {
+        let prefer_en = is_non_zh_effective_locale(&settings.ui.language);
+        prompt_missing_webview2(&base_dir, prefer_en);
+        return;
+    }
     let metadata = load_metadata(&base_dir);
     let initial_hotkey = if settings.ui.overlay_hotkey.trim().is_empty() {
         String::new()
@@ -4088,4 +4168,21 @@ pub fn run() {
             append_crash_log(&log_base, &msg);
             show_fatal_error_dialog(&msg);
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{hotkey_conflict_eq, normalize_shortcut_for_tauri};
+    use crate::models::UiSettings;
+
+    #[test]
+    fn default_overlay_hotkey_normalizes_to_alt_backslash() {
+        let ui = UiSettings::default();
+        assert_eq!(ui.overlay_hotkey, "Alt+\\");
+        assert_eq!(
+            normalize_shortcut_for_tauri(&ui.overlay_hotkey),
+            "alt+Backslash"
+        );
+        assert!(hotkey_conflict_eq(&ui.overlay_hotkey, "Alt+Backslash"));
+    }
 }

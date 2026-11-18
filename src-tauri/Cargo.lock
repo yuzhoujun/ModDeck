@@ -2064,7 +2064,7 @@ dependencies = [
 
 [[package]]
 name = "moddeck"
-version = "3.0.0-alpha.4"
+version = "3.0.0"
 dependencies = [
  "base64 0.22.1",
  "encoding_rs",

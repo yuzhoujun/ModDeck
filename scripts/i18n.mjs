@@ -135,8 +135,6 @@ function scanMissingUsedKeys(baseKeysSet) {
 function scanAllHardcodedChinese() {
   const scanDirs = [
     path.resolve(ROOT, 'src/renderer/src'),
-    path.resolve(ROOT, 'src/main'),
-    path.resolve(ROOT, 'src/preload'),
     path.resolve(ROOT, 'src/shared')
   ]
 
@@ -281,7 +279,7 @@ const command = process.argv[2] || 'check'
 
 if (command === 'extract') {
   const shouldApply = process.argv.includes('--apply')
-  console.log('🔍 Scanning codebase for hardcoded Chinese text (src/main, src/renderer, src/preload, src/shared)...\n')
+  console.log('🔍 Scanning codebase for hardcoded Chinese text (src/renderer, src/shared)...\n')
 
   const baseFile = path.join(LOCALES_DIR, `${BASE_LOCALE}.json`)
   const baseData = fs.existsSync(baseFile) ? loadJson(baseFile) : {}
