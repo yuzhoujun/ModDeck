@@ -43,4 +43,9 @@
 ### 零碎想法与待修细节
 
 - *(后续有任何小想法或待修问题可直接追加在此处)*
-- mod冲突审计能否加上快捷键类？总页的和各个分类的，但应该需要区分一下，注意页面设计
+- **Mod 冲突审计增加热键碰撞检测**：在全局审计及按角色分类审计中补充 Mod 快捷键冲突检测（需与 Hash / FX 插件风险区分展示，注意页面信息层级设计）。
+- ![1795084888752](image/ROADMAP.zh-CN/1795084888752.png)保存相同预设时，提示文本对“默认”在英文模式仍为汉字，其他用户预设文字用用户写的即可但默认是特殊的，英文用Default，另外需要禁止用户编辑为"默认/default"
+- **着色器缓存 `d3dx.ini` `cache_shaders` 可选开关与环境检查联动**：
+
+  - 在「环境检查」页将 `[Rendering] cache_shaders = 1` 作为可选项（零画质损失，将编译后着色器缓存为 `.bin` 放入 `ShaderCache/` 以减少加载与重载卡顿），支持一键读写开关并联动现有的「清空 `ShaderCache`」按钮。
+  - **覆盖机制确认**：实测 `XXMI Launcher Config.json` 中 `enforce_rendering` 与 `enable_hunting` 平时启动仅覆写特定键值（如 `hunting`、`track_region_hashes`），并不包含 `cache_shaders`；仅在 EFMI 更新包且开启 `overwrite_ini = true` 重 deploy `d3dx.ini` 时才可能被模板覆盖为 `0`，因此 ModDeck 只需像对待 `exclude_recursive` / `settings_auto_save_interval` 一样做检查与一键补回即可。

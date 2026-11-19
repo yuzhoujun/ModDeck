@@ -43,3 +43,7 @@ This document serves as the persistent in-repo tracker for upcoming versions, ar
 ### Small Polish & Bug Notes
 
 - *(Append minor bug notes or UI ideas here anytime.)*
+- **Mod Conflict Audit Hotkey Collision Checks**: Add INI hotkey conflict scanning across both the whole-game audit and per-character views (visually separated from Shader/Texture Hash and FX risks).
+- **Optional `d3dx.ini` `cache_shaders` Toggle in Environment Check**:
+  - Surface `[Rendering] cache_shaders = 1` as an optional performance check/toggle under **Settings -> Environment** (lossless visual quality; caches compiled shaders into `ShaderCache/` to reduce loading/F10 stutters), paired with the existing **Clear ShaderCache** action.
+  - **XXMI Overwrite Behavior Verified**: Unlike `hunting` or `enforce_rendering` keys in `XXMI Launcher Config.json`, `cache_shaders` is not listed for per-launch override when `manage_xxmi_dll_config = true`; it is only reset to `0` if an importer package update re-deploys `d3dx.ini` (`overwrite_ini = true`), so ModDeck can check and restore it cleanly just like `exclude_recursive`.
