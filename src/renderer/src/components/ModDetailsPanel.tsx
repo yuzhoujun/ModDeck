@@ -7,7 +7,7 @@ import type {
   ModStaticAnalysis,
   ModVariantPreset
 } from '../../../shared/types'
-import { formatDate } from '../utils'
+import { formatDate, isReservedDefaultPresetName } from '../utils'
 import { D3dxSyncBanner } from './D3dxSyncBanner'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
@@ -205,6 +205,10 @@ export function ModDetailsPanel({
       onNotify?.(t('preset.enterPresetNameErr'), 'err')
       return
     }
+    if (isReservedDefaultPresetName(name)) {
+      onNotify?.(t('preset.reservedDefaultNameErr'), 'err')
+      return
+    }
     setSavingPreset(true)
     try {
       const res = await window.moddeck.saveModPreset(
@@ -230,7 +234,11 @@ export function ModDetailsPanel({
         )
         setPresets(updated)
       } else {
-        onNotify?.(res.error || t('preset.presetSaveFailed'), 'err')
+        const msg =
+          res.duplicatePresetId === '__default__'
+            ? t('preset.duplicateDefaultErr')
+            : res.error || t('preset.presetSaveFailed')
+        onNotify?.(msg, 'err')
       }
       void refreshSyncStatus()
     } catch (err) {

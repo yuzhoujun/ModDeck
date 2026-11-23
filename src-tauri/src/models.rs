@@ -84,6 +84,14 @@ pub struct UiSettings {
     pub auto_sync_before_save_preset: bool,
     #[serde(default)]
     pub variable_ignore_rules: Vec<String>,
+    #[serde(default)]
+    pub ignored_mod_dirs: Vec<String>,
+    #[serde(default = "default_mirror_direct")]
+    pub update_mirror_mode: String,
+    #[serde(default)]
+    pub update_custom_mirror: String,
+    #[serde(default)]
+    pub auto_check_updates: bool,
     #[serde(default = "default_delay")]
     pub post_reload_sync_delay: f64,
     #[serde(default = "default_recent_count")]
@@ -115,6 +123,10 @@ impl Default for UiSettings {
             auto_reload_roster_preset: true,
             auto_sync_before_save_preset: false,
             variable_ignore_rules: Vec::new(),
+            ignored_mod_dirs: Vec::new(),
+            update_mirror_mode: default_mirror_direct(),
+            update_custom_mirror: String::new(),
+            auto_check_updates: false,
             post_reload_sync_delay: default_delay(),
             recent_mod_count: default_recent_count(),
             close_behavior: default_quit(),
@@ -364,6 +376,9 @@ fn default_multi() -> String {
 }
 fn default_quit() -> String {
     "quit".to_string()
+}
+fn default_mirror_direct() -> String {
+    "direct".to_string()
 }
 fn default_active_game() -> String {
     "wuthering-waves".to_string()
@@ -805,6 +820,8 @@ pub struct SaveModPresetResult {
     pub possible_stale: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stale_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duplicate_preset_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1117,4 +1134,57 @@ pub struct ImportRosterResult {
     pub scheme_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scheme_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallModeInfo {
+    pub mode: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub install_dir: Option<String>,
+    pub exe_dir: String,
+    pub can_self_update: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCheckResult {
+    pub ok: bool,
+    pub current_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latest_version: Option<String>,
+    pub has_update: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub release_notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirrored_asset_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_size: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub published_at: Option<String>,
+    pub install_mode: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_used: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInstallResult {
+    pub ok: bool,
+    pub mode: String,
+    pub launched: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub downloaded_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }

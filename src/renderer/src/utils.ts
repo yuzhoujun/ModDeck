@@ -55,3 +55,8 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
 }
+
+export function isReservedDefaultPresetName(name: string): boolean {
+  const norm = name.trim().toLowerCase().replace(/\s+/g, '')
+  return norm === 'default' || norm === '默认' || norm === '默认(初始)' || norm === 'default(initial)'
+}

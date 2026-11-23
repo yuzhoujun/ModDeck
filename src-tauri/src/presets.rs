@@ -512,7 +512,10 @@ pub fn read_active_d3dx_user_variables(
                 }
             }
         } else if !clean_mod_lower.is_empty() && lower_full_key.contains("\\mods\\") {
-            result.insert(lower_full_key, val);
+            let mod_seg = format!("\\{clean_mod_lower}\\");
+            if lower_full_key.contains(&mod_seg) {
+                result.insert(lower_full_key, val);
+            }
         }
     }
     result
@@ -788,6 +791,30 @@ fn evaluate_preset_active(
     true
 }
 
+fn resolve_default_inis(active: &[String], disabled: &[String]) -> Vec<String> {
+    let chosen = if !active.is_empty() { active } else { disabled };
+    chosen.iter().map(|r| normalize_ini_rel_clean(r)).collect()
+}
+
+fn build_default_mod_preset(
+    clean_mod_name: &str,
+    character_folder: &str,
+    active_ini_files: Vec<String>,
+    default_vars: HashMap<String, String>,
+) -> ModVariantPreset {
+    ModVariantPreset {
+        id: "__default__".to_string(),
+        name: "默认".to_string(),
+        mod_name: clean_mod_name.to_string(),
+        character_folder: character_folder.to_string(),
+        active_ini_files,
+        variables: Some(default_vars),
+        is_active: None,
+        is_pending: None,
+        updated_at: 0,
+    }
+}
+
 pub fn get_mod_presets(
     base_dir: &Path,
     game_id: &str,
@@ -854,25 +881,11 @@ pub fn get_mod_presets(
         let mut default_inis = Vec::new();
         if let Some(mp) = mod_path.filter(|p| p.is_dir()) {
             let (active, disabled) = collect_mod_ini_files(mp, false);
-            let chosen = if !active.is_empty() { active } else { disabled };
-            default_inis = chosen
-                .iter()
-                .map(|r| normalize_ini_rel_clean(r))
-                .collect();
+            default_inis = resolve_default_inis(&active, &disabled);
         }
         list.insert(
             0,
-            ModVariantPreset {
-                id: "__default__".to_string(),
-                name: "默认".to_string(),
-                mod_name: clean_mod_name,
-                character_folder: character_folder.to_string(),
-                active_ini_files: default_inis,
-                variables: Some(default_vars),
-                is_active: None,
-                is_pending: None,
-                updated_at: 0,
-            },
+            build_default_mod_preset(&clean_mod_name, character_folder, default_inis, default_vars),
         );
         list_modified = true;
     }
@@ -898,6 +911,19 @@ pub fn get_mod_presets(
     list
 }
 
+pub fn is_reserved_default_preset_name(name: &str) -> bool {
+    let norm: String = name
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    matches!(
+        norm.as_str(),
+        "default" | "默认" | "默认(初始)" | "default(initial)"
+    )
+}
+
 pub fn save_mod_preset(
     base_dir: &Path,
     game_id: &str,
@@ -908,16 +934,37 @@ pub fn save_mod_preset(
     preset_name: &str,
     global_ignore_rules: &[String],
     pending: &mut PendingQueueState,
+    is_en: bool,
 ) -> SaveModPresetResult {
     let name = preset_name.trim();
     if name.is_empty() {
         return SaveModPresetResult {
             ok: false,
             reloaded: None,
-            error: Some("Preset name cannot be empty".to_string()),
+            error: Some(if is_en {
+                "Preset name cannot be empty".to_string()
+            } else {
+                "预设名称不能为空".to_string()
+            }),
             synced_f10: None,
             possible_stale: None,
             stale_reason: None,
+            duplicate_preset_id: None,
+        };
+    }
+    if is_reserved_default_preset_name(name) {
+        return SaveModPresetResult {
+            ok: false,
+            reloaded: None,
+            error: Some(if is_en {
+                "\"Default\" / \"默认\" is reserved for the factory default preset; please choose another name".to_string()
+            } else {
+                "「默认」/「Default」为系统保留的出厂默认预设名称，请更换其他名称".to_string()
+            }),
+            synced_f10: None,
+            possible_stale: None,
+            stale_reason: None,
+            duplicate_preset_id: None,
         };
     }
     if !mod_path.is_dir() {
@@ -928,6 +975,7 @@ pub fn save_mod_preset(
             synced_f10: None,
             possible_stale: None,
             stale_reason: None,
+            duplicate_preset_id: None,
         };
     }
 
@@ -936,7 +984,7 @@ pub fn save_mod_preset(
         .preset_queue
         .remove(&make_queue_key(game_id, character_folder, mod_folder));
 
-    let (active_inis, _) = collect_mod_ini_files(mod_path, false);
+    let (active_inis, disabled_inis) = collect_mod_ini_files(mod_path, false);
     let clean_active_inis: Vec<String> = active_inis
         .iter()
         .map(|r| normalize_ini_rel_clean(r))
@@ -952,9 +1000,9 @@ pub fn save_mod_preset(
     let active_vars = read_active_d3dx_user_variables(mods_path, &known_keys, mod_folder);
 
     let mut snapshot_vars = HashMap::new();
-    for (k, v) in default_vars {
-        if !is_ignored(&k) {
-            snapshot_vars.insert(k, v);
+    for (k, v) in &default_vars {
+        if !is_ignored(k) {
+            snapshot_vars.insert(k.clone(), v.clone());
         }
     }
     for (k, v) in active_vars {
@@ -965,6 +1013,14 @@ pub fn save_mod_preset(
 
     let file_path = mod_preset_file_path(base_dir, game_id, character_folder, mod_folder);
     let mut list: Vec<ModVariantPreset> = read_json_file(&file_path).unwrap_or_default();
+    // Ensure factory __default__ participates in duplicate checks even before get_mod_presets initializes the file.
+    if !list.iter().any(|p| p.id == "__default__") {
+        let default_inis = resolve_default_inis(&active_inis, &disabled_inis);
+        list.insert(
+            0,
+            build_default_mod_preset(&clean_mod_name, character_folder, default_inis, default_vars),
+        );
+    }
     let existing_idx = list.iter().position(|p| p.name.eq_ignore_ascii_case(name));
 
     if let Some(dup) = list.iter().enumerate().find_map(|(i, p)| {
@@ -977,16 +1033,34 @@ pub fn save_mod_preset(
             None
         }
     }) {
+        let display_dup_name =
+            if dup.id == "__default__" || is_reserved_default_preset_name(&dup.name) {
+                if is_en {
+                    "Default"
+                } else {
+                    "默认"
+                }
+            } else {
+                dup.name.as_str()
+            };
         return SaveModPresetResult {
             ok: false,
             reloaded: None,
-            error: Some(format!(
-                "Current appearance matches existing preset \"{}\" cleanly; no duplicate needed",
-                dup.name
-            )),
+            error: Some(if is_en {
+                format!(
+                    "Current appearance matches existing preset \"{}\" cleanly; no duplicate needed",
+                    display_dup_name
+                )
+            } else {
+                format!(
+                    "当前实机造型与已有预设「{}」完全一致，无需重复保存",
+                    display_dup_name
+                )
+            }),
             synced_f10: None,
             possible_stale: Some(true),
             stale_reason: Some("unsynced-game-running".to_string()),
+            duplicate_preset_id: Some(dup.id.clone()),
         };
     }
 
@@ -1018,6 +1092,7 @@ pub fn save_mod_preset(
             synced_f10: None,
             possible_stale: None,
             stale_reason: None,
+            duplicate_preset_id: None,
         };
     }
 
@@ -1028,6 +1103,7 @@ pub fn save_mod_preset(
         synced_f10: Some(false),
         possible_stale: None,
         stale_reason: None,
+        duplicate_preset_id: None,
     }
 }
 
@@ -1347,7 +1423,9 @@ pub fn import_mod_presets_from_file(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RosterPresetsStore {
+    #[serde(default = "default_roster_file_schema")]
     schema_version: u32,
+    #[serde(default)]
     presets: HashMap<String, Vec<RosterPreset>>,
 }
 
@@ -1360,12 +1438,152 @@ impl Default for RosterPresetsStore {
     }
 }
 
-fn load_roster_presets_store(base_dir: &Path) -> RosterPresetsStore {
-    read_json_file(&base_dir.join(ROSTER_PRESETS_FILE)).unwrap_or_default()
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GameRosterPresetsFile {
+    #[serde(default = "default_roster_file_schema")]
+    schema_version: u32,
+    #[serde(default)]
+    game_id: String,
+    #[serde(default)]
+    presets: Vec<RosterPreset>,
 }
 
-fn save_roster_presets_store(base_dir: &Path, store: &RosterPresetsStore) -> Result<(), String> {
-    write_json_atomic(&base_dir.join(ROSTER_PRESETS_FILE), store)
+fn default_roster_file_schema() -> u32 {
+    1
+}
+
+pub fn game_roster_presets_path(base_dir: &Path, game_id: &str) -> PathBuf {
+    let safe_game = sanitize_filename(game_id);
+    base_dir
+        .join("presets")
+        .join(if safe_game.is_empty() {
+            "default".to_string()
+        } else {
+            safe_game
+        })
+        .join(ROSTER_PRESETS_FILE)
+}
+
+pub fn parse_roster_presets_bytes(bytes: &[u8]) -> Option<Vec<RosterPreset>> {
+    if let Ok(wrapped) = serde_json::from_slice::<GameRosterPresetsFile>(bytes) {
+        return Some(wrapped.presets);
+    }
+    if let Ok(list) = serde_json::from_slice::<Vec<RosterPreset>>(bytes) {
+        return Some(list);
+    }
+    None
+}
+
+fn read_game_roster_file_raw(path: &Path) -> Vec<RosterPreset> {
+    let Ok(raw) = fs::read(path) else {
+        return Vec::new();
+    };
+    parse_roster_presets_bytes(&raw).unwrap_or_default()
+}
+
+pub fn save_game_roster_presets(
+    base_dir: &Path,
+    game_id: &str,
+    list: &[RosterPreset],
+) -> Result<(), String> {
+    let file_data = GameRosterPresetsFile {
+        schema_version: 1,
+        game_id: game_id.to_string(),
+        presets: list.to_vec(),
+    };
+    write_json_atomic(&game_roster_presets_path(base_dir, game_id), &file_data)
+}
+
+pub fn merge_roster_presets_into_game(
+    base_dir: &Path,
+    game_id: &str,
+    incoming: &[RosterPreset],
+) -> Result<usize, String> {
+    let _ = migrate_legacy_roster_presets_store(base_dir);
+    let mut existing = read_game_roster_file_raw(&game_roster_presets_path(base_dir, game_id));
+    let mut merged_count = 0usize;
+    for item in incoming {
+        let mut normalized = item.clone();
+        if normalized.game_id.trim().is_empty() {
+            normalized.game_id = game_id.to_string();
+        }
+        if !normalized.id.trim().is_empty() {
+            if let Some(pos) = existing.iter().position(|x| x.id == normalized.id) {
+                existing[pos] = normalized;
+            } else {
+                existing.push(normalized);
+            }
+        } else {
+            normalized.id = next_id("roster");
+            existing.push(normalized);
+        }
+        merged_count += 1;
+    }
+    save_game_roster_presets(base_dir, game_id, &existing)?;
+    Ok(merged_count)
+}
+
+/// Automatically splits legacy root `%APPDATA%\ModDeck\roster-presets.json` into
+/// per-game `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json` files on startup/access.
+pub fn migrate_legacy_roster_presets_store(base_dir: &Path) -> usize {
+    let legacy_path = base_dir.join(ROSTER_PRESETS_FILE);
+    if !legacy_path.is_file() {
+        return 0;
+    }
+    let Some(store) = read_json_file::<RosterPresetsStore>(&legacy_path) else {
+        return 0;
+    };
+
+    let mut migrated_items = 0usize;
+    let mut all_ok = true;
+    for (game_id, incoming_list) in store.presets {
+        if incoming_list.is_empty() {
+            continue;
+        }
+        let target_path = game_roster_presets_path(base_dir, &game_id);
+        let mut existing = read_game_roster_file_raw(&target_path);
+        for mut item in incoming_list {
+            if item.game_id.trim().is_empty() {
+                item.game_id = game_id.clone();
+            }
+            if item.id.trim().is_empty() {
+                item.id = next_id("roster");
+            }
+            if !existing.iter().any(|x| x.id == item.id) {
+                existing.push(item);
+                migrated_items += 1;
+            }
+        }
+        if save_game_roster_presets(base_dir, &game_id, &existing).is_err() {
+            all_ok = false;
+        }
+    }
+
+    if all_ok {
+        let _ = fs::remove_file(&legacy_path);
+    }
+    migrated_items
+}
+
+fn load_game_roster_presets(base_dir: &Path, game_id: &str) -> Vec<RosterPreset> {
+    let _ = migrate_legacy_roster_presets_store(base_dir);
+    read_game_roster_file_raw(&game_roster_presets_path(base_dir, game_id))
+}
+
+pub fn count_all_roster_presets(base_dir: &Path) -> usize {
+    let _ = migrate_legacy_roster_presets_store(base_dir);
+    let presets_dir = base_dir.join("presets");
+    let mut count = 0usize;
+    if let Ok(entries) = fs::read_dir(&presets_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path().join(ROSTER_PRESETS_FILE);
+            if path.is_file() {
+                count += read_game_roster_file_raw(&path).len();
+            }
+        }
+    }
+    count
 }
 
 fn get_assignment_mod_items(assignment: &CharacterModAssignment) -> Vec<ModAssignmentItem> {
@@ -1390,8 +1608,7 @@ fn get_assignment_mod_items(assignment: &CharacterModAssignment) -> Vec<ModAssig
 }
 
 pub fn get_roster_presets(base_dir: &Path, game_id: &str) -> Vec<RosterPreset> {
-    let store = load_roster_presets_store(base_dir);
-    store.presets.get(game_id).cloned().unwrap_or_default()
+    load_game_roster_presets(base_dir, game_id)
 }
 
 pub fn save_roster_preset(
@@ -1403,8 +1620,7 @@ pub fn save_roster_preset(
     if name.is_empty() {
         return ToggleResult::err("Scheme name cannot be empty");
     }
-    let mut store = load_roster_presets_store(base_dir);
-    let list = store.presets.entry(game_id.to_string()).or_default();
+    let mut list = load_game_roster_presets(base_dir, game_id);
     let existing_idx = list.iter().position(|p| p.name.eq_ignore_ascii_case(name));
     let new_preset = RosterPreset {
         id: existing_idx
@@ -1420,21 +1636,20 @@ pub fn save_roster_preset(
     } else {
         list.push(new_preset);
     }
-    match save_roster_presets_store(base_dir, &store) {
+    match save_game_roster_presets(base_dir, game_id, &list) {
         Ok(()) => ToggleResult::ok(),
         Err(err) => ToggleResult::err(err),
     }
 }
 
 pub fn delete_roster_preset(base_dir: &Path, game_id: &str, preset_id: &str) -> ToggleResult {
-    let mut store = load_roster_presets_store(base_dir);
-    let list = store.presets.entry(game_id.to_string()).or_default();
+    let mut list = load_game_roster_presets(base_dir, game_id);
     let prev_len = list.len();
     list.retain(|p| p.id != preset_id);
     if list.len() == prev_len {
         return ToggleResult::err("Scheme not found");
     }
-    match save_roster_presets_store(base_dir, &store) {
+    match save_game_roster_presets(base_dir, game_id, &list) {
         Ok(()) => ToggleResult::ok(),
         Err(err) => ToggleResult::err(err),
     }
@@ -1448,13 +1663,8 @@ pub fn apply_roster_preset(
     global_ignore_rules: &[String],
     pending: &mut PendingQueueState,
 ) -> ToggleResult {
-    let store = load_roster_presets_store(base_dir);
-    let Some(preset) = store
-        .presets
-        .get(game_id)
-        .and_then(|list| list.iter().find(|p| p.id == preset_id))
-        .cloned()
-    else {
+    let list = load_game_roster_presets(base_dir, game_id);
+    let Some(preset) = list.into_iter().find(|p| p.id == preset_id) else {
         return ToggleResult::err("Scheme not found");
     };
 
@@ -1534,11 +1744,10 @@ pub fn build_roster_preset_export_data(
     game_id: &str,
     preset_id: &str,
 ) -> Result<(RosterPresetExportFile, String), String> {
-    let store = load_roster_presets_store(base_dir);
-    let preset = store
-        .presets
-        .get(game_id)
-        .and_then(|list| list.iter().find(|p| p.id == preset_id))
+    let list = load_game_roster_presets(base_dir, game_id);
+    let preset = list
+        .iter()
+        .find(|p| p.id == preset_id)
         .ok_or_else(|| "Scheme not found".to_string())?;
 
     let mut assignments = HashMap::new();
@@ -1771,8 +1980,7 @@ pub fn confirm_import_roster_preset(
         .unwrap_or("Imported Scheme")
         .to_string();
 
-    let mut store = load_roster_presets_store(base_dir);
-    let list = store.presets.entry(game_id.to_string()).or_default();
+    let mut list = load_game_roster_presets(base_dir, game_id);
 
     let mut final_name = base_name.clone();
     let mut counter = 1usize;
@@ -1814,7 +2022,7 @@ pub fn confirm_import_roster_preset(
             let mut assigned_preset_id = it.preset_id.clone();
 
             if let (Some(p_name), Some(p_vars)) = (it.preset_name.as_deref(), it.preset_variables) {
-                if p_name != "默认" && !p_vars.is_empty() {
+                if !is_reserved_default_preset_name(p_name) && !p_vars.is_empty() {
                     let mod_file = mod_preset_file_path(base_dir, game_id, char_folder, &clean_mod);
                     let mut local_presets: Vec<ModVariantPreset> =
                         read_json_file(&mod_file).unwrap_or_default();
@@ -1868,7 +2076,7 @@ pub fn confirm_import_roster_preset(
         assignments: final_assignments,
     });
 
-    if let Err(err) = save_roster_presets_store(base_dir, &store) {
+    if let Err(err) = save_game_roster_presets(base_dir, game_id, &list) {
         return ImportRosterResult {
             ok: false,
             error: Some(err),
@@ -1924,6 +2132,23 @@ mod tests {
         assert_eq!(initial.len(), 1);
         assert_eq!(initial[0].id, "__default__");
 
+        // Reserved default preset names must be rejected in both EN/ZH forms
+        for reserved in ["Default", "default", "默认", "默认 (初始)", "默认(初始)"] {
+            let blocked = save_mod_preset(
+                &base_dir,
+                "wuthering-waves",
+                "Anke",
+                "SummerSkin",
+                &mod_dir,
+                &mods_dir,
+                reserved,
+                &[],
+                &mut pending,
+                true,
+            );
+            assert!(!blocked.ok, "Expected {reserved} to be rejected");
+        }
+
         let save_res = save_mod_preset(
             &base_dir,
             "wuthering-waves",
@@ -1934,6 +2159,7 @@ mod tests {
             "BlueVariant",
             &[],
             &mut pending,
+            true,
         );
         assert!(save_res.ok, "{:?}", save_res.error);
 
@@ -1970,7 +2196,26 @@ mod tests {
         let user_ini_after = fs::read_to_string(importer_dir.join("d3dx_user.ini")).unwrap();
         assert!(user_ini_after.contains("= 0"));
 
-        // Save, export, inspect, and re-import roster preset
+        // Attempting to save when in-game state matches __default__ reports localized "Default" in EN mode
+        let dup_en = save_mod_preset(
+            &base_dir,
+            "wuthering-waves",
+            "Anke",
+            "SummerSkin",
+            &mod_dir,
+            &mods_dir,
+            "DuplicateDefaultAttempt",
+            &[],
+            &mut pending,
+            true,
+        );
+        assert!(!dup_en.ok);
+        assert_eq!(dup_en.duplicate_preset_id.as_deref(), Some("__default__"));
+        let err_en = dup_en.error.unwrap();
+        assert!(err_en.contains("\"Default\""), "Unexpected EN duplicate msg: {err_en}");
+        assert!(!err_en.contains("默认"), "Unexpected Chinese text in EN msg: {err_en}");
+
+        // Save, export, inspect, and re-import roster preset into per-game presets/<gameId>/roster-presets.json
         let mut assignments = HashMap::new();
         assignments.insert(
             "Anke".to_string(),
@@ -1992,6 +2237,8 @@ mod tests {
             },
         );
         assert!(save_roster.ok);
+        assert!(game_roster_presets_path(&base_dir, "wuthering-waves").is_file());
+        assert!(!base_dir.join(ROSTER_PRESETS_FILE).exists());
         let roster_list = get_roster_presets(&base_dir, "wuthering-waves");
         assert_eq!(roster_list.len(), 1);
         let (exported, _) =
@@ -2003,6 +2250,152 @@ mod tests {
             inspect_roster_preset_file_content("wuthering-waves", &mods_dir, &scheme_path);
         assert!(inspected.ok);
         assert_eq!(inspected.matched_mods, 1);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn migrates_legacy_root_roster_presets_store_per_game_without_duplication() {
+        let root = std::env::temp_dir().join(format!("moddeck-migrate-roster-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let base_dir = root.join("app_data");
+        fs::create_dir_all(&base_dir).unwrap();
+
+        let legacy_json = serde_json::json!({
+            "schemaVersion": 1,
+            "presets": {
+                "endfield": [
+                    {
+                        "id": "roster_ef_1",
+                        "name": "TeamAlpha",
+                        "gameId": "endfield",
+                        "updatedAt": 1000,
+                        "assignments": {}
+                    }
+                ],
+                "wuthering-waves": [
+                    {
+                        "id": "roster_ww_1",
+                        "name": "TeamBeta",
+                        "gameId": "wuthering-waves",
+                        "updatedAt": 2000,
+                        "assignments": {}
+                    }
+                ]
+            }
+        });
+        fs::write(
+            base_dir.join(ROSTER_PRESETS_FILE),
+            serde_json::to_string_pretty(&legacy_json).unwrap(),
+        )
+        .unwrap();
+
+        let ef_list = get_roster_presets(&base_dir, "endfield");
+        assert_eq!(ef_list.len(), 1);
+        assert_eq!(ef_list[0].name, "TeamAlpha");
+        assert!(game_roster_presets_path(&base_dir, "endfield").is_file());
+        assert!(game_roster_presets_path(&base_dir, "wuthering-waves").is_file());
+        assert!(!base_dir.join(ROSTER_PRESETS_FILE).exists());
+        assert_eq!(count_all_roster_presets(&base_dir), 2);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn zero_var_mod_does_not_leak_other_mods_and_matches_default() {
+        let root = std::env::temp_dir().join(format!("moddeck-issue5-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let base_dir = root.join("app_data");
+        let importer_dir = root.join("EFMI");
+        let mods_dir = importer_dir.join("Mods");
+        let mod_dir = mods_dir.join("UI").join("ChangeScreens 1.8.3");
+        fs::create_dir_all(&base_dir).unwrap();
+        fs::create_dir_all(&mod_dir).unwrap();
+        fs::write(mod_dir.join("a.ini"), "[ShaderOverrideTest]\nhash = 1234\n").unwrap();
+        fs::write(mod_dir.join("b.ini"), "[TextureOverrideTest]\nhash = 5678\n").unwrap();
+        fs::write(
+            importer_dir.join("d3dx_user.ini"),
+            "$\\mods\\endfield\\chen\\skin\\mod.ini\\outfit = 2\r\n$\\mods\\other\\changescreens 1.8.3_extra\\mod.ini\\x = 1\r\n",
+        )
+        .unwrap();
+
+        let mut pending = PendingQueueState::default();
+
+        // Even before get_mod_presets initializes __default__, saving an unchanged state must block duplicate of __default__
+        let dup_before_open = save_mod_preset(
+            &base_dir,
+            "endfield",
+            "UI",
+            "ChangeScreens 1.8.3",
+            &mod_dir,
+            &mods_dir,
+            "f1",
+            &[],
+            &mut pending,
+            false,
+        );
+        assert!(!dup_before_open.ok);
+        assert_eq!(dup_before_open.duplicate_preset_id.as_deref(), Some("__default__"));
+
+        // After get_mod_presets, __default__ must still match and stay clean of unrelated d3dx_user entries
+        let list = get_mod_presets(
+            &base_dir,
+            "endfield",
+            "UI",
+            "ChangeScreens 1.8.3",
+            Some(&mod_dir),
+            Some(&mods_dir),
+            &[],
+            &pending,
+        );
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].id, "__default__");
+        assert!(list[0].variables.as_ref().map(|v| v.is_empty()).unwrap_or(false));
+
+        let dup_after_open = save_mod_preset(
+            &base_dir,
+            "endfield",
+            "UI",
+            "ChangeScreens 1.8.3",
+            &mod_dir,
+            &mods_dir,
+            "f1",
+            &[],
+            &mut pending,
+            true,
+        );
+        assert!(!dup_after_open.ok);
+        assert_eq!(dup_after_open.duplicate_preset_id.as_deref(), Some("__default__"));
+
+        // Switching an .ini file yields a genuinely distinct appearance and must save cleanly with empty variables
+        fs::rename(mod_dir.join("b.ini"), mod_dir.join("DISABLED_b.ini")).unwrap();
+        let saved = save_mod_preset(
+            &base_dir,
+            "endfield",
+            "UI",
+            "ChangeScreens 1.8.3",
+            &mod_dir,
+            &mods_dir,
+            "f1",
+            &[],
+            &mut pending,
+            false,
+        );
+        assert!(saved.ok, "Expected switched ini preset to save, got: {:?}", saved.error);
+
+        let updated = get_mod_presets(
+            &base_dir,
+            "endfield",
+            "UI",
+            "ChangeScreens 1.8.3",
+            Some(&mod_dir),
+            Some(&mods_dir),
+            &[],
+            &pending,
+        );
+        assert_eq!(updated.len(), 2);
+        let f1 = updated.iter().find(|p| p.name == "f1").unwrap();
+        assert!(f1.variables.as_ref().map(|v| v.is_empty()).unwrap_or(false));
 
         let _ = fs::remove_dir_all(&root);
     }

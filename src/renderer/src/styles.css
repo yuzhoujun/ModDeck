@@ -963,8 +963,17 @@ code {
 }
 
 .setting-row-card .setting-row-action {
-  width: 220px;
+  min-width: 190px;
+  max-width: 280px;
   flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.setting-row-card .setting-row-action .select {
+  width: 100%;
+  max-width: 100%;
 }
 
 .settings-card-head {
@@ -2293,6 +2302,45 @@ input[type='range'].setting-range::-webkit-slider-thumb:active {
 
 .env-game-head .chip {
   margin-left: auto;
+}
+
+.env-root-pill {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 3px 10px;
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-rule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: rgba(255, 255, 255, 0.02);
+  margin-top: 6px;
+}
+
+.env-rule-row.is-ok {
+  background: rgba(16, 185, 129, 0.09);
+  border-color: rgba(16, 185, 129, 0.28);
+  color: #a7f3d0;
+}
+
+.env-rule-row.is-warn {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fde68a;
 }
 
 .overlay-recent {

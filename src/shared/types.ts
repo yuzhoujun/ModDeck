@@ -48,6 +48,10 @@ export interface UiSettings {
   autoReloadRosterPreset: boolean
   autoSyncBeforeSavePreset?: boolean
   variableIgnoreRules?: string[]
+  ignoredModDirs?: string[]
+  updateMirrorMode?: 'direct' | 'ghfast' | 'ghproxy' | 'custom' | string
+  updateCustomMirror?: string
+  autoCheckUpdates?: boolean
   postReloadSyncDelay?: number
   recentModCount: number
   closeBehavior: 'quit' | 'minimize'
@@ -337,6 +341,40 @@ export interface SaveModPresetResult extends ToggleResult {
   syncedF10?: boolean
   possibleStale?: boolean
   staleReason?: 'unsynced-game-running' | 'pending-queue' | 'f10-timeout'
+  duplicatePresetId?: string
+}
+
+export interface InstallModeInfo {
+  mode: 'installer' | 'portable' | string
+  installDir?: string
+  exeDir: string
+  canSelfUpdate: boolean
+}
+
+export interface UpdateCheckResult {
+  ok: boolean
+  currentVersion: string
+  latestVersion?: string
+  hasUpdate: boolean
+  releaseUrl?: string
+  releaseNotes?: string
+  assetName?: string
+  assetUrl?: string
+  mirroredAssetUrl?: string
+  assetSize?: number
+  publishedAt?: string
+  installMode: 'installer' | 'portable' | string
+  sourceUsed?: string
+  error?: string
+}
+
+export interface UpdateInstallResult {
+  ok: boolean
+  mode: string
+  launched: boolean
+  message?: string
+  downloadedPath?: string
+  error?: string
 }
 
 export interface D3dxSyncStatus {

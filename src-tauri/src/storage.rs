@@ -795,7 +795,9 @@ pub fn export_config_bundle(
     let mut zip = ZipWriter::new(file);
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
 
-    for name in ["settings.json", METADATA_FILE, "roster-presets.json"] {
+    let _ = crate::presets::migrate_legacy_roster_presets_store(base_dir);
+
+    for name in ["settings.json", METADATA_FILE] {
         let src = base_dir.join(name);
         if src.is_file() {
             let data = fs::read(&src).map_err(|e| format!("Failed to read {name}: {e}"))?;
@@ -831,16 +833,7 @@ pub fn export_config_bundle(
     let meta = load_metadata(base_dir);
     let character_meta: usize = meta.games.values().map(|m| m.len()).sum();
 
-    let roster_presets = fs::read_to_string(base_dir.join("roster-presets.json"))
-        .ok()
-        .and_then(|s| serde_json::from_str::<Value>(&s).ok())
-        .and_then(|v| v.get("presets").and_then(|p| p.as_object()).cloned())
-        .map(|obj| {
-            obj.values()
-                .filter_map(|arr| arr.as_array().map(|a| a.len()))
-                .sum::<usize>()
-        })
-        .unwrap_or(0);
+    let roster_presets = crate::presets::count_all_roster_presets(base_dir);
 
     let manifest = ConfigBundleManifest {
         moddeck_file_type: "config-bundle".to_string(),
@@ -952,21 +945,6 @@ fn create_config_snapshot(base_dir: &Path) -> Result<PathBuf, String> {
         }
     }
     Ok(snapshot_dir)
-}
-
-fn write_json_atomic_value(target: &Path, val: &Value) -> Result<(), String> {
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {e}"))?;
-    }
-    let tmp = target.with_extension(format!("json.tmp-{}", std::process::id()));
-    let content =
-        serde_json::to_string_pretty(val).map_err(|e| format!("Serialize JSON failed: {e}"))?;
-    fs::write(&tmp, content).map_err(|e| format!("Write temp failed: {e}"))?;
-    if target.exists() {
-        let _ = fs::remove_file(target);
-    }
-    fs::rename(&tmp, target).map_err(|e| format!("Rename failed: {e}"))?;
-    Ok(())
 }
 
 fn is_category_cover_filename(name: &str) -> bool {
@@ -1175,43 +1153,19 @@ pub fn import_config_bundle(
     if let Some((_, bytes)) = entries.iter().find(|(n, _)| n == "roster-presets.json") {
         if let Ok(incoming_roster) = serde_json::from_slice::<Value>(bytes) {
             if let Some(inc_presets) = incoming_roster.get("presets").and_then(|v| v.as_object()) {
-                let target_path = base_dir.join("roster-presets.json");
-                let mut current_val = fs::read_to_string(&target_path)
-                    .ok()
-                    .and_then(|s| serde_json::from_str::<Value>(&s).ok())
-                    .unwrap_or_else(|| serde_json::json!({ "schemaVersion": 1, "presets": {} }));
-                let presets_obj = current_val
-                    .as_object_mut()
-                    .and_then(|o| o.entry("presets").or_insert_with(|| serde_json::json!({})).as_object_mut());
-                if let Some(merged_presets) = presets_obj {
-                    for (g_id, inc_arr_val) in inc_presets {
-                        let Some(inc_arr) = inc_arr_val.as_array() else {
-                            continue;
-                        };
-                        let mut existing_items = merged_presets
-                            .get(g_id)
-                            .and_then(|v| v.as_array())
-                            .cloned()
-                            .unwrap_or_default();
-                        for item in inc_arr {
-                            let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                            if !id.is_empty() {
-                                if let Some(pos) = existing_items
-                                    .iter()
-                                    .position(|x| x.get("id").and_then(|v| v.as_str()) == Some(id))
-                                {
-                                    existing_items[pos] = item.clone();
-                                } else {
-                                    existing_items.push(item.clone());
-                                }
-                            } else {
-                                existing_items.push(item.clone());
-                            }
-                            roster_presets_restored += 1;
-                        }
-                        merged_presets.insert(g_id.clone(), Value::Array(existing_items));
+                for (g_id, inc_arr_val) in inc_presets {
+                    if !is_safe_segment(g_id) {
+                        continue;
                     }
-                    let _ = write_json_atomic_value(&target_path, &current_val);
+                    if let Ok(items) = serde_json::from_value::<Vec<crate::models::RosterPreset>>(
+                        inc_arr_val.clone(),
+                    ) {
+                        if let Ok(merged_n) =
+                            crate::presets::merge_roster_presets_into_game(base_dir, g_id, &items)
+                        {
+                            roster_presets_restored += merged_n;
+                        }
+                    }
                 }
             }
         }
@@ -1279,6 +1233,20 @@ pub fn import_config_bundle(
         }
 
         if !matches!(prefix, "covers" | "presets" | "languages") {
+            continue;
+        }
+        if prefix == "presets"
+            && parts.len() == 3
+            && parts[2].eq_ignore_ascii_case("roster-presets.json")
+            && is_safe_segment(parts[1])
+        {
+            if let Some(items) = crate::presets::parse_roster_presets_bytes(data) {
+                if let Ok(merged_n) =
+                    crate::presets::merge_roster_presets_into_game(base_dir, parts[1], &items)
+                {
+                    roster_presets_restored += merged_n;
+                }
+            }
             continue;
         }
         let allowed_root = base_dir.join(prefix);
@@ -1371,8 +1339,17 @@ mod tests {
         assert!(char_dir.join("TestSkin").join("mod.ini").is_file());
 
         let bundle_path = root.join("export.moddeck-bundle");
-        let manifest = export_config_bundle(&base_dir, "3.0.0-alpha.3", &bundle_path, &settings).unwrap();
+        crate::presets::save_roster_preset(
+            &base_dir,
+            "endfield",
+            &crate::models::SaveRosterPresetInput {
+                name: "BundleScheme".to_string(),
+                assignments: HashMap::new(),
+            },
+        );
+        let manifest = export_config_bundle(&base_dir, "3.1.0-alpha.1", &bundle_path, &settings).unwrap();
         assert_eq!(manifest.moddeck_file_type, "config-bundle");
+        assert_eq!(manifest.stats.roster_presets, 1);
         let inspected = inspect_config_bundle(&bundle_path);
         assert!(inspected.ok);
 
@@ -1385,6 +1362,34 @@ mod tests {
             },
         );
         assert!(imp_res.ok, "{:?}", imp_res.error);
+        assert_eq!(imp_res.restored.unwrap().roster_presets, 1);
+
+        // Legacy v2/v3.0 config bundle with root roster-presets.json must merge into per-game path
+        let legacy_bundle = root.join("legacy-v30.moddeck-bundle");
+        {
+            let file = fs::File::create(&legacy_bundle).unwrap();
+            let mut zip = ZipWriter::new(file);
+            let opt = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+            zip.start_file("manifest.json", opt).unwrap();
+            zip.write_all(
+                br#"{"moddeckFileType":"config-bundle","version":1,"appVersion":"3.0.1","exportedAt":1,"stats":{"customGames":0,"characterMeta":0,"coverFiles":0,"modPresetFiles":0,"rosterPresets":1,"languageFiles":0}}"#,
+            ).unwrap();
+            zip.start_file("roster-presets.json", opt).unwrap();
+            zip.write_all(
+                br#"{"schemaVersion":1,"presets":{"endfield":[{"id":"legacy_1","name":"LegacyScheme","gameId":"endfield","updatedAt":1,"assignments":{}}]}}"#,
+            ).unwrap();
+            zip.finish().unwrap();
+        }
+        let (leg_res, _, _) = import_config_bundle(
+            &base_dir,
+            &legacy_bundle,
+            &settings,
+            &ImportConfigBundleOptions {
+                preserve_existing_paths: true,
+            },
+        );
+        assert!(leg_res.ok, "{:?}", leg_res.error);
+        assert_eq!(crate::presets::get_roster_presets(&base_dir, "endfield").len(), 2);
 
         let old_backup = base_dir
             .join("backups")

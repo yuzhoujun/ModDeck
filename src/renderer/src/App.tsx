@@ -11,7 +11,8 @@ import type {
   ModInfo,
   SettingsPatch,
   StorageOverview,
-  UiSettings
+  UiSettings,
+  UpdateCheckResult
 } from '../../shared/types'
 import { CreateCharacterModal } from './components/CreateCharacterModal'
 import { AddCustomGameModal } from './components/AddCustomGameModal'
@@ -61,6 +62,8 @@ export default function App() {
   const [envWarning, setEnvWarning] = useState<EnvironmentCheck | null>(null)
   const [legacyStorage, setLegacyStorage] = useState<StorageOverview | null>(null)
   const [cleaningLegacy, setCleaningLegacy] = useState(false)
+  const [availableUpdate, setAvailableUpdate] = useState<UpdateCheckResult | null>(null)
+  const [lastUpdateCheck, setLastUpdateCheck] = useState<UpdateCheckResult | null>(null)
   const [parsedImport, setParsedImport] = useState<{
     result: ImportParseResult
     targetCharacter?: string
@@ -237,6 +240,24 @@ export default function App() {
       cancelled = true
     }
   }, [booting])
+
+  useEffect(() => {
+    if (booting || !boot?.settings.ui.autoCheckUpdates) return
+    let cancelled = false
+    window.moddeck
+      .checkAppUpdate(boot.settings.ui.updateMirrorMode, boot.settings.ui.updateCustomMirror)
+      .then((res) => {
+        if (cancelled) return
+        setLastUpdateCheck(res)
+        if (res.ok && res.hasUpdate) {
+          setAvailableUpdate(res)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [booting, boot?.settings.ui.autoCheckUpdates])
 
   async function cleanLegacyFromBanner() {
     setCleaningLegacy(true)
@@ -1046,6 +1067,37 @@ export default function App() {
             </div>
           </div>
         ) : null}
+        {availableUpdate && availableUpdate.hasUpdate && availableUpdate.latestVersion ? (
+          <div className="env-banner">
+            <div className="env-banner-main">
+              <Icon name="download" size={18} />
+              <div>
+                <strong>
+                  {t('settings.about.updateBannerTitle', { version: availableUpdate.latestVersion })}
+                </strong>
+                <span>{t('settings.about.updateBannerDesc')}</span>
+              </div>
+            </div>
+            <div className="env-banner-actions">
+              <button
+                className="btn primary small-btn"
+                onClick={() => {
+                  setSettingsTab('about')
+                  setView('settings')
+                }}
+              >
+                {t('settings.about.openAboutUpdate')}
+              </button>
+              <button
+                className="icon-btn"
+                onClick={() => setAvailableUpdate(null)}
+                title={t('common.closeThisTime')}
+              >
+                <Icon name="close" size={15} />
+              </button>
+            </div>
+          </div>
+        ) : null}
         {legacyStorage && legacyStorage.legacyElectronFiles > 0 ? (
           <div className="env-banner">
             <div className="env-banner-main">
@@ -1093,6 +1145,7 @@ export default function App() {
             games={boot.games}
             settings={boot.settings}
             initialTab={settingsTab}
+            initialUpdateCheck={lastUpdateCheck}
             onSave={saveSettings}
             onNotify={notify}
             onLegacyCleaned={() => setLegacyStorage(null)}

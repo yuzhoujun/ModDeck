@@ -4,6 +4,21 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 结构与标准 [SemVer 2.0.0](https://semver.org/lang/zh-CN/) 语义化版本规范。
 
+## [Unreleased]
+
+### 新增（Added）
+
+- **全角色方案分游戏拆分存储与无感自动迁移**：启动或访问预设方案时，自动将根目录遗留的 `%APPDATA%\ModDeck\roster-presets.json` 无感拆分迁移至各游戏独立文件 `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json` 并按条目 ID 合并去重；完全兼容导入旧版 `.moddeck-bundle` 配置迁移包。
+- **`d3dx.ini` 规则直连开关与环境检查重排版（「设置 -> 环境」）**：新增 `[Include]` `exclude_recursive = DISABLED*` 与 `[Rendering]` `cache_shaders = 1 / 0` 一键切换按钮，采用绿/黄底纹规则行直观区分状态，并在卡片右上角展示完整根目录；将 `EFMI-MCP`、`_*`、`.*` 及自定义「**ModDeck 库扫描与冲突审计忽略目录**」拆分为独立卡片，明确区分 ModDeck 自身过滤与 XXMI 加载器规则。
+- **在线版本检测、国内镜像加速与一键升级（「设置 -> 关于」）**：遵循默认严格离线原则（默认关闭后台检查，仅在手动点击或用户主动勾选开启后请求 GitHub Releases / jsDelivr 兜底）；支持官方直连、`ghfast.top`、`gh-proxy.org` 与自定义镜像前缀，自动识别安装版（NSIS `/P` 原地覆盖）或便携版（ZIP 自动替换重启）完成一键升级。
+
+### 修复（Fixed）
+
+- **修复 NSIS 安装版「打开语言包目录」指向空数据目录（`#4`）**：在 `tauri.conf.json` `bundle.resources` 中将 `languages/*.json` 一并打包至安装包程序同级目录，与便携版目录结构保持一致，同时保留 `%APPDATA%\ModDeck\languages\` 更高优先级的用户自定义覆盖机制。
+- **修复零持久化变量 Mod 串读其他 Mod 变量导致默认预设无重复保护（`#5`）**：修复 `read_active_d3dx_user_variables` 在 Mod 无 `persist` 变量声明时未校验路径归属当前 Mod 文件夹，误把 `d3dx_user.ini` 内其他 Mod 变量写入新预设从而绕过与 `__default__` 重复校验的问题。
+- **修复英文界面保存预设提示硬编码中文 `"默认"` 并禁止占用保留名**：当实机状态与出厂默认预设一致时，前端结合 `duplicatePresetId` 与当前语言精确本地化提示为 `"Default"` / `"默认"`；前后端同步禁止新建或保存以 `Default`、`默认`、`默认 (初始)` 等保留名称命名的自定义预设。
+- 统一 `ini_analysis` 全局冲突审计与 `library` 扫描忽略逻辑，避免 `_ModDeck_Preset_Bridge` 等下划线内部桥接目录及外部沙盒目录产生误报。
+
 ## [3.0.1] - 2026-11-19
 
 ### 新增（Added）

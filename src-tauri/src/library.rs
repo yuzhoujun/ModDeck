@@ -114,8 +114,27 @@ fn is_legacy_container(name: &str) -> bool {
     matches!(name.to_ascii_lowercase().as_str(), "character" | "characters")
 }
 
+const DEFAULT_IGNORED_SANDBOX_DIRS: &[&str] = &["efmi-mcp"];
+
+pub fn is_ignored_sandbox_dir(name: &str, extra_ignores: &[String]) -> bool {
+    let trimmed = name.trim();
+    if trimmed.is_empty() || trimmed.starts_with('.') || trimmed.starts_with('_') {
+        return true;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if DEFAULT_IGNORED_SANDBOX_DIRS
+        .iter()
+        .any(|builtin| *builtin == lower)
+    {
+        return true;
+    }
+    extra_ignores
+        .iter()
+        .any(|custom| custom.trim().eq_ignore_ascii_case(trimmed))
+}
+
 fn ignored_character_name(name: &str) -> bool {
-    name.starts_with('.') || name.starts_with('_')
+    is_ignored_sandbox_dir(name, &[])
 }
 
 fn ignored_mod_name(name: &str) -> bool {
@@ -418,7 +437,9 @@ pub fn build_snapshot(
                 Some(n) => n.to_string(),
                 None => continue,
             };
-            if is_legacy_container(&folder) || ignored_character_name(&folder) {
+            if is_legacy_container(&folder)
+                || is_ignored_sandbox_dir(&folder, &settings.ui.ignored_mod_dirs)
+            {
                 continue;
             }
 
@@ -1683,6 +1704,36 @@ mod stage1_tests {
         assert_eq!(details.hotkeys[6].section, "KeyMouse");
         assert_eq!(details.hotkeys[6].key, "VK_LBUTTON");
         assert_eq!(details.hotkeys[6].hint_kind.as_deref(), Some("mouse"));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn snapshot_excludes_efmi_mcp_and_custom_ignored_dirs() {
+        let root = std::env::temp_dir().join(format!("moddeck-ignore-dirs-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let base_dir = root.join("data");
+        let mods_path = root.join("Mods");
+        fs::create_dir_all(mods_path.join("EFMI-MCP").join("Dummy")).unwrap();
+        fs::create_dir_all(mods_path.join("_ModDeck_Preset_Bridge")).unwrap();
+        fs::create_dir_all(mods_path.join("CustomTempTool")).unwrap();
+        fs::create_dir_all(mods_path.join("Perlica").join("SkinA")).unwrap();
+
+        let mut settings = crate::settings::default_settings();
+        settings.games.insert(
+            "endfield".to_string(),
+            GameSettings {
+                mods_path: mods_path.to_string_lossy().to_string(),
+                ..Default::default()
+            },
+        );
+        settings.ui.ignored_mod_dirs = vec!["customtemptool".to_string()];
+        let game = crate::games::get_game(&settings, "endfield").unwrap();
+        let metadata = MetadataStore::default();
+        let snap = build_snapshot(&base_dir, &game, &settings.games["endfield"], &metadata, &settings);
+
+        let folders: Vec<&str> = snap.characters.iter().map(|c| c.folder.as_str()).collect();
+        assert_eq!(folders, vec!["Perlica"]);
 
         let _ = fs::remove_dir_all(&root);
     }

@@ -4,7 +4,7 @@ import { D3dxSyncBanner } from './components/D3dxSyncBanner'
 import { Icon } from './components/Icon'
 import { Modal } from './components/Modal'
 import { ScrollTitle } from './components/ScrollTitle'
-import { errorMessage } from './utils'
+import { errorMessage, isReservedDefaultPresetName } from './utils'
 import { useI18n } from './i18n'
 
 export function OverlayDetailApp() {
@@ -180,6 +180,10 @@ export function OverlayDetailApp() {
     if (!gameId || !characterFolder || !modFolder || savingPreset) return
     const name = newPresetName.trim()
     if (!name) return
+    if (isReservedDefaultPresetName(name)) {
+      setError(t('preset.reservedDefaultNameErr'))
+      return
+    }
     try {
       setSavingPreset(true)
       const res = await window.moddeck.saveModPreset(
@@ -199,7 +203,11 @@ export function OverlayDetailApp() {
         setShowSaveBox(false)
         void fetchPresets()
       } else {
-        setError(res.error || t('overlay.savePresetFailed'))
+        const msg =
+          res.duplicatePresetId === '__default__'
+            ? t('preset.duplicateDefaultErr')
+            : res.error || t('overlay.savePresetFailed')
+        setError(msg)
       }
       void fetchSyncStatus()
     } catch (err) {

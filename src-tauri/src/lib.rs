@@ -11,6 +11,7 @@ mod presets;
 mod roster;
 mod settings;
 mod storage;
+mod updater;
 
 use games::{get_all_games, get_game, is_builtin_game, sanitize_custom_game};
 use library::{
@@ -29,11 +30,12 @@ use models::{
     D3dxSyncStatus, EnvironmentCheck, ExportPresetResult, GameConflictAuditReport, GameSettings,
     GameSnapshot, HotkeyResult, ImportCommitRequest, ImportConfigBundleOptions,
     ImportConfigBundleResult, ImportParseRequest, ImportParseResult, ImportPresetsResult,
-    ImportRequest, ImportResult, ImportRosterResult, LegacyCleanupResult, MetadataStore, ModDetails, ModInfo,
-    ModStaticAnalysis, ModVariantPreset, OnlyConfiguredResult, PruneBackupsResult, RosterPreset,
-    RosterSchemeImportInspection, RosterSyncResult, RosterSyncStatus, SaveModPresetOptions,
-    SaveModPresetResult, SaveRosterPresetInput, Settings, SimpleResult, StateChangedEvent,
-    StorageOverview, ToggleResult, ToggleVisibilityResult,
+    ImportRequest, ImportResult, ImportRosterResult, InstallModeInfo, LegacyCleanupResult,
+    MetadataStore, ModDetails, ModInfo, ModStaticAnalysis, ModVariantPreset, OnlyConfiguredResult,
+    PruneBackupsResult, RosterPreset, RosterSchemeImportInspection, RosterSyncResult,
+    RosterSyncStatus, SaveModPresetOptions, SaveModPresetResult, SaveRosterPresetInput, Settings,
+    SimpleResult, StateChangedEvent, StorageOverview, ToggleResult, ToggleVisibilityResult,
+    UpdateCheckResult, UpdateInstallResult,
 };
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::Deserialize;
@@ -1909,6 +1911,145 @@ fn clear_shader_cache(state: State<'_, AppState>, game_id: String) -> ClearShade
 }
 
 #[tauri::command]
+fn set_cache_shaders(
+    state: State<'_, AppState>,
+    game_id: String,
+    enabled: bool,
+) -> ToggleResult {
+    let settings = {
+        let guard = state.0.lock().expect("state lock");
+        guard.settings.clone()
+    };
+    let is_en = is_non_zh_effective_locale(&settings.ui.language);
+    detect::set_cache_shaders_for_game(&settings, &game_id, enabled, is_en)
+}
+
+#[tauri::command]
+fn set_exclude_disabled_rule(
+    state: State<'_, AppState>,
+    game_id: String,
+    enabled: bool,
+) -> ToggleResult {
+    let settings = {
+        let guard = state.0.lock().expect("state lock");
+        guard.settings.clone()
+    };
+    let is_en = is_non_zh_effective_locale(&settings.ui.language);
+    detect::set_exclude_disabled_rule_for_game(&settings, &game_id, enabled, is_en)
+}
+
+#[tauri::command]
+fn get_install_mode() -> InstallModeInfo {
+    updater::detect_install_mode()
+}
+
+#[tauri::command]
+async fn check_app_update(
+    state: State<'_, AppState>,
+    mirror_mode: Option<String>,
+    custom_mirror: Option<String>,
+) -> Result<UpdateCheckResult, String> {
+    let (cfg_mode, cfg_custom, is_en) = {
+        let guard = state.0.lock().expect("state lock");
+        (
+            guard.settings.ui.update_mirror_mode.clone(),
+            guard.settings.ui.update_custom_mirror.clone(),
+            is_non_zh_effective_locale(&guard.settings.ui.language),
+        )
+    };
+    let mode = mirror_mode
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(cfg_mode);
+    let custom = custom_mirror.unwrap_or(cfg_custom);
+
+    tauri::async_runtime::spawn_blocking(move || {
+        updater::check_for_updates(&mode, &custom, is_en)
+    })
+    .await
+    .map_err(|e| format!("Update check task failed: {e}"))
+}
+
+#[tauri::command]
+async fn install_app_update(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    asset_url: String,
+    asset_name: String,
+    expected_size: Option<u64>,
+) -> Result<UpdateInstallResult, String> {
+    let is_en = {
+        let guard = state.0.lock().expect("state lock");
+        is_non_zh_effective_locale(&guard.settings.ui.language)
+    };
+    let res = tauri::async_runtime::spawn_blocking(move || {
+        updater::download_and_launch_update(&asset_url, &asset_name, expected_size, is_en)
+    })
+    .await
+    .map_err(|e| format!("Update install task failed: {e}"))?;
+
+    if res.ok && res.launched {
+        let app_handle = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(450));
+            IS_QUITTING.store(true, Ordering::Relaxed);
+            app_handle.exit(0);
+        });
+    }
+    Ok(res)
+}
+
+#[tauri::command]
+fn open_external_url(url: String) -> SimpleResult {
+    let trimmed = url.trim();
+    if !trimmed.starts_with("https://github.com/yuzhoujun/ModDeck") {
+        return SimpleResult {
+            ok: false,
+            error: Some("Unsupported external URL".to_string()),
+        };
+    }
+    #[cfg(windows)]
+    {
+        use std::ffi::OsStr;
+        use std::os::windows::ffi::OsStrExt;
+        use windows::core::PCWSTR;
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+        let op: Vec<u16> = OsStr::new("open\0").encode_wide().collect();
+        let wide_url: Vec<u16> = OsStr::new(trimmed)
+            .encode_wide()
+            .chain(Some(0))
+            .collect();
+        let hinst = unsafe {
+            ShellExecuteW(
+                HWND::default(),
+                PCWSTR(op.as_ptr()),
+                PCWSTR(wide_url.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        if (hinst.0 as isize) <= 32 {
+            return SimpleResult {
+                ok: false,
+                error: Some("Failed to open browser".to_string()),
+            };
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = trimmed;
+    }
+    SimpleResult {
+        ok: true,
+        error: None,
+    }
+}
+
+#[tauri::command]
 async fn delete_mods(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -2458,7 +2599,13 @@ fn audit_game_conflicts(state: State<'_, AppState>, game_id: String) -> GameConf
     let env = detect::check_environment_for_settings(&settings, Some(&game_id), is_en)
         .into_iter()
         .next();
-    ini_analysis::audit_game_mods_conflicts(&game_id, &mods_path, env, is_en)
+    ini_analysis::audit_game_mods_conflicts(
+        &game_id,
+        &mods_path,
+        env,
+        &settings.ui.ignored_mod_dirs,
+        is_en,
+    )
 }
 
 #[tauri::command]
@@ -2674,6 +2821,7 @@ async fn save_mod_preset(
                 synced_f10: Some(false),
                 possible_stale: None,
                 stale_reason: None,
+                duplicate_preset_id: None,
             });
         }
         let Ok(mod_dir) =
@@ -2686,6 +2834,7 @@ async fn save_mod_preset(
                 synced_f10: Some(false),
                 possible_stale: None,
                 stale_reason: None,
+                duplicate_preset_id: None,
             });
         };
         let rules = guard.settings.ui.variable_ignore_rules.clone();
@@ -2728,6 +2877,7 @@ async fn save_mod_preset(
                 synced_f10: Some(false),
                 possible_stale: None,
                 stale_reason: Some("pending-queue".to_string()),
+                duplicate_preset_id: None,
             });
         }
         if launcher::is_game_process_running(&settings_snap, Some(&game_id)) {
@@ -2758,6 +2908,7 @@ async fn save_mod_preset(
         }
     }
 
+    let is_en = is_non_zh_effective_locale(&settings_snap.ui.language);
     let mut res = {
         let mut guard = state.0.lock().expect("state lock");
         presets::save_mod_preset(
@@ -2770,6 +2921,7 @@ async fn save_mod_preset(
             &preset_name,
             &rules,
             &mut guard.pending_queue,
+            is_en,
         )
     };
     res.synced_f10 = Some(synced_f10);
@@ -3904,6 +4056,7 @@ pub fn run() {
         prompt_missing_webview2(&base_dir, prefer_en);
         return;
     }
+    let _ = presets::migrate_legacy_roster_presets_store(&base_dir);
     let metadata = load_metadata(&base_dir);
     let initial_hotkey = if settings.ui.overlay_hotkey.trim().is_empty() {
         String::new()
@@ -4089,6 +4242,7 @@ pub fn run() {
             open_character_folder,
             open_mod_folder,
             open_path,
+            open_external_url,
             reload_f10,
             set_reload_hotkey,
             send_mod_hotkey,
@@ -4113,6 +4267,11 @@ pub fn run() {
             check_environment,
             open_environment_folder,
             clear_shader_cache,
+            set_cache_shaders,
+            set_exclude_disabled_rule,
+            get_install_mode,
+            check_app_update,
+            install_app_update,
             pick_game_exe,
             pick_loader,
             pick_cover,

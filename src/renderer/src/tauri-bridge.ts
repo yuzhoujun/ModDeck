@@ -17,6 +17,7 @@ import type {
   ImportPresetsResult,
   ImportResult,
   ImportRosterResult,
+  InstallModeInfo,
   LegacyCleanupResult,
   ModDetails,
   ModInfo,
@@ -30,7 +31,9 @@ import type {
   Settings,
   SimpleResult,
   StorageOverview,
-  ToggleResult
+  ToggleResult,
+  UpdateCheckResult,
+  UpdateInstallResult
 } from '../../shared/types'
 
 /**
@@ -95,6 +98,7 @@ export function ensureTauriBridge(): void {
     openCharacterFolder: (gameId, characterFolder) =>
       invoke('open_character_folder', { gameId, characterFolder }),
     openPath: (kind, gameId) => invoke('open_path', { kind, gameId }),
+    openExternalUrl: (url) => invoke<SimpleResult>('open_external_url', { url }),
     pickModsFolder: () => invoke<string | null>('pick_mods_folder'),
     pickXxmiRoot: () => invoke<AutoDetectPathsResult>('pick_xxmi_root'),
     autoDetectPaths: () => invoke<AutoDetectPathsResult>('auto_detect_paths'),
@@ -246,6 +250,21 @@ export function ensureTauriBridge(): void {
     checkEnvironment: (gameId) => invoke<EnvironmentCheck[]>('check_environment', { gameId: gameId ?? null }),
     openEnvironmentFolder: (gameId) => invoke<ToggleResult>('open_environment_folder', { gameId }),
     clearShaderCache: (gameId) => invoke<ClearShaderCacheResult>('clear_shader_cache', { gameId }),
+    setCacheShaders: (gameId, enabled) => invoke<ToggleResult>('set_cache_shaders', { gameId, enabled }),
+    setExcludeDisabledRule: (gameId, enabled) =>
+      invoke<ToggleResult>('set_exclude_disabled_rule', { gameId, enabled }),
+    getInstallMode: () => invoke<InstallModeInfo>('get_install_mode'),
+    checkAppUpdate: (mirrorMode, customMirror) =>
+      invoke<UpdateCheckResult>('check_app_update', {
+        mirrorMode: mirrorMode ?? null,
+        customMirror: customMirror ?? null
+      }),
+    installAppUpdate: (assetUrl, assetName, expectedSize) =>
+      invoke<UpdateInstallResult>('install_app_update', {
+        assetUrl,
+        assetName,
+        expectedSize: expectedSize ?? null
+      }),
     auditGameConflicts: (gameId) => invoke<GameConflictAuditReport>('audit_game_conflicts', { gameId }),
     exportConflictAuditReport: (gameId, report) =>
       invoke<ExportPresetResult>('export_conflict_audit_report', { gameId, report }),

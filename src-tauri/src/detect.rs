@@ -1043,6 +1043,257 @@ pub fn clear_shader_cache_for_game(
     }
 }
 
+pub fn set_cache_shaders_for_game(
+    settings: &Settings,
+    game_id: &str,
+    enabled: bool,
+    is_en: bool,
+) -> crate::models::ToggleResult {
+    let mods_path = settings
+        .games
+        .get(game_id)
+        .map(|g| g.mods_path.trim())
+        .unwrap_or("");
+    if mods_path.is_empty() {
+        return crate::models::ToggleResult::err(if is_en {
+            "Mods directory is not configured"
+        } else {
+            "尚未配置 Mods 目录"
+        });
+    }
+    let Some(root) = resolve_env_root(mods_path) else {
+        return crate::models::ToggleResult::err("Invalid mods path");
+    };
+    let d3dx_path = root.join("d3dx.ini");
+    if !d3dx_path.is_file() {
+        return crate::models::ToggleResult::err(if is_en {
+            "Cannot find d3dx.ini in importer root"
+        } else {
+            "找不到根目录下的 d3dx.ini"
+        });
+    }
+    let Ok(content) = fs::read_to_string(&d3dx_path) else {
+        return crate::models::ToggleResult::err("Failed to read d3dx.ini");
+    };
+
+    let target_val = if enabled { "1" } else { "0" };
+    let eol = if content.contains("\r\n") { "\r\n" } else { "\n" };
+    let has_trailing_nl = content.ends_with('\n');
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+
+    let mut in_rendering = false;
+    let mut rendering_header_idx: Option<usize> = None;
+    let mut rendering_end_idx: Option<usize> = None;
+    let mut replaced_existing = false;
+
+    for (idx, line) in lines.iter_mut().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            let section_name = trimmed[1..trimmed.len() - 1].trim();
+            if in_rendering && rendering_end_idx.is_none() {
+                rendering_end_idx = Some(idx);
+            }
+            in_rendering = section_name.eq_ignore_ascii_case("Rendering");
+            if in_rendering && rendering_header_idx.is_none() {
+                rendering_header_idx = Some(idx);
+            }
+            continue;
+        }
+        if !in_rendering || trimmed.starts_with(';') || trimmed.starts_with('#') {
+            continue;
+        }
+        if let Some((lhs, rhs)) = line.split_once('=') {
+            if lhs.trim().eq_ignore_ascii_case("cache_shaders") {
+                let inline_comment = rhs
+                    .find(';')
+                    .map(|pos| format!(" {}", rhs[pos..].trim_start()))
+                    .unwrap_or_default();
+                *line = format!("cache_shaders = {target_val}{inline_comment}");
+                replaced_existing = true;
+                break;
+            }
+        }
+    }
+
+    if !replaced_existing {
+        if let Some(hdr_idx) = rendering_header_idx {
+            let insert_at = rendering_end_idx.unwrap_or(lines.len());
+            let mut pos = insert_at;
+            while pos > hdr_idx + 1 && lines[pos - 1].trim().is_empty() {
+                pos -= 1;
+            }
+            lines.insert(pos, format!("cache_shaders = {target_val}"));
+        } else {
+            if !lines.is_empty() && !lines.last().map(|s| s.trim().is_empty()).unwrap_or(true) {
+                lines.push(String::new());
+            }
+            lines.push("[Rendering]".to_string());
+            lines.push(format!("cache_shaders = {target_val}"));
+        }
+    }
+
+    let mut next_content = lines.join(eol);
+    if has_trailing_nl || !next_content.ends_with(eol) {
+        next_content.push_str(eol);
+    }
+
+    match fs::write(&d3dx_path, next_content) {
+        Ok(()) => crate::models::ToggleResult::ok(),
+        Err(err) => crate::models::ToggleResult::err(format!("Failed to write d3dx.ini: {err}")),
+    }
+}
+
+pub fn set_exclude_disabled_rule_for_game(
+    settings: &Settings,
+    game_id: &str,
+    enabled: bool,
+    is_en: bool,
+) -> crate::models::ToggleResult {
+    let mods_path = settings
+        .games
+        .get(game_id)
+        .map(|g| g.mods_path.trim())
+        .unwrap_or("");
+    if mods_path.is_empty() {
+        return crate::models::ToggleResult::err(if is_en {
+            "Mods directory is not configured"
+        } else {
+            "尚未配置 Mods 目录"
+        });
+    }
+    let Some(root) = resolve_env_root(mods_path) else {
+        return crate::models::ToggleResult::err("Invalid mods path");
+    };
+    let d3dx_path = root.join("d3dx.ini");
+    if !d3dx_path.is_file() {
+        return crate::models::ToggleResult::err(if is_en {
+            "Cannot find d3dx.ini in importer root"
+        } else {
+            "找不到根目录下的 d3dx.ini"
+        });
+    }
+    let Ok(content) = fs::read_to_string(&d3dx_path) else {
+        return crate::models::ToggleResult::err("Failed to read d3dx.ini");
+    };
+
+    let eol = if content.contains("\r\n") { "\r\n" } else { "\n" };
+    let has_trailing_nl = content.ends_with('\n');
+    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
+
+    let is_disabled_token = |tok: &str| {
+        tok.eq_ignore_ascii_case("DISABLED*") || tok.eq_ignore_ascii_case("DISABLED")
+    };
+
+    if enabled {
+        let already_active = lines.iter().any(|raw_line| {
+            let clean = raw_line.split(';').next().unwrap_or("").trim();
+            if let Some((lhs, rhs)) = clean.split_once('=') {
+                lhs.trim().eq_ignore_ascii_case("exclude_recursive")
+                    && rhs.split_whitespace().any(&is_disabled_token)
+            } else {
+                false
+            }
+        });
+        if already_active {
+            return crate::models::ToggleResult::ok();
+        }
+
+        let mut uncommented_existing = false;
+        for line in &mut lines {
+            let trimmed = line.trim_start();
+            if let Some(after_comment) = trimmed.strip_prefix(';').or_else(|| trimmed.strip_prefix('#')) {
+                let code_part = after_comment.split(';').next().unwrap_or("").trim();
+                if let Some((lhs, rhs)) = code_part.split_once('=') {
+                    if lhs.trim().eq_ignore_ascii_case("exclude_recursive")
+                        && rhs.split_whitespace().any(&is_disabled_token)
+                    {
+                        *line = after_comment.trim_start().to_string();
+                        uncommented_existing = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if !uncommented_existing {
+            let mut in_include = false;
+            let mut include_hdr_idx: Option<usize> = None;
+            let mut include_end_idx: Option<usize> = None;
+            for (idx, line) in lines.iter().enumerate() {
+                let trimmed = line.trim();
+                if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                    let section_name = trimmed[1..trimmed.len() - 1].trim();
+                    if in_include && include_end_idx.is_none() {
+                        include_end_idx = Some(idx);
+                    }
+                    in_include = section_name.eq_ignore_ascii_case("Include");
+                    if in_include && include_hdr_idx.is_none() {
+                        include_hdr_idx = Some(idx);
+                    }
+                }
+            }
+            if let Some(hdr_idx) = include_hdr_idx {
+                let mut pos = include_end_idx.unwrap_or(lines.len());
+                while pos > hdr_idx + 1 && lines[pos - 1].trim().is_empty() {
+                    pos -= 1;
+                }
+                lines.insert(pos, "exclude_recursive = DISABLED*".to_string());
+            } else {
+                if !lines.is_empty() && !lines.last().map(|s| s.trim().is_empty()).unwrap_or(true) {
+                    lines.push(String::new());
+                }
+                lines.push("[Include]".to_string());
+                lines.push("exclude_recursive = DISABLED*".to_string());
+            }
+        }
+    } else {
+        for line in &mut lines {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with(';') || trimmed.starts_with('#') {
+                continue;
+            }
+            let (code, comment) = match line.find(';') {
+                Some(pos) => (&line[..pos], Some(line[pos..].trim_start())),
+                None => (line.as_str(), None),
+            };
+            let Some((lhs, rhs)) = code.split_once('=') else {
+                continue;
+            };
+            if !lhs.trim().eq_ignore_ascii_case("exclude_recursive") {
+                continue;
+            }
+            let tokens: Vec<&str> = rhs.split_whitespace().collect();
+            if !tokens.iter().any(|t| is_disabled_token(t)) {
+                continue;
+            }
+            let remaining: Vec<&str> = tokens
+                .into_iter()
+                .filter(|t| !is_disabled_token(t))
+                .collect();
+            if remaining.is_empty() {
+                *line = format!("; {}", line.trim_start());
+            } else {
+                let mut rebuilt = format!("{} = {}", lhs.trim(), remaining.join(" "));
+                if let Some(c) = comment {
+                    rebuilt.push(' ');
+                    rebuilt.push_str(c);
+                }
+                *line = rebuilt;
+            }
+        }
+    }
+
+    let mut next_content = lines.join(eol);
+    if has_trailing_nl || !next_content.ends_with(eol) {
+        next_content.push_str(eol);
+    }
+
+    match fs::write(&d3dx_path, next_content) {
+        Ok(()) => crate::models::ToggleResult::ok(),
+        Err(err) => crate::models::ToggleResult::err(format!("Failed to write d3dx.ini: {err}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1205,8 +1456,33 @@ mod tests {
         assert_eq!(cleared.freed_bytes, Some(5));
 
         fs::write(efmi_dir.join("d3dx.ini"), "[Rendering]\r\ncache_shaders = 0\r\n").unwrap();
-        let missing = check_environment_for_settings(&updated, Some("endfield"), true);
-        assert_eq!(missing[0].status, "missing-line");
+        let enable_res = set_cache_shaders_for_game(&updated, "endfield", true, true);
+        assert!(enable_res.ok, "{:?}", enable_res.error);
+        let after_enable = check_environment_for_settings(&updated, Some("endfield"), true);
+        assert_eq!(after_enable[0].shader_cache.as_ref().unwrap().enabled_in_ini, Some(true));
+        let disable_res = set_cache_shaders_for_game(&updated, "endfield", false, true);
+        assert!(disable_res.ok, "{:?}", disable_res.error);
+        let after_disable = check_environment_for_settings(&updated, Some("endfield"), true);
+        assert_eq!(after_disable[0].shader_cache.as_ref().unwrap().enabled_in_ini, Some(false));
+        assert_eq!(after_disable[0].status, "missing-line");
+
+        fs::write(
+            efmi_dir.join("d3dx.ini"),
+            "[Include]\r\nexclude_recursive = DISABLED*\r\nexclude_recursive = desktop.ini\r\n[Rendering]\r\ncache_shaders = 1\r\n",
+        )
+        .unwrap();
+        let disable_excl = set_exclude_disabled_rule_for_game(&updated, "endfield", false, true);
+        assert!(disable_excl.ok, "{:?}", disable_excl.error);
+        let after_excl_off = check_environment_for_settings(&updated, Some("endfield"), true);
+        assert_eq!(after_excl_off[0].status, "missing-line");
+        let raw_off = fs::read_to_string(efmi_dir.join("d3dx.ini")).unwrap();
+        assert!(raw_off.contains("; exclude_recursive = DISABLED*"));
+        assert!(raw_off.contains("exclude_recursive = desktop.ini"));
+
+        let enable_excl = set_exclude_disabled_rule_for_game(&updated, "endfield", true, true);
+        assert!(enable_excl.ok, "{:?}", enable_excl.error);
+        let after_excl_on = check_environment_for_settings(&updated, Some("endfield"), true);
+        assert_eq!(after_excl_on[0].status, "ok");
 
         let _ = fs::remove_dir_all(&root);
     }

@@ -4,10 +4,12 @@ import type {
   ConfigBundleInspection,
   EnvironmentCheck,
   GameDef,
+  InstallModeInfo,
   RosterSyncStatus,
   Settings,
   SettingsPatch,
-  StorageOverview
+  StorageOverview,
+  UpdateCheckResult
 } from '../../../shared/types'
 import { Icon } from '../components/Icon'
 import { Modal } from '../components/Modal'
@@ -21,6 +23,7 @@ export function SettingsView({
   games,
   settings,
   initialTab = 'general',
+  initialUpdateCheck = null,
   onSave,
   onNotify,
   onLegacyCleaned,
@@ -31,6 +34,7 @@ export function SettingsView({
   games: GameDef[]
   settings: Settings
   initialTab?: SettingsTab
+  initialUpdateCheck?: UpdateCheckResult | null
   onSave: (patch: SettingsPatch) => Promise<void>
   onNotify: (text: string, kind?: 'ok' | 'err' | 'info') => void
   onLegacyCleaned?: () => void
@@ -67,7 +71,10 @@ export function SettingsView({
   const [showF10WarningModal, setShowF10WarningModal] = useState(false)
   const [showDisablePresetReloadModal, setShowDisablePresetReloadModal] = useState<"modPreset" | "rosterPreset" | null>(null)
   const [newIgnoreRule, setNewIgnoreRule] = useState('')
+  const [newIgnoredModDir, setNewIgnoredModDir] = useState('')
   const [clearingCacheGameId, setClearingCacheGameId] = useState<string | null>(null)
+  const [togglingCacheGameId, setTogglingCacheGameId] = useState<string | null>(null)
+  const [togglingExcludeGameId, setTogglingExcludeGameId] = useState<string | null>(null)
   const [storageOverview, setStorageOverview] = useState<StorageOverview | null>(null)
   const [storageLoading, setStorageLoading] = useState(false)
   const [bundleInspect, setBundleInspect] = useState<ConfigBundleInspection | null>(null)
@@ -76,6 +83,16 @@ export function SettingsView({
   const [restoringBackupId, setRestoringBackupId] = useState<string | null>(null)
   const [pruningBackups, setPruningBackups] = useState(false)
   const [cleaningLegacy, setCleaningLegacy] = useState(false)
+  const [installMode, setInstallMode] = useState<InstallModeInfo | null>(null)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(initialUpdateCheck)
+  const [installingUpdate, setInstallingUpdate] = useState(false)
+
+  useEffect(() => {
+    if (initialUpdateCheck) {
+      setUpdateResult((current) => current ?? initialUpdateCheck)
+    }
+  }, [initialUpdateCheck])
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedBadgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -103,6 +120,10 @@ export function SettingsView({
     window.moddeck
       .getRosterStatus()
       .then(setRosterStatus)
+      .catch(() => undefined)
+    window.moddeck
+      .getInstallMode()
+      .then(setInstallMode)
       .catch(() => undefined)
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
@@ -236,19 +257,6 @@ export function SettingsView({
   function updateImport(patch: Partial<Settings['import']>, debounced = false) {
     setDraft((current) => ({ ...current, import: { ...current.import, ...patch } }))
     void persistPatch({ import: patch }, debounced)
-  }
-
-  function shortPath(value: string): string {
-    const parts = value.split(/[\\/]/).filter(Boolean)
-    return parts.length <= 2 ? value : `.../${parts.slice(-2).join('/')}`
-  }
-
-  function envStatusText(status: EnvironmentCheck['status'] | undefined): string {
-    if (status === 'ok') return t('settings.environment.statusOk')
-    if (status === 'missing-line') return t('settings.environment.statusMissingLine')
-    if (status === 'missing-file') return t('settings.environment.statusMissingFile')
-    if (status === 'no-root') return t('settings.environment.statusNoRoot')
-    return t('settings.environment.statusNotChecked')
   }
 
   function updateGame(
@@ -387,6 +395,107 @@ export function SettingsView({
       onNotify(errorMessage(error), 'err')
     } finally {
       setClearingCacheGameId(null)
+    }
+  }
+
+  async function handleSetCacheShaders(gameId: string, enabled: boolean) {
+    setTogglingCacheGameId(gameId)
+    try {
+      const res = await window.moddeck.setCacheShaders(gameId, enabled)
+      if (!res.ok) {
+        onNotify(res.error || t('common.operationFailed'), 'err')
+      } else {
+        onNotify(
+          enabled
+            ? t('settings.environment.cacheShadersEnabled')
+            : t('settings.environment.cacheShadersDisabled'),
+          'ok'
+        )
+        await refreshEnvironment()
+      }
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setTogglingCacheGameId(null)
+    }
+  }
+
+  async function handleSetExcludeDisabledRule(gameId: string, enabled: boolean) {
+    setTogglingExcludeGameId(gameId)
+    try {
+      const res = await window.moddeck.setExcludeDisabledRule(gameId, enabled)
+      if (!res.ok) {
+        onNotify(res.error || t('common.operationFailed'), 'err')
+      } else {
+        onNotify(
+          enabled
+            ? t('settings.environment.excludeRuleEnabled')
+            : t('settings.environment.excludeRuleDisabled'),
+          enabled ? 'ok' : 'info'
+        )
+        await refreshEnvironment()
+      }
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setTogglingExcludeGameId(null)
+    }
+  }
+
+  function addIgnoredModDirFromInput() {
+    const tokens = newIgnoredModDir
+      .split(/[,，;\n\r]+/)
+      .map((s) => s.trim())
+      .filter((s) => s && s !== '.' && s !== '..' && !s.includes('/') && !s.includes('\\'))
+    if (tokens.length === 0) return
+    const current = draft.ui.ignoredModDirs ?? []
+    const existingLower = new Set(current.map((x) => x.toLowerCase()))
+    const added = tokens.filter((tk) => !existingLower.has(tk.toLowerCase()))
+    if (added.length > 0) {
+      updateUi({ ignoredModDirs: [...current, ...added] })
+    }
+    setNewIgnoredModDir('')
+  }
+
+  async function handleCheckUpdate() {
+    setCheckingUpdate(true)
+    try {
+      const res = await window.moddeck.checkAppUpdate(
+        draft.ui.updateMirrorMode || 'direct',
+        draft.ui.updateCustomMirror || ''
+      )
+      setUpdateResult(res)
+      if (!res.ok && res.error) {
+        onNotify(res.error, 'err')
+      }
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setCheckingUpdate(false)
+    }
+  }
+
+  async function handleInstallUpdate() {
+    if (!updateResult?.ok || !updateResult.hasUpdate) return
+    const targetUrl = updateResult.mirroredAssetUrl || updateResult.assetUrl
+    const assetName = updateResult.assetName
+    if (!targetUrl || !assetName) return
+    setInstallingUpdate(true)
+    try {
+      const res = await window.moddeck.installAppUpdate(
+        targetUrl,
+        assetName,
+        updateResult.assetSize
+      )
+      if (!res.ok) {
+        onNotify(res.error || t('common.operationFailed'), 'err')
+      } else if (res.message) {
+        onNotify(res.message, 'ok')
+      }
+    } catch (error) {
+      onNotify(errorMessage(error), 'err')
+    } finally {
+      setInstallingUpdate(false)
     }
   }
 
@@ -1290,7 +1399,8 @@ export function SettingsView({
       ) : null}
 
       {tab === 'environment' ? (
-        <section className="settings-card">
+        <>
+          <section className="settings-card">
           <div className="settings-card-head">
             <div className="settings-card-icon" style={{ background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.25)' }}>
               <Icon name="box" size={18} />
@@ -1341,27 +1451,61 @@ export function SettingsView({
               const configured = Boolean(draft.games[game.id]?.modsPath?.trim())
               const supported = configured || game.id === 'endfield'
               const env = envResults.find((item) => item.gameId === game.id)
+              const excludeActive = env?.status === 'ok'
+              const hasIniFile = env?.status === 'ok' || env?.status === 'missing-line'
+              const cacheEnabled = env?.shaderCache?.enabledInIni === true
               return (
                 <div className={`env-game-card${supported ? '' : ' pending'}`} key={game.id}>
                   <div className="env-game-head">
                     <span className="dot" style={{ background: game.accent }} />
                     <strong>{getLocaleGameName(game, effectiveLocale)}</strong>
                     <span className="muted">{game.loader}</span>
-                    <span className={`chip${supported && env?.status === 'ok' ? ' ok' : ''}`}>
-                      {supported ? envStatusText(env?.status) : t('settings.environment.notConfigured')}
-                    </span>
+                    {supported && env?.root ? (
+                      <span
+                        className="env-root-pill"
+                        title={env.root}
+                      >
+                        {t('settings.environment.rootDirLabel')}
+                        {env.root}
+                      </span>
+                    ) : (
+                      <span className="chip">{t('settings.environment.notConfigured')}</span>
+                    )}
                   </div>
                   {supported ? (
                     <>
-                      <div className="muted small">
-                        {t('settings.environment.rootDirLabel')}
-                        {shortPath(env?.root || draft.games[game.id]?.modsPath || t('settings.environment.notConfigured'))}
+                      <div className={`env-rule-row small ${excludeActive ? 'is-ok' : 'is-warn'}`}>
+                        <div className="row" style={{ gap: '8px', alignItems: 'center', minWidth: 0 }}>
+                          <code>exclude_recursive = DISABLED*</code>
+                          <span className={`chip${excludeActive ? ' ok' : ''}`}>
+                            {excludeActive
+                              ? t('settings.environment.ruleActive')
+                              : env?.status === 'missing-file'
+                                ? t('settings.environment.statusMissingFile')
+                                : t('settings.environment.ruleMissing')}
+                          </span>
+                        </div>
+                        {hasIniFile ? (
+                          <button
+                            type="button"
+                            className="btn ghost tiny-btn"
+                            disabled={togglingExcludeGameId === game.id}
+                            onClick={() =>
+                              void handleSetExcludeDisabledRule(game.id, !excludeActive)
+                            }
+                          >
+                            <Icon name="sliders" size={12} />
+                            {togglingExcludeGameId === game.id
+                              ? t('common.processing')
+                              : excludeActive
+                                ? t('settings.environment.disableExcludeRule')
+                                : t('settings.environment.enableExcludeRule')}
+                          </button>
+                        ) : null}
                       </div>
-                      <p className="muted small">
-                        {t('settings.environment.ruleLabel')}<code>exclude_recursive = DISABLED*</code>
-                      </p>
+
                       {env?.shaderCache ? (
-                        <div className="env-extra-row muted small">
+                        <div className={`env-rule-row small ${cacheEnabled ? 'is-ok' : 'is-warn'}`}>
                           <span>
                             {t('settings.environment.shaderCacheLabel')}:{' '}
                             {env.shaderCache.fileCount} ({formatBytes(env.shaderCache.totalBytes)})
@@ -1369,19 +1513,39 @@ export function SettingsView({
                               ? ` · cache_shaders=${env.shaderCache.enabledInIni ? '1' : '0'}`
                               : ''}
                           </span>
-                          {env.shaderCache.fileCount > 0 ? (
-                            <button
-                              type="button"
-                              className="btn ghost tiny-btn"
-                              disabled={clearingCacheGameId === game.id}
-                              onClick={() => void handleClearShaderCache(game.id)}
-                            >
-                              <Icon name="trash" size={12} />
-                              {clearingCacheGameId === game.id
-                                ? t('common.processing')
-                                : t('settings.environment.clearShaderCache')}
-                            </button>
-                          ) : null}
+                          <div className="row" style={{ gap: '6px' }}>
+                            {hasIniFile ? (
+                              <button
+                                type="button"
+                                className="btn ghost tiny-btn"
+                                disabled={togglingCacheGameId === game.id}
+                                title={t('settings.environment.cacheShadersWarnTitle')}
+                                onClick={() =>
+                                  void handleSetCacheShaders(game.id, !cacheEnabled)
+                                }
+                              >
+                                <Icon name="sliders" size={12} />
+                                {togglingCacheGameId === game.id
+                                  ? t('common.processing')
+                                  : cacheEnabled
+                                    ? t('settings.environment.disableCacheShaders')
+                                    : t('settings.environment.enableCacheShaders')}
+                              </button>
+                            ) : null}
+                            {env.shaderCache.fileCount > 0 ? (
+                              <button
+                                type="button"
+                                className="btn ghost tiny-btn"
+                                disabled={clearingCacheGameId === game.id}
+                                onClick={() => void handleClearShaderCache(game.id)}
+                              >
+                                <Icon name="trash" size={12} />
+                                {clearingCacheGameId === game.id
+                                  ? t('common.processing')
+                                  : t('settings.environment.clearShaderCache')}
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                       ) : null}
                       {env?.shaderFixes && env.shaderFixes.fileCount > 0 ? (
@@ -1395,7 +1559,7 @@ export function SettingsView({
                           </span>
                         </div>
                       ) : null}
-                      <div className="row" style={{ marginTop: '6px' }}>
+                      <div className="row" style={{ marginTop: '8px' }}>
                         <button
                           className="btn ghost small-btn"
                           onClick={() => void window.moddeck.openEnvironmentFolder(game.id)}
@@ -1415,6 +1579,79 @@ export function SettingsView({
             })}
           </div>
         </section>
+
+        <section className="settings-card">
+          <div className="settings-card-head">
+            <div
+              className="settings-card-icon"
+              style={{
+                background: 'rgba(168, 85, 247, 0.12)',
+                color: '#c084fc',
+                borderColor: 'rgba(168, 85, 247, 0.25)'
+              }}
+            >
+              <Icon name="filter" size={18} />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0 }}>{t('settings.environment.sandboxIgnoreTitle')}</h3>
+                <span className="tag ok">{t('settings.environment.sandboxIgnoreBadge')}</span>
+              </div>
+              <p className="muted">{t('settings.environment.sandboxIgnoreDesc')}</p>
+            </div>
+          </div>
+          <div className="muted small" style={{ marginBottom: '10px' }}>
+            <code>{t('settings.environment.sandboxIgnoreBuiltIn')}</code>
+          </div>
+          <div className="field-row" style={{ gap: '8px' }}>
+            <input
+              className="input"
+              value={newIgnoredModDir}
+              placeholder={t('settings.environment.sandboxIgnorePlaceholder')}
+              onChange={(e) => setNewIgnoredModDir(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addIgnoredModDirFromInput()
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn ghost small-btn"
+              style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+              onClick={() => addIgnoredModDirFromInput()}
+            >
+              <Icon name="plus" size={14} />
+              {t('settings.environment.sandboxIgnoreAdd')}
+            </button>
+          </div>
+          {(draft.ui.ignoredModDirs ?? []).length === 0 ? (
+            <div className="muted small" style={{ marginTop: '8px' }}>
+              {t('settings.environment.sandboxIgnoreEmpty')}
+            </div>
+          ) : (
+            <div className="ignore-rules-chips">
+              {(draft.ui.ignoredModDirs ?? []).map((dirName) => (
+                <span key={dirName} className="ignore-rule-chip">
+                  <code>{dirName}</code>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`Remove ${dirName}`}
+                    onClick={() => {
+                      const next = (draft.ui.ignoredModDirs ?? []).filter((d) => d !== dirName)
+                      updateUi({ ignoredModDirs: next })
+                    }}
+                  >
+                    <Icon name="close" size={11} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </section>
+        </>
       ) : null}
 
       {tab === 'import' ? (
@@ -1489,7 +1726,7 @@ export function SettingsView({
                 <div className="setting-row-action">
                   <select
                     className="select"
-                    style={{ minWidth: '180px' }}
+                    style={{ width: '100%', maxWidth: '100%' }}
                     value={
                       draft.import.rosterRemoteUrl === 'https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/roster.json'
                         ? 'raw'
@@ -1841,6 +2078,181 @@ export function SettingsView({
                   <span>{t('settings.about.license')}</span>
                   <code>MIT License</code>
                 </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="settings-card">
+            <div className="settings-card-head">
+              <div
+                className="settings-card-icon"
+                style={{
+                  background: 'rgba(16, 185, 129, 0.12)',
+                  color: '#34d399',
+                  borderColor: 'rgba(16, 185, 129, 0.25)'
+                }}
+              >
+                <Icon name="download" size={18} />
+              </div>
+              <div>
+                <h3>{t('settings.about.updateTitle')}</h3>
+                <p className="muted">{t('settings.about.updateDesc')}</p>
+              </div>
+            </div>
+
+            <div className="setting-row-card" style={{ marginBottom: '10px' }}>
+              <div className="setting-row-info">
+                <div className="setting-row-title">{t('settings.about.installModeLabel')}</div>
+                {installMode?.exeDir ? (
+                  <div className="setting-row-desc" style={{ wordBreak: 'break-all' }}>
+                    <code>{installMode.exeDir}</code>
+                  </div>
+                ) : null}
+              </div>
+              <div className="setting-row-action">
+                <span className="tag ok">
+                  {installMode?.mode === 'installer'
+                    ? t('settings.about.installModeInstaller')
+                    : t('settings.about.installModePortable')}
+                </span>
+              </div>
+            </div>
+
+            <div className="setting-row-card" style={{ marginBottom: '10px' }}>
+              <div className="setting-row-info">
+                <div className="setting-row-title">{t('settings.about.mirrorModeLabel')}</div>
+              </div>
+              <div className="setting-row-action">
+                <select
+                  className="select"
+                  style={{ width: '100%', maxWidth: '100%' }}
+                  value={draft.ui.updateMirrorMode || 'direct'}
+                  onChange={(e) => {
+                    const nextMode = e.target.value
+                    updateUi({ updateMirrorMode: nextMode })
+                    setUpdateResult(null)
+                  }}
+                >
+                  <option value="direct">{t('settings.about.mirrorDirect')}</option>
+                  <option value="ghfast">{t('settings.about.mirrorGhFast')}</option>
+                  <option value="ghproxy">{t('settings.about.mirrorGhProxy')}</option>
+                  <option value="custom">{t('settings.about.mirrorCustom')}</option>
+                </select>
+              </div>
+            </div>
+
+            {draft.ui.updateMirrorMode === 'custom' ? (
+              <div className="setting-group-box" style={{ marginBottom: '10px' }}>
+                <input
+                  className="input"
+                  value={draft.ui.updateCustomMirror || ''}
+                  placeholder={t('settings.about.customMirrorPlaceholder')}
+                  onChange={(e) => updateUi({ updateCustomMirror: e.target.value }, true)}
+                />
+              </div>
+            ) : null}
+
+            <label className="check-row-card" style={{ marginBottom: '14px' }}>
+              <input
+                type="checkbox"
+                checked={draft.ui.autoCheckUpdates === true}
+                onChange={(e) => updateUi({ autoCheckUpdates: e.target.checked })}
+              />
+              <div>
+                <div style={{ fontWeight: 600, color: '#f1f5f9' }}>{t('settings.about.autoCheckLabel')}</div>
+                <div className="muted small" style={{ marginTop: '2px' }}>
+                  {t('settings.about.autoCheckDesc')}
+                </div>
+              </div>
+            </label>
+
+            <div className="row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={checkingUpdate || installingUpdate}
+                onClick={() => void handleCheckUpdate()}
+              >
+                <Icon name="refresh" size={15} />
+                {checkingUpdate ? t('settings.about.checkingUpdateBtn') : t('settings.about.checkUpdateBtn')}
+              </button>
+              {updateResult?.ok && updateResult.hasUpdate && (updateResult.mirroredAssetUrl || updateResult.assetUrl) ? (
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={installingUpdate}
+                  onClick={() => void handleInstallUpdate()}
+                >
+                  <Icon name="download" size={15} />
+                  {installingUpdate
+                    ? t('settings.about.installingUpdateBtn')
+                    : t('settings.about.installUpdateBtn')}
+                </button>
+              ) : null}
+              {updateResult?.releaseUrl ? (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => void window.moddeck.openExternalUrl(updateResult.releaseUrl!)}
+                >
+                  <Icon name="info" size={15} />
+                  {t('settings.about.openReleaseBtn')}
+                </button>
+              ) : null}
+            </div>
+
+            {updateResult && updateResult.ok ? (
+              <div
+                className="setting-group-box"
+                style={{
+                  marginTop: '12px',
+                  borderColor: updateResult.hasUpdate ? 'rgba(56, 189, 248, 0.35)' : undefined
+                }}
+              >
+                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <strong style={{ color: updateResult.hasUpdate ? '#38bdf8' : '#34d399' }}>
+                    {updateResult.hasUpdate && updateResult.latestVersion
+                      ? t('settings.about.updateAvailable', {
+                          latest: updateResult.latestVersion,
+                          current: updateResult.currentVersion
+                        })
+                      : updateResult.latestVersion && updateResult.latestVersion !== updateResult.currentVersion
+                        ? t('settings.about.devAhead', {
+                            current: updateResult.currentVersion,
+                            latest: updateResult.latestVersion
+                          })
+                        : t('settings.about.upToDate', {
+                            version: updateResult.currentVersion
+                          })}
+                  </strong>
+                  {updateResult.sourceUsed ? (
+                    <span className="muted small">
+                      {t('settings.about.sourceTag', { source: updateResult.sourceUsed })}
+                    </span>
+                  ) : null}
+                </div>
+                {updateResult.hasUpdate && updateResult.assetName ? (
+                  <div className="muted small" style={{ marginTop: '6px' }}>
+                    <code>{updateResult.assetName}</code>
+                    {updateResult.assetSize ? ` · ${formatBytes(updateResult.assetSize)}` : ''}
+                  </div>
+                ) : null}
+                {updateResult.releaseNotes ? (
+                  <pre
+                    className="muted small"
+                    style={{
+                      marginTop: '8px',
+                      whiteSpace: 'pre-wrap',
+                      maxHeight: '140px',
+                      overflowY: 'auto',
+                      background: 'rgba(0,0,0,0.2)',
+                      padding: '8px 10px',
+                      borderRadius: '6px'
+                    }}
+                  >
+                    {updateResult.releaseNotes}
+                  </pre>
+                ) : null}
               </div>
             ) : null}
           </section>

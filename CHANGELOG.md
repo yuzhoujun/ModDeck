@@ -4,6 +4,21 @@
 
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning 2.0.0](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Per-Game Roster Scheme Storage & Seamless Auto-Migration**: Split roster schemes from root `%APPDATA%\ModDeck\roster-presets.json` into per-game `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json` automatically on startup/access, while maintaining full backwards compatibility and per-item ID merging when importing legacy `.moddeck-bundle` archives.
+- **Optional `d3dx.ini` Loader Rule Toggles (`Settings -> Environment`)**: Added direct toggles for `[Include]` `exclude_recursive = DISABLED*` and `[Rendering]` `cache_shaders = 1 / 0` in `d3dx.ini`, refactored game cards with color-coded rule rows + full root path headers, and separated **ModDeck Library & Audit Ignores** (`EFMI-MCP`, `_*`, `.*`, plus custom entries) into its own card so ModDeck filters and XXMI loader rules remain clearly distinguished.
+- **Mirrored Online Update Check & One-Click Upgrade (`Settings -> About`)**: Added offline-first manual update checks (plus opt-in startup checks, off by default) against GitHub Releases / jsDelivr fallback, mirror prefix selection (`Direct`, `ghfast.top`, `gh-proxy.org`, `Custom`), distribution mode detection (`installer` vs `portable`), and one-click NSIS passive upgrade or portable self-replacement.
+
+### Fixed
+
+- **Fixed NSIS Installer Languages Folder Packaging (`#4`)**: Bundled `languages/*.json` beside `ModDeck.exe` in Windows NSIS installer packages via `tauri.conf.json` `bundle.resources`, matching the portable layout so **Open Languages Directory** opens populated built-in dictionaries directly while keeping `%APPDATA%\ModDeck\languages\` overrides functional.
+- **Fixed Cross-Mod Variable Leak & Missing `__default__` Duplicate Guard on 0-Variable Mods (`#5`)**: Fixed `read_active_d3dx_user_variables` fallback branch ingesting unrelated `$\\mods\\...` entries from `d3dx_user.ini` when a mod declared zero `persist` variables (e.g. INI-toggle UI mods), which had caused saving a new preset on Default to bypass duplicate protection against `__default__`.
+- **Localized `"Default"` Duplicate Error & Reserved Name Guard**: Fixed `save_mod_preset` returning hardcoded Chinese `"默认"` when matching `__default__` under non-Chinese UI locales, and rejected reserved default preset names (`Default`, `默认`, `默认 (初始)`) when creating custom mod presets.
+- Aligned global conflict audit folder skipping in `ini_analysis` with `library` rules so internal bridge folders (such as `_ModDeck_Preset_Bridge`) and external tool sandboxes do not produce false conflict warnings.
+
 ## [3.0.1] - 2026-11-19
 
 ### Added

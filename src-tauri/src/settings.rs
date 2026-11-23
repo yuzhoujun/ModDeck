@@ -229,6 +229,29 @@ pub fn normalize_settings(mut settings: Settings) -> Settings {
         settings.ui.recent_mod_count = 50;
     }
 
+    let mut seen_ignored_dirs = HashSet::new();
+    settings.ui.ignored_mod_dirs = settings
+        .ui
+        .ignored_mod_dirs
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| {
+            !s.is_empty()
+                && s != "."
+                && s != ".."
+                && !s.contains('/')
+                && !s.contains('\\')
+                && seen_ignored_dirs.insert(s.to_ascii_lowercase())
+        })
+        .collect();
+
+    let mirror_mode = settings.ui.update_mirror_mode.trim().to_ascii_lowercase();
+    settings.ui.update_mirror_mode = match mirror_mode.as_str() {
+        "ghfast" | "ghproxy" | "custom" => mirror_mode,
+        _ => "direct".to_string(),
+    };
+    settings.ui.update_custom_mirror = settings.ui.update_custom_mirror.trim().to_string();
+
     let max_recent = settings.ui.recent_mod_count as usize;
     settings.recent_mods.retain(|item| {
         !item.game_id.trim().is_empty()

@@ -30,6 +30,7 @@ import type {
   ImportRequest,
   ImportResult,
   ImportRosterResult,
+  InstallModeInfo,
   LegacyCleanupResult,
   ModDetails,
   ModInfo,
@@ -42,7 +43,9 @@ import type {
   SettingsPatch,
   SimpleResult,
   StorageOverview,
-  ToggleResult
+  ToggleResult,
+  UpdateCheckResult,
+  UpdateInstallResult
 } from './types'
 
 export const IPC = {
@@ -62,6 +65,7 @@ export const IPC = {
   openModFolder: 'shell:open-mod-folder',
   openCharacterFolder: 'shell:open-character-folder',
   openPath: 'shell:open-path',
+  openExternalUrl: 'shell:open-external-url',
   pickModsFolder: 'dialog:mods-folder',
   pickXxmiRoot: 'dialog:xxmi-root',
   autoDetectPaths: 'settings:auto-detect-paths',
@@ -121,6 +125,11 @@ export const IPC = {
   checkEnvironment: 'env:check',
   openEnvironmentFolder: 'env:open-folder',
   clearShaderCache: 'env:clear-shader-cache',
+  setCacheShaders: 'env:set-cache-shaders',
+  setExcludeDisabledRule: 'env:set-exclude-disabled-rule',
+  getInstallMode: 'updater:install-mode',
+  checkAppUpdate: 'updater:check',
+  installAppUpdate: 'updater:install',
   auditGameConflicts: 'mods:audit-conflicts',
   exportConflictAuditReport: 'mods:export-conflict-report',
   getStorageOverview: 'storage:overview',
@@ -177,6 +186,7 @@ export interface ModDeckApi {
   openModFolder(gameId: GameId, characterFolder: string, modFolder: string): Promise<ToggleResult>
   openCharacterFolder(gameId: GameId, characterFolder: string): Promise<ToggleResult>
   openPath(kind: 'mods' | 'game' | 'loader' | 'data' | 'logs' | 'languages' | 'locales', gameId?: GameId): Promise<ToggleResult>
+  openExternalUrl(url: string): Promise<SimpleResult>
   pickModsFolder(): Promise<string | null>
   pickXxmiRoot(): Promise<AutoDetectPathsResult>
   autoDetectPaths(): Promise<AutoDetectPathsResult>
@@ -315,6 +325,11 @@ export interface ModDeckApi {
   checkEnvironment(gameId?: GameId): Promise<EnvironmentCheck[]>
   openEnvironmentFolder(gameId: GameId): Promise<ToggleResult>
   clearShaderCache(gameId: GameId): Promise<ClearShaderCacheResult>
+  setCacheShaders(gameId: GameId, enabled: boolean): Promise<ToggleResult>
+  setExcludeDisabledRule(gameId: GameId, enabled: boolean): Promise<ToggleResult>
+  getInstallMode(): Promise<InstallModeInfo>
+  checkAppUpdate(mirrorMode?: string, customMirror?: string): Promise<UpdateCheckResult>
+  installAppUpdate(assetUrl: string, assetName: string, expectedSize?: number): Promise<UpdateInstallResult>
   auditGameConflicts(gameId: GameId): Promise<GameConflictAuditReport>
   exportConflictAuditReport(gameId: GameId, report: GameConflictAuditReport): Promise<ExportPresetResult>
   getStorageOverview(): Promise<StorageOverview>

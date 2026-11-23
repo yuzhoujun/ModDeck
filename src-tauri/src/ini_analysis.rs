@@ -1,4 +1,4 @@
-use crate::library::{is_mod_effectively_enabled, resolve_character_dir};
+use crate::library::{is_ignored_sandbox_dir, is_mod_effectively_enabled, resolve_character_dir};
 use crate::models::{
     CharacterHashConflict, CharacterHashConflictMod, ConflictAuditModLocation,
     ConflictAuditSummary, EnvironmentCheck, GameConflictAuditItem, GameConflictAuditReport,
@@ -884,6 +884,7 @@ pub fn audit_game_mods_conflicts(
     game_id: &str,
     mods_path: &str,
     environment: Option<EnvironmentCheck>,
+    ignored_mod_dirs: &[String],
     is_en: bool,
 ) -> GameConflictAuditReport {
     static SECTION_RX: OnceLock<Regex> = OnceLock::new();
@@ -991,7 +992,7 @@ pub fn audit_game_mods_conflicts(
                 continue;
             };
             if !top_path.is_dir()
-                || top_name.starts_with('.')
+                || is_ignored_sandbox_dir(&top_name, ignored_mod_dirs)
                 || top_name.to_ascii_lowercase().starts_with("disabled")
             {
                 continue;
@@ -1012,8 +1013,13 @@ pub fn audit_game_mods_conflicts(
                     let Some(sub_name) = sub.file_name().to_str().map(str::to_string) else {
                         continue;
                     };
+                    let sub_ignored = sub_name.eq_ignore_ascii_case("efmi-mcp")
+                        || ignored_mod_dirs
+                            .iter()
+                            .any(|x| x.trim().eq_ignore_ascii_case(&sub_name));
                     if !sub_path.is_dir()
                         || sub_name.starts_with('.')
+                        || sub_ignored
                         || sub_name.to_ascii_lowercase().starts_with("disabled")
                     {
                         continue;
@@ -1543,8 +1549,22 @@ mod tests {
         let mods_dir = root.join("Mods");
         let mod_a = mods_dir.join("Anke").join("ModA");
         let mod_b = mods_dir.join("Anke").join("ModB");
+        let sandbox_mcp = mods_dir.join("EFMI-MCP").join("Dummy");
+        let bridge_dir = mods_dir.join("_ModDeck_Preset_Bridge");
         fs::create_dir_all(&mod_a).unwrap();
         fs::create_dir_all(&mod_b).unwrap();
+        fs::create_dir_all(&sandbox_mcp).unwrap();
+        fs::create_dir_all(&bridge_dir).unwrap();
+        fs::write(
+            sandbox_mcp.join("mcp.ini"),
+            "[TextureOverrideBody]\nhash = deadbeef\n[ShaderOverrideGlow]\nhash = 99998888\nfilter_index = 2\n",
+        )
+        .unwrap();
+        fs::write(
+            bridge_dir.join("bridge.ini"),
+            "[TextureOverrideBody]\nhash = deadbeef\nfilter_index = 9\n",
+        )
+        .unwrap();
 
         fs::write(
             mod_a.join("a.ini"),
@@ -1560,11 +1580,15 @@ mod tests {
         let char_conflicts = scan_character_hash_conflicts(&mods_dir, "Anke").unwrap();
         assert_eq!(char_conflicts.len(), 2);
 
-        let report = audit_game_mods_conflicts("wuthering-waves", &mods_dir.to_string_lossy(), None, true);
+        let report =
+            audit_game_mods_conflicts("wuthering-waves", &mods_dir.to_string_lossy(), None, &[], true);
         assert!(report.summary.high >= 1);
         assert!(report.summary.warning >= 2);
+        assert_eq!(report.scanned_mods, 2);
         let txt = format_conflict_audit_report_text("Wuthering Waves", &report, true);
         assert!(txt.contains("deadbeef"));
+        assert!(!txt.contains("EFMI-MCP"));
+        assert!(!txt.contains("bridge.ini"));
 
         let _ = fs::remove_dir_all(&root);
     }
