@@ -13,6 +13,7 @@ import type {
 } from '../../../shared/types'
 import { Icon } from '../components/Icon'
 import { Modal } from '../components/Modal'
+import { ReleaseNotesView } from '../components/ReleaseNotesView'
 import type { IconName } from '../components/Icon'
 import { errorMessage, formatBytes } from '../utils'
 import { useI18n, getLocaleGameName, getLocaleGameShortName } from '../i18n'
@@ -2238,20 +2239,10 @@ export function SettingsView({
                   </div>
                 ) : null}
                 {updateResult.releaseNotes ? (
-                  <pre
-                    className="muted small"
-                    style={{
-                      marginTop: '8px',
-                      whiteSpace: 'pre-wrap',
-                      maxHeight: '140px',
-                      overflowY: 'auto',
-                      background: 'rgba(0,0,0,0.2)',
-                      padding: '8px 10px',
-                      borderRadius: '6px'
-                    }}
-                  >
-                    {updateResult.releaseNotes}
-                  </pre>
+                  <ReleaseNotesView
+                    markdown={updateResult.releaseNotes}
+                    isZh={effectiveLocale.toLowerCase().startsWith('zh')}
+                  />
                 ) : null}
               </div>
             ) : null}

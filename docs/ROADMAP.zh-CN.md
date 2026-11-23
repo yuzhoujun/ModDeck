@@ -20,7 +20,7 @@
 
 ---
 
-## 开发与预发布测试中：v3.1.0（`3.1.0-beta.2`）
+## 开发与预发布测试中：v3.1.0（`3.1.0-beta.3`）
 
 - **全角色池方案（Preset Pool）按游戏拆目录与无感自动迁移**（已在 `3.1.0-alpha.1` 实现）：
   - 将根目录下单文件 `%APPDATA%\ModDeck\roster-presets.json` 迁移拆分为 `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json`（与单 Mod 预设目录 `presets\<gameId>\<角色>\<Mod>.json` 保持彻底统一，多游戏互不混杂）。
