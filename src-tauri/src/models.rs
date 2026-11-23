@@ -92,6 +92,8 @@ pub struct UiSettings {
     pub update_custom_mirror: String,
     #[serde(default)]
     pub auto_check_updates: bool,
+    #[serde(default)]
+    pub ignored_update_version: String,
     #[serde(default = "default_delay")]
     pub post_reload_sync_delay: f64,
     #[serde(default = "default_recent_count")]
@@ -127,6 +129,7 @@ impl Default for UiSettings {
             update_mirror_mode: default_mirror_direct(),
             update_custom_mirror: String::new(),
             auto_check_updates: false,
+            ignored_update_version: String::new(),
             post_reload_sync_delay: default_delay(),
             recent_mod_count: default_recent_count(),
             close_behavior: default_quit(),

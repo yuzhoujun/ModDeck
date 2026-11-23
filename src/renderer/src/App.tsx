@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import type {
   Bootstrap,
   CharacterInfo,
@@ -64,6 +64,12 @@ export default function App() {
   const [cleaningLegacy, setCleaningLegacy] = useState(false)
   const [availableUpdate, setAvailableUpdate] = useState<UpdateCheckResult | null>(null)
   const [lastUpdateCheck, setLastUpdateCheck] = useState<UpdateCheckResult | null>(null)
+  const [updateToastFading, setUpdateToastFading] = useState(false)
+  const [updateToastHovered, setUpdateToastHovered] = useState(false)
+  const [skipThisUpdate, setSkipThisUpdate] = useState(false)
+  const startupUpdateCheckedRef = useRef(false)
+  const updateFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const updateHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [parsedImport, setParsedImport] = useState<{
     result: ImportParseResult
     targetCharacter?: string
@@ -241,23 +247,81 @@ export default function App() {
     }
   }, [booting])
 
+  function clearUpdateToastTimers() {
+    if (updateFadeTimerRef.current) {
+      clearTimeout(updateFadeTimerRef.current)
+      updateFadeTimerRef.current = null
+    }
+    if (updateHideTimerRef.current) {
+      clearTimeout(updateHideTimerRef.current)
+      updateHideTimerRef.current = null
+    }
+  }
+
+  function closeUpdateToast() {
+    clearUpdateToastTimers()
+    setUpdateToastFading(false)
+    setAvailableUpdate(null)
+  }
+
+  async function toggleSkipUpdateVersion(checked: boolean) {
+    setSkipThisUpdate(checked)
+    const ver = checked ? availableUpdate?.latestVersion?.trim() || '' : ''
+    try {
+      const next = await window.moddeck.saveSettings({ ui: { ignoredUpdateVersion: ver } })
+      setBoot((current) => (current ? { ...current, settings: next } : current))
+    } catch (error) {
+      notify(errorMessage(error), 'err')
+    }
+  }
+
   useEffect(() => {
-    if (booting || !boot?.settings.ui.autoCheckUpdates) return
+    if (booting || startupUpdateCheckedRef.current) return
+    startupUpdateCheckedRef.current = true
+    if (!boot?.settings.ui.autoCheckUpdates) return
     let cancelled = false
+    let settled = false
     window.moddeck
       .checkAppUpdate(boot.settings.ui.updateMirrorMode, boot.settings.ui.updateCustomMirror)
       .then((res) => {
+        settled = true
         if (cancelled) return
         setLastUpdateCheck(res)
-        if (res.ok && res.hasUpdate) {
-          setAvailableUpdate(res)
+        if (res.ok && res.hasUpdate && res.latestVersion) {
+          const normVer = (v?: string) => (v || '').trim().replace(/^v/i, '').toLowerCase()
+          const ignoredVer = normVer(boot.settings.ui.ignoredUpdateVersion)
+          const remoteVer = normVer(res.latestVersion)
+          if (ignoredVer !== remoteVer) {
+            setSkipThisUpdate(false)
+            setUpdateToastFading(false)
+            setAvailableUpdate(res)
+          }
         }
       })
-      .catch(() => undefined)
+      .catch(() => {
+        settled = true
+      })
     return () => {
       cancelled = true
+      if (!settled) startupUpdateCheckedRef.current = false
     }
-  }, [booting, boot?.settings.ui.autoCheckUpdates])
+  }, [booting])
+
+  useEffect(() => {
+    clearUpdateToastTimers()
+    if (!availableUpdate || updateToastHovered) {
+      if (updateToastHovered) setUpdateToastFading(false)
+      return
+    }
+    updateFadeTimerRef.current = setTimeout(() => {
+      setUpdateToastFading(true)
+      updateHideTimerRef.current = setTimeout(() => {
+        setAvailableUpdate(null)
+        setUpdateToastFading(false)
+      }, 450)
+    }, 10000)
+    return clearUpdateToastTimers
+  }, [availableUpdate, updateToastHovered])
 
   async function cleanLegacyFromBanner() {
     setCleaningLegacy(true)
@@ -1067,37 +1131,6 @@ export default function App() {
             </div>
           </div>
         ) : null}
-        {availableUpdate && availableUpdate.hasUpdate && availableUpdate.latestVersion ? (
-          <div className="env-banner">
-            <div className="env-banner-main">
-              <Icon name="download" size={18} />
-              <div>
-                <strong>
-                  {t('settings.about.updateBannerTitle', { version: availableUpdate.latestVersion })}
-                </strong>
-                <span>{t('settings.about.updateBannerDesc')}</span>
-              </div>
-            </div>
-            <div className="env-banner-actions">
-              <button
-                className="btn primary small-btn"
-                onClick={() => {
-                  setSettingsTab('about')
-                  setView('settings')
-                }}
-              >
-                {t('settings.about.openAboutUpdate')}
-              </button>
-              <button
-                className="icon-btn"
-                onClick={() => setAvailableUpdate(null)}
-                title={t('common.closeThisTime')}
-              >
-                <Icon name="close" size={15} />
-              </button>
-            </div>
-          </div>
-        ) : null}
         {legacyStorage && legacyStorage.legacyElectronFiles > 0 ? (
           <div className="env-banner">
             <div className="env-banner-main">
@@ -1359,6 +1392,62 @@ export default function App() {
           onCancel={() => void cancelParsedImport()}
           onCommit={commitParsedImport}
         />
+      ) : null}
+
+      {availableUpdate && availableUpdate.hasUpdate && availableUpdate.latestVersion ? (
+        <aside
+          className={`update-float-toast${updateToastFading ? ' is-fading' : ''}`}
+          role="status"
+          aria-live="polite"
+          onMouseEnter={() => {
+            setUpdateToastHovered(true)
+            setUpdateToastFading(false)
+          }}
+          onMouseLeave={() => setUpdateToastHovered(false)}
+        >
+          <div className="update-float-head">
+            <div className="update-float-title">
+              <Icon name="download" size={16} />
+              <strong>
+                {t('settings.about.updateToastTitle', { version: availableUpdate.latestVersion })}
+              </strong>
+            </div>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={closeUpdateToast}
+              title={t('common.close')}
+              aria-label={t('common.close')}
+            >
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+          <p className="update-float-desc">
+            {t('settings.about.updateToastDesc', { current: availableUpdate.currentVersion })}
+          </p>
+          <div className="update-float-foot">
+            <label className="update-float-skip">
+              <input
+                type="checkbox"
+                checked={skipThisUpdate}
+                onChange={(e) => void toggleSkipUpdateVersion(e.target.checked)}
+              />
+              <span>{t('settings.about.skipVersionLabel')}</span>
+            </label>
+            <button
+              type="button"
+              className="btn primary small-btn"
+              onClick={() => {
+                setSettingsTab('about')
+                setView('settings')
+                setUpdateToastHovered(false)
+                closeUpdateToast()
+              }}
+            >
+              {t('settings.about.openAboutUpdate')}
+            </button>
+          </div>
+        </aside>
       ) : null}
 
       {toast ? <div className={`toast ${toast.kind}`}>{toast.text}</div> : null}

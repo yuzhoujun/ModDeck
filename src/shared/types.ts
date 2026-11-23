@@ -52,6 +52,7 @@ export interface UiSettings {
   updateMirrorMode?: 'direct' | 'ghfast' | 'ghproxy' | 'custom' | string
   updateCustomMirror?: string
   autoCheckUpdates?: boolean
+  ignoredUpdateVersion?: string
   postReloadSyncDelay?: number
   recentModCount: number
   closeBehavior: 'quit' | 'minimize'

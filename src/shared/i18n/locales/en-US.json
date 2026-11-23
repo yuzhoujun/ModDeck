@@ -689,7 +689,7 @@
   },
   "settings": {
     "about": {
-      "autoCheckDesc": "When enabled, ModDeck quietly checks GitHub / jsDelivr once at startup and notifies you if a newer version is available.",
+      "autoCheckDesc": "When enabled, ModDeck quietly checks once on app launch and shows a non-blocking bottom-right toast when a newer version is available.",
       "autoCheckLabel": "Check for updates on startup (Default OFF)",
       "checkUpdateBtn": "Check for Updates",
       "checkingUpdateBtn": "Checking…",
@@ -714,6 +714,7 @@
       "openLanguagesFolder": "Open Languages Directory (languages)",
       "openLogsFolder": "Open Run Logs (logs)",
       "openReleaseBtn": "Open Release Page",
+      "skipVersionLabel": "Skip this version",
       "sourceTag": "Source: {source}",
       "storageDesc": "Settings, character metadata, covers, snapshots and logs are kept strictly on this PC. Pure local-first with zero cloud leaks.",
       "storageTip": "💡 Contains ModDeck settings, character match data, preset snapshots, and runtime logs. Backup this folder directly when migrating or reinstalling Windows.",
@@ -721,10 +722,10 @@
       "title": "About ModDeck",
       "upToDate": "You are up to date (v{version})",
       "updateAvailable": "New version available: v{latest} (current v{current})",
-      "updateBannerDesc": "Go to Settings -> About to download via GitHub or mirror and upgrade in place.",
-      "updateBannerTitle": "New ModDeck v{version} Available",
-      "updateDesc": "Offline-first by default: only queries GitHub Releases / CDN when you click Check for Updates or opt into startup checks.",
+      "updateDesc": "Offline-first by default: only queries GitHub Releases / Atom / CDN when you click Check for Updates or opt into startup checks.",
       "updateTitle": "Software Updates & Mirror Acceleration",
+      "updateToastDesc": "Current v{current}. View About to upgrade.",
+      "updateToastTitle": "ModDeck v{version} Available",
       "userDataBadge": "Local Persistent Storage",
       "userDataLabel": "User Data Directory (userData)",
       "version": "Software Version"

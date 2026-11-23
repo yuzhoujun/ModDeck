@@ -689,7 +689,7 @@
   },
   "settings": {
     "about": {
-      "autoCheckDesc": "开启后，每次启动仅联网核对一次最新版本号；检测到新版时仅在顶部轻提示，绝不自动下载或强制打断使用。",
+      "autoCheckDesc": "开启后，仅在软件启动时联网核对一次最新版本（托盘呼出不重复弹窗）；发现新版时在右下角轻提示，一段时间后自动淡出，不打断正常点击。",
       "autoCheckLabel": "启动时后台检测新版（默认关闭）",
       "checkUpdateBtn": "立即检查更新",
       "checkingUpdateBtn": "检查中…",
@@ -714,6 +714,7 @@
       "openLanguagesFolder": "打开语言包目录 (languages)",
       "openLogsFolder": "打开运行日志 (logs)",
       "openReleaseBtn": "前往发布页",
+      "skipVersionLabel": "不再提醒此版本",
       "sourceTag": "数据源：{source}",
       "storageDesc": "设置、角色元数据、封面、快照和日志都保存在本机，纯本地无云端泄露隐患。",
       "storageTip": "💡 包含 ModDeck 配置、角色匹配数据、预设方案快照及运行日志。在重装系统或迁移设备时，直接打包复制该文件夹即可完整保留所有设置与预设。",
@@ -721,10 +722,10 @@
       "title": "关于 ModDeck",
       "upToDate": "当前已是最新版本 (v{version})",
       "updateAvailable": "发现新版本：v{latest}（当前 v{current}）",
-      "updateBannerDesc": "可前往「设置 -> 关于」选择官方或国内镜像源一键下载并覆盖升级。",
-      "updateBannerTitle": "发现新版本 ModDeck v{version}",
-      "updateDesc": "默认严格遵循离线优先：仅在手动点击检查，或勾选允许后台检测时联网请求 GitHub Releases / jsDelivr。",
+      "updateDesc": "默认严格遵循离线优先：仅在手动点击检查，或勾选允许后台检测时联网请求 GitHub Releases / Atom / 镜像 CDN。",
       "updateTitle": "版本更新检测与国内镜像加速",
+      "updateToastDesc": "当前 v{current}，可前往「关于」一键升级。",
+      "updateToastTitle": "发现新版本 ModDeck v{version}",
       "userDataBadge": "本地持久化存储",
       "userDataLabel": "数据存储根目录 (userData)",
       "version": "软件版本"

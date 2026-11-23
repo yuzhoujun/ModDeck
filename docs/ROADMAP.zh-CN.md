@@ -20,13 +20,14 @@
 
 ---
 
-## 开发与预发布测试中：v3.1.0（`3.1.0-alpha.2`）
+## 开发与预发布测试中：v3.1.0（`3.1.0-alpha.3`）
 
 - **全角色池方案（Preset Pool）按游戏拆目录与无感自动迁移**（已在 `3.1.0-alpha.1` 实现）：
   - 将根目录下单文件 `%APPDATA%\ModDeck\roster-presets.json` 迁移拆分为 `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json`（与单 Mod 预设目录 `presets\<gameId>\<角色>\<Mod>.json` 保持彻底统一，多游戏互不混杂）。
   - 启动或首次读取时自动执行无感迁移，并在 `.moddeck-bundle` 导入阶段保持对 `v2.5.0` / `v3.0.x` 旧配置迁移包的向下兼容。
-- **应用内版本检测与镜像源一键在线升级**（已在 `3.1.0-alpha.1` 实现）：
-  - 支持读取 GitHub Releases 最新版本信息（并支持 `cdn.jsdelivr.net` 兜底回退），内置官方直连、`ghfast.top`、`gh-proxy.org` 与自定义镜像加速前缀；严格遵循默认离线原则，同时提供「启动时后台检测」可选开关。
+- **应用内版本检测与镜像源一键在线升级**（`3.1.0-alpha.3` 重构加固）：
+  - 四级检测链路（`api.github.com` API -> 无 API 速率限制的 `github.com/releases/latest` 重定向与 `releases.atom` -> 代理镜像 Atom / `raw.githubusercontent.com` -> 区分稳定/预发布信道的 `cdn.jsdelivr.net` 兜底），内置官方直连、`ghfast.top`、`gh-proxy.org` 与自定义镜像加速前缀；严格遵循默认离线原则。
+  - 启动后台检测仅在每次软件进程启动时执行一次（托盘收起再打开主窗口不重复弹出），发现新版时在右下角展示不阻塞正常点击的轻浮窗，支持悬停暂停、延时淡出、关闭，以及按版本号记录的「不再提醒此版本」（下一新版发布时自动恢复提醒）。
   - 自动识别运行形态：安装版拉取新 `ModDeck-<ver>-win-x64-setup.exe` 以 `/P` 参数原地覆盖升级；便携版下载新版 ZIP 并通过脱离进程自动替换文件并重启。
 - **默认预设保留名、重复校验隔离与多语言提示修正**（`#5` 修复于 `3.1.0-alpha.2`）：
   - ![1795084888752](image/ROADMAP.zh-CN/1795084888752.png)修复英文界面下保存重复预设匹配 `__default__` 时提示文本硬编码 `"默认"` 的问题，禁止新建 `"默认"` / `"默认 (初始)"` / `"default"` 保留名预设；同时修复零持久化变量 Mod（如纯 `.ini` 切换界面 Mod）在无变量兜底读取分支串读全盘 `d3dx_user.ini` 其他 Mod 变量从而绕过 `__default__` 重复保护的缺陷。

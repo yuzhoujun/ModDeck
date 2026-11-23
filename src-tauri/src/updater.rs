@@ -12,6 +12,12 @@ const GITHUB_RELEASE_LATEST_API: &str =
     "https://api.github.com/repos/yuzhoujun/ModDeck/releases/latest";
 const GITHUB_RELEASES_LIST_API: &str =
     "https://api.github.com/repos/yuzhoujun/ModDeck/releases?per_page=10";
+const GITHUB_RELEASE_LATEST_WEB: &str =
+    "https://github.com/yuzhoujun/ModDeck/releases/latest";
+const GITHUB_RELEASES_ATOM: &str =
+    "https://github.com/yuzhoujun/ModDeck/releases.atom";
+const RAW_PACKAGE_URL: &str =
+    "https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/package.json";
 const JSDELIVR_PACKAGE_URL: &str =
     "https://cdn.jsdelivr.net/gh/yuzhoujun/ModDeck@main/package.json";
 const GITHUB_RELEASE_DOWNLOAD_BASE: &str = "https://github.com/yuzhoujun/ModDeck/releases/download";
@@ -143,8 +149,9 @@ pub fn apply_mirror_url(raw_url: &str, mirror_mode: &str, custom_mirror: &str) -
     if url.is_empty() {
         return String::new();
     }
-    let is_github_url =
-        url.starts_with("https://github.com/") || url.starts_with("https://objects.githubusercontent.com/");
+    let is_github_url = url.starts_with("https://github.com/")
+        || url.starts_with("https://objects.githubusercontent.com/")
+        || url.starts_with("https://raw.githubusercontent.com/");
     if !is_github_url {
         return url.to_string();
     }
@@ -249,9 +256,18 @@ pub fn detect_install_mode() -> InstallModeInfo {
 
 fn ureq_agent() -> ureq::Agent {
     ureq::AgentBuilder::new()
-        .timeout_connect(Duration::from_secs(6))
-        .timeout_read(Duration::from_secs(20))
-        .timeout(Duration::from_secs(60))
+        .timeout_connect(Duration::from_secs(5))
+        .timeout_read(Duration::from_secs(10))
+        .timeout(Duration::from_secs(12))
+        .build()
+}
+
+fn no_redirect_agent() -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .redirects(0)
+        .timeout_connect(Duration::from_secs(5))
+        .timeout_read(Duration::from_secs(8))
+        .timeout(Duration::from_secs(10))
         .build()
 }
 
@@ -346,16 +362,147 @@ fn fetch_github_release(
     }
 }
 
-fn fetch_jsdelivr_version(agent: &ureq::Agent) -> Result<String, String> {
+fn extract_tag_from_release_url(url_or_path: &str) -> Option<String> {
+    let (_, tail) = url_or_path.rsplit_once("/releases/tag/")?;
+    let clean = tail
+        .split(['?', '#'])
+        .next()
+        .unwrap_or(tail)
+        .trim()
+        .trim_matches('/');
+    if clean.is_empty() || parse_semver(clean).is_none() {
+        return None;
+    }
+    Some(normalize_version_tag(clean))
+}
+
+fn parse_best_tag_from_releases_atom(xml: &str, include_prerelease: bool) -> Option<String> {
+    let mut best: Option<(ParsedSemVer, String)> = None;
+    let mut rest = xml;
+    while let Some(id_start) = rest.find("<id>") {
+        let after_start = &rest[id_start + 4..];
+        let Some(id_end) = after_start.find("</id>") else {
+            break;
+        };
+        let id_val = after_start[..id_end].trim();
+        rest = &after_start[id_end + 5..];
+
+        // Atom release entry IDs use "tag:github.com,2008:Repository/<repo_id>/<tag>";
+        // reading <id> avoids picking up links mentioned inside escaped HTML release notes.
+        if !id_val.starts_with("tag:github.com,") || !id_val.contains(":Repository/") {
+            continue;
+        }
+        let Some((_, raw_tag)) = id_val.rsplit_once('/') else {
+            continue;
+        };
+        let Some(ver) = parse_semver(raw_tag) else {
+            continue;
+        };
+        if !include_prerelease && ver.pre.is_some() {
+            continue;
+        }
+        let norm = normalize_version_tag(raw_tag);
+        let is_better = best
+            .as_ref()
+            .map(|(cur_ver, _)| compare_semver(&ver, cur_ver) == Ordering::Greater)
+            .unwrap_or(true);
+        if is_better {
+            best = Some((ver, norm));
+        }
+    }
+    best.map(|(_, tag)| tag)
+}
+
+fn validate_package_json_candidate(raw_version: &str, allow_prerelease: bool) -> Result<String, String> {
+    let ver = parse_semver(raw_version)
+        .ok_or_else(|| format!("Invalid SemVer in package.json: {raw_version}"))?;
+    if !allow_prerelease && ver.pre.is_some() {
+        return Err(format!(
+            "Skipping pre-release manifest version {} on stable channel",
+            normalize_version_tag(raw_version)
+        ));
+    }
+    Ok(normalize_version_tag(raw_version))
+}
+
+fn fetch_github_latest_web_tag() -> Result<String, String> {
+    let agent = no_redirect_agent();
     let resp = agent
-        .get(JSDELIVR_PACKAGE_URL)
+        .get(GITHUB_RELEASE_LATEST_WEB)
         .set("User-Agent", &format!("ModDeck/{}", env!("CARGO_PKG_VERSION")))
         .call()
-        .map_err(|e| format!("jsDelivr fallback failed: {e}"))?;
+        .map_err(|e| format!("GitHub web latest redirect check failed: {e}"))?;
+
+    let location = resp
+        .header("location")
+        .or_else(|| resp.header("Location"))
+        .unwrap_or_else(|| resp.get_url());
+    let tag = extract_tag_from_release_url(location)
+        .ok_or_else(|| format!("No release tag found in redirect target: {location}"))?;
+    validate_package_json_candidate(&tag, false)
+}
+
+fn fetch_github_atom_best_tag(
+    agent: &ureq::Agent,
+    url: &str,
+    include_prerelease: bool,
+) -> Result<String, String> {
+    let resp = agent
+        .get(url)
+        .set("User-Agent", &format!("ModDeck/{}", env!("CARGO_PKG_VERSION")))
+        .set("Accept", "application/atom+xml, application/xml, text/xml")
+        .call()
+        .map_err(|e| format!("GitHub releases.atom request failed: {e}"))?;
+    let body = resp
+        .into_string()
+        .map_err(|e| format!("Invalid releases.atom response body: {e}"))?;
+    parse_best_tag_from_releases_atom(&body, include_prerelease)
+        .ok_or_else(|| "No matching release tag found in releases.atom".to_string())
+}
+
+fn fetch_package_json_version(
+    agent: &ureq::Agent,
+    url: &str,
+    allow_prerelease: bool,
+) -> Result<String, String> {
+    let resp = agent
+        .get(url)
+        .set("User-Agent", &format!("ModDeck/{}", env!("CARGO_PKG_VERSION")))
+        .call()
+        .map_err(|e| format!("Manifest check failed ({url}): {e}"))?;
     let pkg: PackageJsonVersion = resp
         .into_json()
-        .map_err(|e| format!("Invalid jsDelivr package.json: {e}"))?;
-    Ok(normalize_version_tag(&pkg.version))
+        .map_err(|e| format!("Invalid package.json ({url}): {e}"))?;
+    validate_package_json_candidate(&pkg.version, allow_prerelease)
+}
+
+fn build_tag_check_result(
+    latest_ver: String,
+    current_version: String,
+    install_mode: String,
+    mirror_mode: &str,
+    custom_mirror: &str,
+    source_used: &str,
+) -> UpdateCheckResult {
+    let has_update = is_newer_version(&current_version, &latest_ver);
+    let (asset_name, raw_url) = build_fallback_asset(&latest_ver, &install_mode);
+    let mirrored = apply_mirror_url(&raw_url, mirror_mode, custom_mirror);
+    UpdateCheckResult {
+        ok: true,
+        current_version,
+        latest_version: Some(latest_ver.clone()),
+        has_update,
+        release_url: Some(format!("{GITHUB_RELEASE_TAG_BASE}/v{latest_ver}")),
+        release_notes: None,
+        asset_name: Some(asset_name),
+        asset_url: Some(raw_url),
+        mirrored_asset_url: Some(mirrored),
+        asset_size: None,
+        published_at: None,
+        install_mode,
+        source_used: Some(source_used.to_string()),
+        error: None,
+    }
 }
 
 pub fn check_for_updates(
@@ -369,6 +516,7 @@ pub fn check_for_updates(
         .and_then(|v| v.pre)
         .is_some();
     let agent = ureq_agent();
+    let mut errors: Vec<String> = Vec::new();
 
     match fetch_github_release(&agent, current_is_pre) {
         Ok(rel) => {
@@ -389,7 +537,7 @@ pub fn check_for_updates(
                 .as_deref()
                 .map(|u| apply_mirror_url(u, mirror_mode, custom_mirror));
 
-            UpdateCheckResult {
+            return UpdateCheckResult {
                 ok: true,
                 current_version,
                 latest_version: Some(latest_ver.clone()),
@@ -408,31 +556,96 @@ pub fn check_for_updates(
                 install_mode: mode_info.mode,
                 source_used: Some("github-api".to_string()),
                 error: None,
-            }
+            };
         }
-        Err(api_err) => match fetch_jsdelivr_version(&agent) {
+        Err(err) => errors.push(err),
+    }
+
+    // Tier 2: GitHub web redirect (stable) and releases.atom (both channels) avoid REST API rate limits.
+    if !current_is_pre {
+        match fetch_github_latest_web_tag() {
             Ok(latest_ver) => {
-                let has_update = is_newer_version(&current_version, &latest_ver);
-                let (asset_name, raw_url) = build_fallback_asset(&latest_ver, &mode_info.mode);
-                let mirrored = apply_mirror_url(&raw_url, mirror_mode, custom_mirror);
-                UpdateCheckResult {
-                    ok: true,
+                return build_tag_check_result(
+                    latest_ver,
                     current_version,
-                    latest_version: Some(latest_ver.clone()),
-                    has_update,
-                    release_url: Some(format!("{GITHUB_RELEASE_TAG_BASE}/v{latest_ver}")),
-                    release_notes: None,
-                    asset_name: Some(asset_name),
-                    asset_url: Some(raw_url),
-                    mirrored_asset_url: Some(mirrored),
-                    asset_size: None,
-                    published_at: None,
-                    install_mode: mode_info.mode,
-                    source_used: Some("jsdelivr-fallback".to_string()),
-                    error: None,
-                }
+                    mode_info.mode,
+                    mirror_mode,
+                    custom_mirror,
+                    "github-web",
+                );
             }
-            Err(cdn_err) => UpdateCheckResult {
+            Err(err) => errors.push(err),
+        }
+    }
+
+    match fetch_github_atom_best_tag(&agent, GITHUB_RELEASES_ATOM, current_is_pre) {
+        Ok(latest_ver) => {
+            return build_tag_check_result(
+                latest_ver,
+                current_version,
+                mode_info.mode,
+                mirror_mode,
+                custom_mirror,
+                "github-atom",
+            );
+        }
+        Err(err) => errors.push(err),
+    }
+
+    // Tier 3: Configured URL proxy mirror for releases.atom + raw.githubusercontent.com fallback.
+    let normalized_mirror = mirror_mode.trim().to_ascii_lowercase();
+    let supports_web_proxy = normalized_mirror == "ghproxy"
+        || (normalized_mirror == "custom" && !custom_mirror.trim().is_empty());
+    if supports_web_proxy {
+        let mirrored_atom = apply_mirror_url(GITHUB_RELEASES_ATOM, mirror_mode, custom_mirror);
+        match fetch_github_atom_best_tag(&agent, &mirrored_atom, current_is_pre) {
+            Ok(latest_ver) => {
+                return build_tag_check_result(
+                    latest_ver,
+                    current_version,
+                    mode_info.mode,
+                    mirror_mode,
+                    custom_mirror,
+                    "mirror-atom",
+                );
+            }
+            Err(err) => errors.push(err),
+        }
+    }
+
+    let raw_url = if supports_web_proxy {
+        apply_mirror_url(RAW_PACKAGE_URL, mirror_mode, custom_mirror)
+    } else {
+        RAW_PACKAGE_URL.to_string()
+    };
+    match fetch_package_json_version(&agent, &raw_url, current_is_pre) {
+        Ok(latest_ver) => {
+            return build_tag_check_result(
+                latest_ver,
+                current_version,
+                mode_info.mode,
+                mirror_mode,
+                custom_mirror,
+                "raw-fallback",
+            );
+        }
+        Err(err) => errors.push(err),
+    }
+
+    // Tier 4: jsDelivr CDN (works without VPN in CN, guarded against exposing unreleased pre-releases to stable builds).
+    match fetch_package_json_version(&agent, JSDELIVR_PACKAGE_URL, current_is_pre) {
+        Ok(latest_ver) => build_tag_check_result(
+            latest_ver,
+            current_version,
+            mode_info.mode,
+            mirror_mode,
+            custom_mirror,
+            "jsdelivr-fallback",
+        ),
+        Err(cdn_err) => {
+            errors.push(cdn_err);
+            let summary = errors.join("; ");
+            UpdateCheckResult {
                 ok: false,
                 current_version,
                 latest_version: None,
@@ -447,12 +660,12 @@ pub fn check_for_updates(
                 install_mode: mode_info.mode,
                 source_used: None,
                 error: Some(if is_en {
-                    format!("Update check failed: {api_err}; {cdn_err}")
+                    format!("Update check failed: {summary}")
                 } else {
-                    format!("检查更新失败：{api_err}；{cdn_err}")
+                    format!("检查更新失败：{summary}")
                 }),
-            },
-        },
+            }
+        }
     }
 }
 
@@ -805,6 +1018,10 @@ mod tests {
             format!("https://gh-proxy.org/{raw}")
         );
         assert_eq!(
+            apply_mirror_url("https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/package.json", "ghproxy", ""),
+            "https://gh-proxy.org/https://raw.githubusercontent.com/yuzhoujun/ModDeck/main/package.json"
+        );
+        assert_eq!(
             apply_mirror_url(raw, "custom", "https://mirror.example.com/"),
             format!("https://mirror.example.com/{raw}")
         );
@@ -812,6 +1029,43 @@ mod tests {
             apply_mirror_url(raw, "custom", "https://dl.example.com/?target={url}"),
             format!("https://dl.example.com/?target={raw}")
         );
+    }
+
+    #[test]
+    fn parses_releases_atom_and_redirect_urls_safely() {
+        let sample_atom = r#"<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:github.com,2008:https://github.com/yuzhoujun/ModDeck/releases</id>
+  <entry>
+    <id>tag:github.com,2008:Repository/1425449614/v3.1.0-alpha.3</id>
+    <content type="html">&lt;a href="https://github.com/yuzhoujun/ModDeck/releases/tag/v9.9.9"&gt;fake&lt;/a&gt;</content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1425449614/v3.0.1</id>
+  </entry>
+</feed>"#;
+        assert_eq!(
+            parse_best_tag_from_releases_atom(sample_atom, true).as_deref(),
+            Some("3.1.0-alpha.3")
+        );
+        assert_eq!(
+            parse_best_tag_from_releases_atom(sample_atom, false).as_deref(),
+            Some("3.0.1")
+        );
+        assert_eq!(
+            extract_tag_from_release_url("https://github.com/yuzhoujun/ModDeck/releases/tag/v3.0.1?foo=1").as_deref(),
+            Some("3.0.1")
+        );
+        assert_eq!(
+            extract_tag_from_release_url("/yuzhoujun/ModDeck/releases/tag/v3.1.0-alpha.2").as_deref(),
+            Some("3.1.0-alpha.2")
+        );
+        assert!(validate_package_json_candidate("3.2.0-alpha.1", false).is_err());
+        assert_eq!(
+            validate_package_json_candidate("3.2.0-alpha.1", true).unwrap(),
+            "3.2.0-alpha.1"
+        );
+        assert_eq!(validate_package_json_candidate("3.1.0", false).unwrap(), "3.1.0");
     }
 
     #[test]

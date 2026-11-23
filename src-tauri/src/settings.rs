@@ -251,6 +251,7 @@ pub fn normalize_settings(mut settings: Settings) -> Settings {
         _ => "direct".to_string(),
     };
     settings.ui.update_custom_mirror = settings.ui.update_custom_mirror.trim().to_string();
+    settings.ui.ignored_update_version = settings.ui.ignored_update_version.trim().to_string();
 
     let max_recent = settings.ui.recent_mod_count as usize;
     settings.recent_mods.retain(|item| {
