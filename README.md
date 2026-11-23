@@ -42,7 +42,7 @@ Upgrading from ModDeck v2 (Electron)? See [docs/MIGRATION_V2_TO_V3.md](docs/MIGR
 
 ### 1. Mod Library & Category Management
 
-- **Disk as Source of Truth**: Scans categories and mods directly from your `Mods` directory (`DISABLED_` prefix toggling with file-lock fallback onto internal `.ini` files while a game is running).
+- **Disk as Source of Truth**: Scans categories and mods directly from your `Mods` directory (`DISABLED_` prefix toggling with file-lock fallback onto internal `.ini` files while a game is running), while isolating external sandboxes (`EFMI-MCP`, `_*`, `.*`, and custom `ignoredModDirs`) from ModDeck scans and audits.
 - **Filtering & Search**: Filter by All, Characters Only, Utility / UI / Other, With Mods, or Without Mods; search across localized names, aliases, Pinyin, and folder names.
 - **Drag-and-Drop Ordering & Cover Editor**: Customize category/mod ordering locally and crop 1:1 `.preview.png` category covers via pan/zoom preview.
 - **Native Folder Watcher**: Monitors the active `Mods` tree and `d3dx_user.ini` for external additions, deletions, recycle-bin restores, and in-game F10 writes.
@@ -69,7 +69,7 @@ Upgrading from ModDeck v2 (Electron)? See [docs/MIGRATION_V2_TO_V3.md](docs/MIGR
 
 ### 4. Dual-Pool Roster Schemes Workspace
 
-- **Character + Utility Separation**: Splits configurations into **Character Presets** and **Utility / UI / World** pools so global UI mods do not interfere with character skins.
+- **Character + Utility Separation**: Splits per-game configurations (`presets/<gameId>/roster-presets.json`) into **Character Presets** and **Utility / UI / World** pools so global UI mods do not interfere with character skins.
 - **Per-Card Single / Multi Mode & Fingerprinting**: Choose mutually exclusive or multi-mod combinations per category, batch enable or reset per pool, detect unsaved live modifications, and block duplicate saves.
 
 ![Roster Scheme Workspace](docs/ModDeck.ModsPersetPool.en.png)
@@ -83,16 +83,17 @@ Upgrading from ModDeck v2 (Electron)? See [docs/MIGRATION_V2_TO_V3.md](docs/MIGR
 
 ![In-Game Quick Overlay](docs/ModDeck.Quick.en.png)
 
-### 6. Preset / Scheme Sharing, Static INI Audit & Config Migration
+### 6. Preset / Scheme Sharing, Environment Rules & Config Migration
 
 - **Import/Export Sharing**: Share single-mod presets (`.moddeck-preset.json`) or full roster schemes (`.moddeck-scheme.json`) with automated local matching and missing variant reconstruction (`ImportSchemeModal`).
-- **Static INI Diagnostics & Conflict Audit**: Scans `[Key*]`/`[CommandList]` persist declarations, per-character Shader/Texture Hash overlaps, duplicate FX preloads (`RabbitFX`, `CrossIBClassifier.ini`, `KatFXMatcap`), `[ShaderRegex]`, `[ShaderOverride]` risk levels, and cross-mod Hash collisions with one-click disable, `ShaderCache` cleanup, and `.txt` export.
+- **Static INI Diagnostics, Loader Rules & Conflict Audit**: Scans `[Key*]`/`[CommandList]` persist declarations, per-character Shader/Texture Hash overlaps, duplicate FX preloads (`RabbitFX`, `CrossIBClassifier.ini`, `KatFXMatcap`), `[ShaderRegex]`, `[ShaderOverride]` risk levels, and cross-mod Hash collisions with one-click disable, `ShaderCache` cleanup, and `.txt` export; plus direct **Settings -> Environment** toggles for `d3dx.ini` (`exclude_recursive = DISABLED*` and `cache_shaders = 1 / 0`).
 - **Storage Manager & Full Bundle Migration (`.moddeck-bundle`)**: Tracks storage usage, restores/prunes mod overwrite backups (including `DISABLED_*` backups), and exports/imports complete backups of settings, custom games, covers, presets, and schemes.
 
-### 7. Localization & Custom Games
+### 7. Localization, Custom Games & Offline-First Updater
 
-- **Built-in Bilingual UI (`zh-CN` / `en-US`)**: Instant language switching (`Auto`, `zh-CN`, `en-US`) backed by 921 aligned dictionary keys (`scripts/i18n.mjs`), canonical English character names, and automatic discovery of drop-in `.json` packs under `languages/` next to `ModDeck.exe` or inside `%APPDATA%\ModDeck\languages\`.
+- **Built-in Bilingual UI (`zh-CN` / `en-US`)**: Instant language switching (`Auto`, `zh-CN`, `en-US`) backed by 980 aligned dictionary keys (`scripts/i18n.mjs`), canonical English character names, and drop-in `.json` packs shipped under `languages/` beside `ModDeck.exe` in both portable and NSIS installer builds (with user overrides in `%APPDATA%\ModDeck\languages\`).
 - **Custom Games & Sidebar Controls**: Add, edit, or hide custom 3DMigoto/XXMI games with per-locale names and optional "Configured Games Only" filtering.
+- **Offline-First Update Check & Upgrade (`Settings -> About`)**: Background checks are **disabled by default**. When triggered manually or opted into at startup, ModDeck checks GitHub Releases / Atom / CDN fallbacks with optional download mirrors (`Direct`, `ghfast.top`, `gh-proxy.org`, `Custom`), shows a non-blocking bottom-right toast with per-version skip, and supports both the interactive NSIS setup wizard and portable self-replacement with formatted Markdown release notes.
 
 ---
 
@@ -127,7 +128,7 @@ For full subsystem details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 - **OS**: Windows 10 / Windows 11 64-bit (`x64`).
 - **WebView2**: Microsoft Edge WebView2 Runtime (built into Windows 11 and modern Windows 10; checked at startup).
-- **Local-First & Offline**: All settings, covers, presets, and backups reside in `%APPDATA%\ModDeck\` (falling back to `ModDeck-data\` beside `ModDeck.exe` if AppData is restricted). Zero telemetry or external uploads.
+- **Local-First & Offline**: All settings, covers, presets, and backups reside in `%APPDATA%\ModDeck\` (falling back to `ModDeck-data\` beside `ModDeck.exe` if AppData is restricted). Zero telemetry or external uploads; optional update checks and remote dictionary syncs are off by default until initiated by the user.
 
 ---
 
@@ -142,6 +143,7 @@ npm run typecheck
 npm run i18n:check
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run package:portable
+npm run package:installer
 ```
 
 See [docs/BUILD.md](docs/BUILD.md) for prerequisites (Node.js 24, Rust stable + MSVC Build Tools) and release workflow details.

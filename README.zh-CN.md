@@ -42,7 +42,7 @@ ModDeck 专职在磁盘与配置层面管理游戏 `Mods` 目录：`DISABLED_` �
 
 ### 1. Mod 库管理与多维分类
 
-- **磁盘即真相**：直接扫描 `Mods` 目录物理结构，`DISABLED_` 前缀启停，游戏运行中被锁定目录时自动降级重命名内部主 `.ini` 实现热启停。
+- **磁盘即真相**：直接扫描 `Mods` 目录物理结构，`DISABLED_` 前缀启停，游戏运行中被锁定目录时自动降级重命名内部主 `.ini` 实现热启停；同时在「环境」卡片单独隔离 `EFMI-MCP`、`_*`、`.*` 及用户自定义忽略目录，避免干扰库统计与审计。
 - **筛选、排序与封面裁切**：支持全部 / 仅角色 / 功能 UI / 有 Mod / 无 Mod 过滤，支持拼音与中英文搜索、卡片拖拽排序与 1:1 `.preview.png` 裁切编辑。
 - **原生文件系统监听**：自动感知外部新增、删除、回收站恢复与 `d3dx_user.ini` 游戏内写盘刷新界面。
 
@@ -68,7 +68,7 @@ ModDeck 专职在磁盘与配置层面管理游戏 `Mods` 目录：`DISABLED_` �
 
 ### 4. 全角色池双分池搭配方案
 
-- **角色池与功能/UI 池隔离**：自动分为「角色预设」与「功能 / UI / 世界其他」双池管理，避免全局 UI Mod 干扰角色皮肤配置。
+- **角色池与功能/UI 池隔离**：按游戏拆分保存独立方案文件（`presets/<gameId>/roster-presets.json`），自动分为「角色预设」与「功能 / UI / 世界其他」双池管理，避免全局 UI Mod 干扰角色皮肤配置。
 - **独立单选/多选与防重校验**：支持按分类独立切换单选（互斥）/ 多选（共存）、分池一键开关、未保存实机改动拦截以及方案指纹去重。
 
 ![全角色池方案工作台](docs/ModDeck.ModsPersetPool.png)
@@ -81,16 +81,17 @@ ModDeck 专职在磁盘与配置层面管理游戏 `Mods` 目录：`DISABLED_` �
 
 ![游戏内快捷操作台](docs/ModDeck.Quick.png)
 
-### 6. 分享导入导出、冲突审计与备份迁移
+### 6. 分享导入导出、环境规则、冲突审计与备份迁移
 
 - **单 Mod 预设与全队方案分享**：支持 `.moddeck-preset.json` 与 `.moddeck-scheme.json` 导出/导入及缺失变体重建（`ImportSchemeModal`）。
-- **冲突审计与缓存清理**：检测同角色 Hash 重叠、重复或互斥 FX 前置插件（`RabbitFX` / `CrossIBClassifier.ini` / `KatFXMatcap`）、`[ShaderRegex]`、`[ShaderOverride]` 风险分级与跨 Mod Hash 碰撞，支持一键禁用冲突 Mod、清空 `ShaderCache` 与导出 `.txt` 报告。
+- **冲突审计、环境开关与缓存清理**：检测同角色 Hash 重叠、重复或互斥 FX 前置插件（`RabbitFX` / `CrossIBClassifier.ini` / `KatFXMatcap`）、`[ShaderRegex]`、`[ShaderOverride]` 风险分级与跨 Mod Hash 碰撞，支持一键禁用冲突 Mod、清空 `ShaderCache` 与导出 `.txt` 报告；可在 **设置 -> 环境** 直接切换 `d3dx.ini` 规则（`exclude_recursive = DISABLED*` 与 `cache_shaders = 1 / 0`）。
 - **存储管理与全量配置迁移（`.moddeck-bundle`）**：统计配置/封面/备份/日志占用，还原或清理 Mod 覆盖备份，并支持一键打包或跨机迁移全部配置、封面、预设与方案。
 
-### 7. 双语界面、外挂语言包与自定义游戏
+### 7. 双语界面、外挂语言包、自定义游戏与离线优先升级
 
-- **内置简中 / 英文实时热切换**：内建 921 条 100% 对齐词条（`Auto` / `zh-CN` / `en-US`），支持将社区语言包放入 `ModDeck.exe` 同级 `languages/` 或 `%APPDATA%\ModDeck\languages\` 热加载。
+- **内置简中 / 英文实时热切换**：内建 980 条 100% 对齐词条（`Auto` / `zh-CN` / `en-US`），便携版与 NSIS 安装版统一随包附带同级 `languages/` 目录（继续支持 `%APPDATA%\ModDeck\languages\` 外部覆盖热加载）。
 - **自定义游戏与侧栏治理**：支持新增自定义游戏、配置多语言名称与「仅显示已配置 Mods 目录的游戏」过滤。
+- **默认严格离线的版本检测与一键升级（设置 -> 关于）**：启动自动检查**默认关闭**；仅在手动点击或用户勾选开启启动检测后，通过抗限流四级链路检测 GitHub Releases / Atom / 镜像 CDN（内置直连、`ghfast.top`、`gh-proxy.org` 与自定义镜像），发现新版时在右下角以不阻断点击的轻浮窗提示并支持「不再提醒此版本」，支持调起完整 NSIS 安装向导或便携版前置拉起原地升级（更新明细自动按当前语言抽取 Markdown 渲染）。
 
 ---
 
@@ -124,7 +125,7 @@ ModDeck 专职在磁盘与配置层面管理游戏 `Mods` 目录：`DISABLED_` �
 
 - **操作系统**：Windows 10 / Windows 11 64 位（x64）。
 - **WebView2**：依赖系统 Microsoft Edge WebView2 Runtime（启动时自动检测，缺失时提示引导安装）。
-- **本地优先（Local-First）**：数据保存于 `%APPDATA%\ModDeck\`（受限时回退至程序同级 `ModDeck-data\`），全程纯本地离线可用，零遥测上传。
+- **本地优先（Local-First）**：数据保存于 `%APPDATA%\ModDeck\`（受限时回退至程序同级 `ModDeck-data\`），全程纯本地离线可用，零遥测上传；可选的版本检测与远端角色词库同步默认均处于关闭/手动触发状态。
 
 ---
 
@@ -139,6 +140,7 @@ npm run typecheck
 npm run i18n:check
 cargo test --manifest-path src-tauri/Cargo.toml
 npm run package:portable
+npm run package:installer
 ```
 
 环境前置与发版规则详见 [docs/BUILD.zh-CN.md](docs/BUILD.zh-CN.md)。
