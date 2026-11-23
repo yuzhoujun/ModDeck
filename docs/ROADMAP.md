@@ -20,7 +20,7 @@ This document serves as the persistent in-repo tracker for upcoming versions, ar
 
 ---
 
-## Active Development: v3.1.0 (`3.1.0-alpha.3` Pre-release Testing)
+## Active Development: v3.1.0 (`3.1.0-beta.1` Pre-release Testing)
 
 - **Per-Game Roster Scheme Storage & Seamless Auto-Migration** (`Done in 3.1.0-alpha.1`):
   - Split `%APPDATA%\ModDeck\roster-presets.json` into per-game files under `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json` (matching the existing `presets/<gameId>/<character>/<mod>.json` isolation model) so multi-game setups remain tidy.

@@ -1,6 +1,6 @@
 [package]
 name = "moddeck"
-version = "3.1.0-alpha.3"
+version = "3.1.0-beta.1"
 description = "Open-source local mod manager for 3DMigoto / XXMI games"
 authors = ["yuzhoujun <2445665133@qq.com>"]
 license = "MIT"
