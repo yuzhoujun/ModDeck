@@ -13,31 +13,16 @@
 - 完成由 Electron 到 Tauri 2 + Rust + WebView2 的全功能对等迁移（便携压缩包约 3.5 MB），Electron `v2.5.0` 源码已完整保留于 `legacy/electron` 分支。
 - 新增原生多格式解压与编码纠偏、INI 热键类型识别、导入升级目标手选、WebView2 前置检测及英中双语文档体系。
 
-### v3.0.1 — Windows 安装/卸载包与旧版数据规范化（本次发布）
+### v3.0.1 — Windows 安装/卸载包与旧版数据规范化（2026-11-19 发布）
 
 - 新增 Windows NSIS 安装/卸载包（`ModDeck-3.0.1-win-x64-setup.exe`），依赖标准注册表（`HKCU\Software\yuzhoujun\ModDeck`）在后续覆盖升级时自动定位安装目录，并在卸载确认页勾选「删除应用数据」时同步清理 `%APPDATA%\ModDeck\` 与 WebView2 数据（未勾选则完整保留）。
 - 在应用启动探测与「设置 -> 存储与备份」新增**旧版 Electron v2 遗留残留检测与一键安全清理**（识别 `Cache`、`GPUCache`、`GrShaderCache`、`bin\ModDeckKeyHelper-v2.*`、`mod-presets.json`、v2 旧日志等，不触碰任何预设、封面、配置与 Mod 备份），同时服务安装版与免安装版用户。
 
----
+### v3.1.0 — 全角色方案分游戏拆分、在线更新与环境规则开关（当前正式版，2026-11-23 发布）
 
-## 开发与预发布测试中：v3.1.0（`3.1.0-beta.3`）
-
-- **全角色池方案（Preset Pool）按游戏拆目录与无感自动迁移**（已在 `3.1.0-alpha.1` 实现）：
-  - 将根目录下单文件 `%APPDATA%\ModDeck\roster-presets.json` 迁移拆分为 `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json`（与单 Mod 预设目录 `presets\<gameId>\<角色>\<Mod>.json` 保持彻底统一，多游戏互不混杂）。
-  - 启动或首次读取时自动执行无感迁移，并在 `.moddeck-bundle` 导入阶段保持对 `v2.5.0` / `v3.0.x` 旧配置迁移包的向下兼容。
-- **应用内版本检测与镜像源一键在线升级**（`3.1.0-beta.2` 完善）：
-  - 四级检测链路（`api.github.com` API -> 无 API 速率限制的 `github.com/releases/latest` 重定向与 `releases.atom` -> 代理镜像 Atom / `raw.githubusercontent.com` -> 区分稳定/预发布信道的 `cdn.jsdelivr.net` 兜底），内置官方直连、`ghfast.top`、`gh-proxy.org` 与自定义镜像加速前缀；严格遵循默认离线原则。
-  - 启动后台检测仅在每次软件进程启动时执行一次（托盘收起再打开主窗口不重复弹出），发现新版时在右下角展示不阻塞正常点击的轻浮窗，支持悬停暂停、延时淡出、关闭，以及按版本号记录的「不再提醒此版本」（下一新版发布时自动恢复提醒）。
-  - 自动识别运行形态：安装版拉取 `ModDeck-<ver>-win-x64-setup.exe` 并打开完整安装向导（保留原安装目录预设及结束页的「启动软件 / 创建桌面快捷方式」勾选）；便携版下载 ZIP 自动覆盖文件，前置拉起主窗口并通过 `--updated-from` 在右下角弹出「更新成功」轻浮窗提示。
-- **默认预设保留名、重复校验隔离与多语言提示修正**（`#5` 修复于 `3.1.0-alpha.2`）：
-  - ![1795084888752](image/ROADMAP.zh-CN/1795084888752.png)修复英文界面下保存重复预设匹配 `__default__` 时提示文本硬编码 `"默认"` 的问题，禁止新建 `"默认"` / `"默认 (初始)"` / `"default"` 保留名预设；同时修复零持久化变量 Mod（如纯 `.ini` 切换界面 Mod）在无变量兜底读取分支串读全盘 `d3dx_user.ini` 其他 Mod 变量从而绕过 `__default__` 重复保护的缺陷。
-- **`d3dx.ini` 核心规则双向开关与环境设置重构**（已在 `3.1.0-alpha.1` 实现）：
-  - 在「设置 -> 环境」支持 `[Include] exclude_recursive = DISABLED*` 与 `[Rendering] cache_shaders = 1 / 0` 一键切换，搭配绿/黄状态规则行、头部全路径展示与「清空 `ShaderCache`」。
-  - **覆盖机制确认**：实测 `XXMI Launcher Config.json` 中 `enforce_rendering` 与 `enable_hunting` 平时启动仅覆写特定键值（如 `hunting`、`track_region_hashes`），并不包含 `cache_shaders`；仅在 EFMI 更新包且开启 `overwrite_ini = true` 重 deploy `d3dx.ini` 时才可能被模板覆盖为 `0`，因此 ModDeck 只需像对待 `exclude_recursive` / `settings_auto_save_interval` 一样做检查与一键补回即可。
-- **外部工具沙盒与 ModDeck 自身过滤卡片独立**（已在 `3.1.0-alpha.1` 实现）：
-  - 将「ModDeck 库扫描与冲突审计忽略目录」（内置 `EFMI-MCP`、`_*`、`.*` 及用户自定义目录）拆分为独立卡片并明确标注仅限 ModDeck 自身过滤、不影响 XXMI 实机加载；同时对齐 `ini_analysis.rs` 对 `_` 前缀与沙盒目录的跳过逻辑。
-- **NSIS 安装包同级打包 `languages/` 目录（`#4`）**（修复于 `3.1.0-alpha.2`）：
-  - 安装包与便携包统一在 `ModDeck.exe` 同级附带 `languages/*.json`，使「打开语言包目录」行为一致并继续支持 `%APPDATA%\ModDeck\languages\` 自定义覆盖。
+- 将根目录 `roster-presets.json` 自动拆分迁移至 `presets\<gameId>\roster-presets.json`，同时保持旧版 `.moddeck-bundle` 向下兼容与条目合并。
+- 上线默认严格离线的四级抗限流在线更新检测（`github-api` -> `github-web` / `releases.atom` -> 镜像代理 Atom / `raw-fallback` -> 区分信道的 `jsDelivr`）与镜像加速；新增不阻断点击的右下角启动/升级成功轻浮窗（支持悬停暂停淡出、托盘防重弹、`不再提醒此版本` 与 `--updated-from`）、恢复 NSIS 向导完成页选择及按语言截取渲染的 Markdown 更新明细。
+- 在「设置 -> 环境」新增 `exclude_recursive = DISABLED*` 与 `cache_shaders = 1 / 0` 一键开关、分拆 ModDeck 自身忽略目录卡片（`EFMI-MCP`、`_*`、`.*` 及自定义），并修复 NSIS 安装包语言目录打包（`#4`）与零变量 Mod 串读 `d3dx_user.ini` 绕过默认预设重复校验的问题（`#5`）。
 
 ---
 

@@ -13,31 +13,16 @@ This document serves as the persistent in-repo tracker for upcoming versions, ar
 - Replaced Electron and Chromium with Tauri 2, Rust, and Windows WebView2 across all core features (~3.5 MB portable ZIP), while archiving Electron `v2.5.0` on branch `legacy/electron`.
 - Added native archive/charset handling, INI hotkey type diagnostics (`hold` / modifier-only / mouse), import upgrade target selection, WebView2 runtime preflight, and bilingual Route A documentation.
 
-### v3.0.1 — Windows Installer & Legacy Data Cleanup (Current Release)
+### v3.0.1 — Windows Installer & Legacy Data Cleanup (Released 2026-11-19)
 
 - Added Windows NSIS installer (`ModDeck-3.0.1-win-x64-setup.exe`) with registry-backed upgrade path resolution (`HKCU\Software\yuzhoujun\ModDeck`) and optional deletion of `%APPDATA%\ModDeck\` + WebView2 data when opting into "Delete app data" on uninstall.
 - Added startup and `Settings -> Storage & Backups` detection with one-click safe cleanup for obsolete Electron v2 caches/helpers (`Cache`, `GPUCache`, `GrShaderCache`, `bin/ModDeckKeyHelper-v2.*`, `mod-presets.json`, legacy logs) while preserving all user presets, covers, settings, and backups.
 
----
+### v3.1.0 — Per-Game Roster Presets, Mirrored Updater & Loader Rule Toggles (Current Release, 2026-11-23)
 
-## Active Development: v3.1.0 (`3.1.0-beta.3` Pre-release Testing)
-
-- **Per-Game Roster Scheme Storage & Seamless Auto-Migration** (`Done in 3.1.0-alpha.1`):
-  - Split `%APPDATA%\ModDeck\roster-presets.json` into per-game files under `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json` (matching the existing `presets/<gameId>/<character>/<mod>.json` isolation model) so multi-game setups remain tidy.
-  - Perform automatic non-destructive migration from root `roster-presets.json` on startup/read and retain backwards-compatible `.moddeck-bundle` import support for `v2.5.0` / `v3.0.x` archives.
-- **In-App Update Check & Mirrored One-Click Upgrade** (`Updated in 3.1.0-beta.2`):
-  - Uses a 4-tier detection chain (`api.github.com` -> rate-limit-free `github.com/releases/latest` redirect & `releases.atom` -> mirror proxy Atom / `raw.githubusercontent.com` -> channel-guarded `jsDelivr` CDN) with user-selectable download mirrors (`Direct`, `ghfast.top`, `gh-proxy.org`, `Custom`; offline-first with optional opt-in startup check).
-  - Shows a non-blocking bottom-right floating update toast once per app process launch (unaffected by tray hide/restore), featuring hover-paused auto-fade, dismiss button, and persistent `ignoredUpdateVersion` per-version skip checkbox that resumes automatically for newer versions.
-  - Detect distribution mode (`installer` vs `portable`): installer builds launch the interactive NSIS setup wizard over the registry-tracked install location so users keep the finish-page launch & shortcut toggles; portable builds extract and replace files via a detached PowerShell swapper (`--updated-from=<old>`), focus the relaunched window, and display a green post-update confirmation toast.
-- **Localized Default Preset Name, Duplicate Guard & Reserved Name Validation** (`Done in 3.1.0-alpha.1`, `#5` fixed in `3.1.0-alpha.2`):
-  - Fixed duplicate-preset toast messages showing hardcoded `"默认"` instead of `"Default"` in non-Chinese UI when matching `__default__`, blocked saving reserved names (`"默认"` / `"默认 (初始)"` / `"default"`), and fixed 0-variable INI mods leaking unrelated `d3dx_user.ini` keys that bypassed `__default__` duplicate detection.
-- **Optional `d3dx.ini` Rule Toggles & Environment Layout** (`Done in 3.1.0-alpha.1`):
-  - Surfaced `[Include] exclude_recursive = DISABLED*` and `[Rendering] cache_shaders = 1 / 0` toggles under **Settings -> Environment**, paired with existing **Clear ShaderCache** action, full root path headers, and color-coded status rows.
-  - **XXMI Overwrite Behavior Verified**: Unlike `hunting` or `enforce_rendering` keys in `XXMI Launcher Config.json`, `cache_shaders` is not listed for per-launch override when `manage_xxmi_dll_config = true`; it is only reset to `0` if an importer package update re-deploys `d3dx.ini` (`overwrite_ini = true`), so ModDeck can check and restore it cleanly just like `exclude_recursive`.
-- **External Tool Sandbox Isolation (e.g. `Mods\EFMI-MCP\`)** (`Done in 3.1.0-alpha.1`):
-  - Excluded `EFMI-MCP`, leading-underscore (`_*`), leading-dot (`.*`), and user-configured `ignoredModDirs` folders from ModDeck library scans and conflict audits in a dedicated Environment card clearly marked ModDeck-only (does not alter `d3dx.ini`), while aligning `_`-prefixed skip rules in `ini_analysis.rs`.
-- **NSIS Installer `languages/` Bundling (`#4`)** (`Fixed in 3.1.0-alpha.2`):
-  - Bundled `languages/*.json` into NSIS installer resources alongside `ModDeck.exe` so **Open Languages Directory** aligns cleanly with portable builds while preserving `%APPDATA%\ModDeck\languages\` overrides.
+- Split `%APPDATA%\ModDeck\roster-presets.json` into per-game files under `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json` with automatic startup/read migration and legacy `.moddeck-bundle` import merging.
+- Added 4-tier mirrored online update checks (`github-api`, `github-web` / `github-atom`, mirror Atom / `raw-fallback`, channel-guarded `jsDelivr`), non-blocking bottom-right update & post-update floating toasts (`ignoredUpdateVersion`, `--updated-from`), interactive NSIS upgrade wizard finish options, and localized Markdown release note rendering.
+- Added direct `d3dx.ini` toggles (`exclude_recursive = DISABLED*`, `cache_shaders = 1 / 0`), redesigned Environment game cards, separated ModDeck-only ignore directories (`EFMI-MCP`, `_*`, `.*`, custom), bundled `languages/` in NSIS installers (`#4`), and fixed 0-variable mod `d3dx_user.ini` cross-mod leaks (`#5`).
 
 ---
 

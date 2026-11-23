@@ -4,7 +4,7 @@
 
 本项目采用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 结构与标准 [SemVer 2.0.0](https://semver.org/lang/zh-CN/) 语义化版本规范。
 
-## [Unreleased]
+## [3.1.0] - 2026-11-23
 
 ### 新增（Added）
 
