@@ -20,15 +20,15 @@ This document serves as the persistent in-repo tracker for upcoming versions, ar
 
 ---
 
-## Active Development: v3.1.0 (`3.1.0-beta.1` Pre-release Testing)
+## Active Development: v3.1.0 (`3.1.0-beta.2` Pre-release Testing)
 
 - **Per-Game Roster Scheme Storage & Seamless Auto-Migration** (`Done in 3.1.0-alpha.1`):
   - Split `%APPDATA%\ModDeck\roster-presets.json` into per-game files under `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json` (matching the existing `presets/<gameId>/<character>/<mod>.json` isolation model) so multi-game setups remain tidy.
   - Perform automatic non-destructive migration from root `roster-presets.json` on startup/read and retain backwards-compatible `.moddeck-bundle` import support for `v2.5.0` / `v3.0.x` archives.
-- **In-App Update Check & Mirrored One-Click Upgrade** (`Updated in 3.1.0-alpha.3`):
+- **In-App Update Check & Mirrored One-Click Upgrade** (`Updated in 3.1.0-beta.2`):
   - Uses a 4-tier detection chain (`api.github.com` -> rate-limit-free `github.com/releases/latest` redirect & `releases.atom` -> mirror proxy Atom / `raw.githubusercontent.com` -> channel-guarded `jsDelivr` CDN) with user-selectable download mirrors (`Direct`, `ghfast.top`, `gh-proxy.org`, `Custom`; offline-first with optional opt-in startup check).
   - Shows a non-blocking bottom-right floating update toast once per app process launch (unaffected by tray hide/restore), featuring hover-paused auto-fade, dismiss button, and persistent `ignoredUpdateVersion` per-version skip checkbox that resumes automatically for newer versions.
-  - Detect distribution mode (`installer` vs `portable`): installer builds launch `ModDeck-<ver>-win-x64-setup.exe /P` over the registry-tracked install location (`RestorePreviousInstallLocation`); portable builds download and extract `ModDeck-<ver>-win-x64.zip` via a detached PowerShell swapper.
+  - Detect distribution mode (`installer` vs `portable`): installer builds launch the interactive NSIS setup wizard over the registry-tracked install location so users keep the finish-page launch & shortcut toggles; portable builds extract and replace files via a detached PowerShell swapper (`--updated-from=<old>`), focus the relaunched window, and display a green post-update confirmation toast.
 - **Localized Default Preset Name, Duplicate Guard & Reserved Name Validation** (`Done in 3.1.0-alpha.1`, `#5` fixed in `3.1.0-alpha.2`):
   - Fixed duplicate-preset toast messages showing hardcoded `"默认"` instead of `"Default"` in non-Chinese UI when matching `__default__`, blocked saving reserved names (`"默认"` / `"默认 (初始)"` / `"default"`), and fixed 0-variable INI mods leaking unrelated `d3dx_user.ini` keys that bypassed `__default__` duplicate detection.
 - **Optional `d3dx.ini` Rule Toggles & Environment Layout** (`Done in 3.1.0-alpha.1`):

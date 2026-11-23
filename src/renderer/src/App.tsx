@@ -63,6 +63,7 @@ export default function App() {
   const [legacyStorage, setLegacyStorage] = useState<StorageOverview | null>(null)
   const [cleaningLegacy, setCleaningLegacy] = useState(false)
   const [availableUpdate, setAvailableUpdate] = useState<UpdateCheckResult | null>(null)
+  const [updatedNotice, setUpdatedNotice] = useState<{ from: string; to: string } | null>(null)
   const [lastUpdateCheck, setLastUpdateCheck] = useState<UpdateCheckResult | null>(null)
   const [updateToastFading, setUpdateToastFading] = useState(false)
   const [updateToastHovered, setUpdateToastHovered] = useState(false)
@@ -95,6 +96,9 @@ export default function App() {
         if (cancelled) return
         setBoot(data)
         setSnapshot(data.snapshot)
+        if (data.justUpdatedFrom) {
+          setUpdatedNotice({ from: data.justUpdatedFrom, to: data.appVersion })
+        }
       } catch (error) {
         if (!cancelled) setFatal(errorMessage(error))
       } finally {
@@ -258,10 +262,16 @@ export default function App() {
     }
   }
 
+  const hasFloatToast = Boolean(
+    (availableUpdate && availableUpdate.hasUpdate && availableUpdate.latestVersion) || updatedNotice
+  )
+
   function closeUpdateToast() {
     clearUpdateToastTimers()
     setUpdateToastFading(false)
+    setUpdateToastHovered(false)
     setAvailableUpdate(null)
+    setUpdatedNotice(null)
   }
 
   async function toggleSkipUpdateVersion(checked: boolean) {
@@ -309,7 +319,7 @@ export default function App() {
 
   useEffect(() => {
     clearUpdateToastTimers()
-    if (!availableUpdate || updateToastHovered) {
+    if (!hasFloatToast || updateToastHovered) {
       if (updateToastHovered) setUpdateToastFading(false)
       return
     }
@@ -317,11 +327,12 @@ export default function App() {
       setUpdateToastFading(true)
       updateHideTimerRef.current = setTimeout(() => {
         setAvailableUpdate(null)
+        setUpdatedNotice(null)
         setUpdateToastFading(false)
       }, 450)
     }, 10000)
     return clearUpdateToastTimers
-  }, [availableUpdate, updateToastHovered])
+  }, [hasFloatToast, updateToastHovered])
 
   async function cleanLegacyFromBanner() {
     setCleaningLegacy(true)
@@ -1394,61 +1405,74 @@ export default function App() {
         />
       ) : null}
 
-      {availableUpdate && availableUpdate.hasUpdate && availableUpdate.latestVersion ? (
-        <aside
-          className={`update-float-toast${updateToastFading ? ' is-fading' : ''}`}
-          role="status"
-          aria-live="polite"
-          onMouseEnter={() => {
-            setUpdateToastHovered(true)
-            setUpdateToastFading(false)
-          }}
-          onMouseLeave={() => setUpdateToastHovered(false)}
-        >
-          <div className="update-float-head">
-            <div className="update-float-title">
-              <Icon name="download" size={16} />
-              <strong>
-                {t('settings.about.updateToastTitle', { version: availableUpdate.latestVersion })}
-              </strong>
+      {(() => {
+        const isUpdateOffer = Boolean(
+          availableUpdate && availableUpdate.hasUpdate && availableUpdate.latestVersion
+        )
+        const activeOffer = isUpdateOffer ? availableUpdate : null
+        if (!activeOffer && !updatedNotice) return null
+        const isSuccess = !activeOffer
+        return (
+          <aside
+            className={`update-float-toast${isSuccess ? ' is-success' : ''}${updateToastFading ? ' is-fading' : ''}`}
+            role="status"
+            aria-live="polite"
+            onMouseEnter={() => {
+              setUpdateToastHovered(true)
+              setUpdateToastFading(false)
+            }}
+            onMouseLeave={() => setUpdateToastHovered(false)}
+          >
+            <div className="update-float-head">
+              <div className="update-float-title">
+                <Icon name={isSuccess ? 'check' : 'download'} size={16} />
+                <strong>
+                  {activeOffer
+                    ? t('settings.about.updateToastTitle', { version: activeOffer.latestVersion! })
+                    : t('settings.about.updatedSuccessTitle', { version: updatedNotice!.to })}
+                </strong>
+              </div>
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={closeUpdateToast}
+                title={t('common.close')}
+                aria-label={t('common.close')}
+              >
+                <Icon name="close" size={14} />
+              </button>
             </div>
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={closeUpdateToast}
-              title={t('common.close')}
-              aria-label={t('common.close')}
-            >
-              <Icon name="close" size={14} />
-            </button>
-          </div>
-          <p className="update-float-desc">
-            {t('settings.about.updateToastDesc', { current: availableUpdate.currentVersion })}
-          </p>
-          <div className="update-float-foot">
-            <label className="update-float-skip">
-              <input
-                type="checkbox"
-                checked={skipThisUpdate}
-                onChange={(e) => void toggleSkipUpdateVersion(e.target.checked)}
-              />
-              <span>{t('settings.about.skipVersionLabel')}</span>
-            </label>
-            <button
-              type="button"
-              className="btn primary small-btn"
-              onClick={() => {
-                setSettingsTab('about')
-                setView('settings')
-                setUpdateToastHovered(false)
-                closeUpdateToast()
-              }}
-            >
-              {t('settings.about.openAboutUpdate')}
-            </button>
-          </div>
-        </aside>
-      ) : null}
+            <p className="update-float-desc">
+              {activeOffer
+                ? t('settings.about.updateToastDesc', { current: activeOffer.currentVersion })
+                : t('settings.about.updatedSuccessDesc', { from: updatedNotice!.from })}
+            </p>
+            {activeOffer ? (
+              <div className="update-float-foot">
+                <label className="update-float-skip">
+                  <input
+                    type="checkbox"
+                    checked={skipThisUpdate}
+                    onChange={(e) => void toggleSkipUpdateVersion(e.target.checked)}
+                  />
+                  <span>{t('settings.about.skipVersionLabel')}</span>
+                </label>
+                <button
+                  type="button"
+                  className="btn primary small-btn"
+                  onClick={() => {
+                    setSettingsTab('about')
+                    setView('settings')
+                    closeUpdateToast()
+                  }}
+                >
+                  {t('settings.about.openAboutUpdate')}
+                </button>
+              </div>
+            ) : null}
+          </aside>
+        )
+      })()}
 
       {toast ? <div className={`toast ${toast.kind}`}>{toast.text}</div> : null}
 

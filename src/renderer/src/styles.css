@@ -4189,6 +4189,14 @@ input[type='range'].setting-range::-webkit-slider-thumb:active {
   pointer-events: none;
 }
 
+.update-float-toast.is-success {
+  border-color: rgba(52, 211, 153, 0.42);
+}
+
+.update-float-toast.is-success .update-float-title {
+  color: #a7f3d0;
+}
+
 .update-float-head {
   display: flex;
   align-items: center;

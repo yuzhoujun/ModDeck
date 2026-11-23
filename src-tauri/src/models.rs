@@ -304,6 +304,8 @@ pub struct Bootstrap {
     pub app_version: String,
     pub roster_map: HashMap<String, Vec<String>>,
     pub custom_locales: HashMap<String, Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub just_updated_from: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

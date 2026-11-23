@@ -836,7 +836,7 @@ pub fn download_and_launch_update(
             };
         }
 
-        if let Err(err) = Command::new(&downloaded).arg("/P").spawn() {
+        if let Err(err) = Command::new(&downloaded).spawn() {
             return UpdateInstallResult {
                 ok: false,
                 mode: mode_info.mode,
@@ -852,10 +852,10 @@ pub fn download_and_launch_update(
             mode: "installer".to_string(),
             launched: true,
             message: Some(if is_en {
-                "Installer launched. ModDeck will close to complete the in-place upgrade."
+                "Installer wizard launched. ModDeck will close so you can complete the upgrade and choose launch options on the finish page."
                     .to_string()
             } else {
-                "已启动覆盖安装程序，ModDeck 即将退出以完成原地升级。".to_string()
+                "已启动安装向导，ModDeck 即将退出；请在完成向导后按需勾选启动应用或创建快捷方式。".to_string()
             }),
             downloaded_path: Some(downloaded.to_string_lossy().to_string()),
             error: None,
@@ -934,24 +934,36 @@ pub fn download_and_launch_update(
     let script_path = temp_root.join("apply-portable-update.ps1");
     let pid = std::process::id();
     let esc = |p: &Path| p.to_string_lossy().replace('\'', "''");
+    let safe_from_ver = env!("CARGO_PKG_VERSION").replace('\'', "");
     let ps_script = format!(
         "$ErrorActionPreference = 'Stop'\r\n\
          $pidToWait = {pid}\r\n\
          $srcDir = '{src}'\r\n\
          $dstDir = '{dst}'\r\n\
          $cleanupDir = '{tmp}'\r\n\
+         $updatedFrom = '{from_ver}'\r\n\
          for ($i = 0; $i -lt 40; $i++) {{\r\n\
            if (-not (Get-Process -Id $pidToWait -ErrorAction SilentlyContinue)) {{ break }}\r\n\
            Start-Sleep -Milliseconds 300\r\n\
          }}\r\n\
-         Copy-Item -Path (Join-Path $srcDir '*') -Destination $dstDir -Recurse -Force\r\n\
+         Start-Sleep -Milliseconds 350\r\n\
+         for ($attempt = 0; $attempt -lt 6; $attempt++) {{\r\n\
+           try {{\r\n\
+             Copy-Item -Path (Join-Path $srcDir '*') -Destination $dstDir -Recurse -Force\r\n\
+             break\r\n\
+           }} catch {{\r\n\
+             if ($attempt -ge 5) {{ throw }}\r\n\
+             Start-Sleep -Milliseconds 400\r\n\
+           }}\r\n\
+         }}\r\n\
          $exePath = Join-Path $dstDir 'ModDeck.exe'\r\n\
-         if (Test-Path $exePath) {{ Start-Process -FilePath $exePath -WorkingDirectory $dstDir }}\r\n\
+         if (Test-Path $exePath) {{ Start-Process -FilePath $exePath -WorkingDirectory $dstDir -WindowStyle Normal -ArgumentList \"--updated-from=$updatedFrom\" }}\r\n\
          Start-Sleep -Seconds 2\r\n\
          Remove-Item -Path $cleanupDir -Recurse -Force -ErrorAction SilentlyContinue\r\n",
         src = esc(&payload_root),
         dst = esc(&target_dir),
-        tmp = esc(&temp_root)
+        tmp = esc(&temp_root),
+        from_ver = safe_from_ver
     );
 
     if let Err(err) = fs::write(&script_path, ps_script) {

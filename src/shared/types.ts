@@ -231,6 +231,7 @@ export interface Bootstrap {
   games: GameDef[]
   snapshot: GameSnapshot | null
   appVersion: string
+  justUpdatedFrom?: string
   rosterMap?: Record<GameId, string[]>
   customLocales?: Record<string, Record<string, any>>
 }

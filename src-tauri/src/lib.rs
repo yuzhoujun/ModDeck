@@ -335,6 +335,7 @@ struct InnerState {
     webview_data_dir: Option<PathBuf>,
     import_sessions: imports::ImportSessionManager,
     pending_queue: presets::PendingQueueState,
+    pending_updated_from: Option<String>,
 }
 
 pub struct AppState(Mutex<InnerState>);
@@ -841,12 +842,14 @@ fn bootstrap(state: State<'_, AppState>) -> Bootstrap {
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()));
     let custom_locales = load_custom_locales(exe_dir.as_deref(), &guard.base_dir);
+    let just_updated_from = guard.pending_updated_from.take();
     Bootstrap {
         pending_preset_count: 0,
         settings: guard.settings.clone(),
         games,
         snapshot,
         app_version: env!("CARGO_PKG_VERSION").to_string(),
+        just_updated_from,
         roster_map,
         custom_locales,
     }
@@ -4043,6 +4046,17 @@ fn has_webview2_runtime() -> bool {
 #[cfg(not(windows))]
 fn prompt_missing_webview2(_base_dir: &Path, _prefer_en: bool) {}
 
+fn extract_updated_from_arg() -> Option<String> {
+    std::env::args().skip(1).find_map(|arg| {
+        let ver = arg.strip_prefix("--updated-from=")?.trim();
+        if !ver.is_empty() && ver.len() <= 64 {
+            Some(ver.to_string())
+        } else {
+            None
+        }
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let base_dir = resolve_base_dir();
@@ -4065,6 +4079,8 @@ pub fn run() {
     };
 
     let setup_base_dir = base_dir.clone();
+    let updated_from = extract_updated_from_arg();
+    let focus_main_after_update = updated_from.is_some();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -4077,6 +4093,7 @@ pub fn run() {
             webview_data_dir: None,
             import_sessions: imports::ImportSessionManager::default(),
             pending_queue: presets::PendingQueueState::default(),
+            pending_updated_from: updated_from,
         })))
         .register_uri_scheme_protocol("moddeck", |ctx, request| {
             let uri = request.uri();
@@ -4190,6 +4207,9 @@ pub fn run() {
                 let state = app.state::<AppState>();
                 let mut guard = state.0.lock().expect("state lock");
                 guard.webview_data_dir = active_data_dir.clone();
+            }
+            if focus_main_after_update {
+                show_main_window(app.handle());
             }
 
             if let Err(overlay_err) =

@@ -726,6 +726,8 @@
       "updateTitle": "版本更新检测与国内镜像加速",
       "updateToastDesc": "当前 v{current}，可前往「关于」一键升级。",
       "updateToastTitle": "发现新版本 ModDeck v{version}",
+      "updatedSuccessDesc": "已由 v{from} 原地替换并自动重启完成。",
+      "updatedSuccessTitle": "已更新至 ModDeck v{version}",
       "userDataBadge": "本地持久化存储",
       "userDataLabel": "数据存储根目录 (userData)",
       "version": "软件版本"

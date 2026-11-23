@@ -726,6 +726,8 @@
       "updateTitle": "Software Updates & Mirror Acceleration",
       "updateToastDesc": "Current v{current}. View About to upgrade.",
       "updateToastTitle": "ModDeck v{version} Available",
+      "updatedSuccessDesc": "Upgraded in place from v{from} and relaunched.",
+      "updatedSuccessTitle": "Updated to ModDeck v{version}",
       "userDataBadge": "Local Persistent Storage",
       "userDataLabel": "User Data Directory (userData)",
       "version": "Software Version"

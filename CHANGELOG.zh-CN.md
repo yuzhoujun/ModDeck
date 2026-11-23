@@ -10,7 +10,7 @@
 
 - **全角色方案分游戏拆分存储与无感自动迁移**：启动或访问预设方案时，自动将根目录遗留的 `%APPDATA%\ModDeck\roster-presets.json` 无感拆分迁移至各游戏独立文件 `%APPDATA%\ModDeck\presets\<gameId>\roster-presets.json` 并按条目 ID 合并去重；完全兼容导入旧版 `.moddeck-bundle` 配置迁移包。
 - **`d3dx.ini` 规则直连开关与环境检查重排版（「设置 -> 环境」）**：新增 `[Include]` `exclude_recursive = DISABLED*` 与 `[Rendering]` `cache_shaders = 1 / 0` 一键切换按钮，采用绿/黄底纹规则行直观区分状态，并在卡片右上角展示完整根目录；将 `EFMI-MCP`、`_*`、`.*` 及自定义「**ModDeck 库扫描与冲突审计忽略目录**」拆分为独立卡片，明确区分 ModDeck 自身过滤与 XXMI 加载器规则。
-- **在线版本检测、国内镜像加速与一键升级（「设置 -> 关于」）**：遵循默认严格离线原则（默认关闭后台检查，仅在手动点击或用户主动勾选开启后联网）；构建四级抗限流检测链路（`api.github.com` REST API -> 无 API 限流的 `github.com/releases/latest` 重定向与 `releases.atom` 订阅 -> 镜像代理 Atom / `raw.githubusercontent.com` -> 区分稳定/预发布信道的 `jsDelivr` CDN）；启动检测到新版时仅在每次软件启动（托盘呼出主窗口不重复弹出）在右下角展示不阻塞点击的轻浮窗提醒，支持悬停暂停、延时自动淡出、关闭以及按版本号生效的「不再提醒此版本」；内置官方直连、`ghfast.top`、`gh-proxy.org` 与自定义镜像，自动识别安装版或便携版完成一键升级。
+- **在线版本检测、国内镜像加速与一键升级（「设置 -> 关于」）**：遵循默认严格离线原则（默认关闭后台检查，仅在手动点击或用户主动勾选开启后联网）；构建四级抗限流检测链路（`api.github.com` REST API -> 无 API 速率限制的 `github.com/releases/latest` 重定向与 `releases.atom` 订阅 -> 镜像代理 Atom / `raw.githubusercontent.com` -> 区分稳定/预发布信道的 `jsDelivr` CDN）；启动检测到新版时仅在每次软件启动（托盘呼出主窗口不重复弹出）在右下角展示不阻塞点击的轻浮窗提醒，支持悬停暂停、延时自动淡出、关闭以及按版本号生效的「不再提醒此版本」；内置官方直连、`ghfast.top`、`gh-proxy.org` 与自定义镜像，安装版升级调起完整 NSIS 安装向导以保留完成页的启动与桌面快捷方式选项，便携版支持无注册表原地覆盖并前置拉起窗口展示升级成功轻提示。
 
 ### 修复（Fixed）
 
