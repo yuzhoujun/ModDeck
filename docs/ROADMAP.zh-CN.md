@@ -41,6 +41,8 @@
   - 通过零依赖文件体积扫描直接统计启用中 Mod 内单文件超过 `32 MiB`（如 `8192×8192`）的 `.dds` 贴图，在「Mod 详情 / 静态诊断」与全局审计 `info` 汇总中提示首帧/重载卡顿风险（可联动推荐开启 `cache_shaders = 1`）。
 - **一键复制精简 Markdown 诊断上下文**：
   - 在冲突审计弹窗新增「复制诊断摘要」按钮，生成脱敏相对路径、冲突 Hash / 寄存器 / 热键、`.ini` 行号与环境状态的紧凑 Markdown，方便直接粘贴给外部 AI 会话或 `EFMI-MCP` 接力排障。
+- **非 API 更新兜底链路（`github-atom` / `github-web` / 镜像）补全更新明细**：
+  - 从 `releases.atom` 的 `<content type="html">`（或对应 Release 页面）提取并清洗标准化双语 Release 说明（遵循统一的 `## English` / `## 简体中文` / `### Checksums` 发版模板），使 `api.github.com` 触发 403 限流退至兜底数据源时，「设置 -> 关于」仍能完整渲染更新说明。
 
 ---
 

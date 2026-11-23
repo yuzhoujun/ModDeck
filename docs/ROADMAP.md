@@ -41,6 +41,8 @@ This document serves as the persistent in-repo tracker for upcoming versions, ar
   - Flag oversized single `.dds` files (`> 32 MiB`, such as `8192×8192`) by fast file-size inspection (zero heavy DDS decoding dependencies) in Mod Details / Static Diagnostics and aggregate them in Global Audit (`info`) complementing `cache_shaders = 1`.
 - **One-Click Compact Markdown Diagnostic Context Copy**:
   - Add a "Copy Diagnostic Summary" button in the Conflict Audit modal exporting sanitized relative paths, conflict hashes/registers/hotkeys, `.ini` line numbers, and `d3dx.ini` status as compact Markdown for pasting into AI sessions or `EFMI-MCP`.
+- **Release Notes Extraction on Non-API Update Fallbacks**:
+  - Parse sanitized `<content type="html">` from `releases.atom` (or release tag pages on `github-web` / `mirror-atom`) following the standardized `## English` / `## 简体中文` Release template, so formatted release notes still render cleanly in **Settings -> About** when `api.github.com` is rate-limited.
 
 ---
 
