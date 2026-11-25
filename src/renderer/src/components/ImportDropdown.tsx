@@ -73,13 +73,17 @@ export function ImportDropdown({
           <button
             type="button"
             className="import-menu-item"
+            title={t('library.importFolderMultiHint')}
             onClick={() => {
               setOpen(false)
               onImportFolder()
             }}
           >
             <Icon name="folder" size={14} />
-            <span>{t('library.importFolder')}</span>
+            <span className="import-menu-item-text">
+              <span>{t('library.importFolder')}</span>
+              <span className="import-menu-item-hint">{t('library.importFolderMultiHint')}</span>
+            </span>
           </button>
         </div>
       )}

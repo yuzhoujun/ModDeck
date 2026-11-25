@@ -4,6 +4,18 @@
 
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning 2.0.0](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **Mod Overwrite Backup Directory Shortcuts (`#9`)**: Added an **Open Backup Folder** action to both the **Local Data & Storage** overview and the **Mod Overwrite Backup History** header (`open_path("backups")`), along with a per-backup **Open Backup Directory** button (`open_backup_folder`) to open each snapshot directly in Explorer.
+- **Built-In Roster Refresh & Comma-Separated Aliases**: Updated [roster.json](roster.json) (`2026-11-25`) with verified official CN/EN entries across all five built-in games (including `Typhoeus` / `Tiphlos`), exposed `"aliases"` across all entries, and added comma-delimited string/array alias parsing (`deserialize_roster_aliases`).
+
+### Fixed
+
+- **Folder Drag-and-Drop & Multi-Folder Import Discoverability (`#6`)**: Added WebView2 `FileSystemDirectoryEntry` (`webkitGetAsEntry`) directory traversal and backend drop-session folder staging (`stage_dropped_folder_file`, capped at 2 GiB with cleanup on commit/discard) so dragging mod folders onto the main window works cleanly alongside archives without breaking internal card/mod drag sorting, and surfaced Ctrl/Shift multi-select guidance on the **Import Folder** menu item.
+- **Same-Name Mod Conflict Detection & Disabled-State Preservation (`#7`)**: Auto-matched incoming candidates against existing character mods (stripping `DISABLED_` prefixes case-insensitively) in the Import Preview dialog with explicit conflict/keep-both options; ensured `unique_dir_name` checks bare names across enabled and disabled siblings, and preserved `DISABLED_` state when overwriting disabled mod directories after backing up the previous copy.
+
 ## [3.1.0] - 2026-11-23
 
 ### Added

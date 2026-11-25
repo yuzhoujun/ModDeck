@@ -1820,6 +1820,14 @@ export function SettingsView({
                 <button
                   type="button"
                   className="btn ghost small-btn"
+                  onClick={() => void window.moddeck.openPath('backups')}
+                >
+                  <Icon name="folder" size={14} />
+                  {t('settings.storage.openBackupsFolder')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost small-btn"
                   disabled={storageLoading}
                   onClick={() => void refreshStorageOverview()}
                 >
@@ -1964,6 +1972,14 @@ export function SettingsView({
                 <button
                   type="button"
                   className="btn ghost tiny-btn"
+                  onClick={() => void window.moddeck.openPath('backups')}
+                >
+                  <Icon name="folder" size={12} />
+                  {t('settings.storage.openBackupsFolder')}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost tiny-btn"
                   disabled={pruningBackups || !storageOverview?.backups.length}
                   onClick={() => void handlePruneBackups(30)}
                 >
@@ -2023,6 +2039,14 @@ export function SettingsView({
                           {restoringBackupId === item.id
                             ? t('common.processing')
                             : t('settings.storage.restoreBtn')}
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          title={t('settings.storage.openBackupItemFolder')}
+                          onClick={() => void window.moddeck.openBackupFolder(item.id)}
+                        >
+                          <Icon name="folder" size={14} />
                         </button>
                         <button
                           type="button"

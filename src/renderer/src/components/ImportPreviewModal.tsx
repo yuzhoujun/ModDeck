@@ -10,6 +10,12 @@ import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { useI18n, getLocaleCharacterName, getLocaleGameShortName } from '../i18n'
 
+const KEEP_BOTH_VALUE = '__keep_both__'
+
+function stripDisabledPrefix(name: string): string {
+  return name.replace(/^disabled_/i, '').trim()
+}
+
 export function ImportPreviewModal({
   game,
   parsed,
@@ -51,6 +57,7 @@ export function ImportPreviewModal({
     return map
   })
   const [overwriteTargets, setOverwriteTargets] = useState<Record<string, string>>({})
+  const [manualOverwriteChoices, setManualOverwriteChoices] = useState<Set<string>>(() => new Set())
   const [modsByChar, setModsByChar] = useState<Record<string, ModInfo[]>>({})
   const [submitting, setSubmitting] = useState(false)
 
@@ -87,6 +94,41 @@ export function ImportPreviewModal({
       cancelled = true
     }
   }, [charAssignments, defaultOtherFolder, existingFolderSet, game.id, modsByChar, parsed.candidates])
+
+  useEffect(() => {
+    setOverwriteTargets((current) => {
+      let changed = false
+      const next = { ...current }
+      for (const candidate of parsed.candidates) {
+        if (manualOverwriteChoices.has(candidate.id)) continue
+        const assigned = charAssignments[candidate.id] || defaultOtherFolder
+        const existingMods = modsByChar[assigned]
+        if (!existingMods) continue
+        const bareTarget = stripDisabledPrefix(
+          (modNames[candidate.id] ?? candidate.modName).trim()
+        ).toLowerCase()
+        const match = bareTarget
+          ? existingMods.find(
+              (m) => stripDisabledPrefix(m.folderName).toLowerCase() === bareTarget
+            )
+          : undefined
+        const autoVal = match ? match.folderName : ''
+        if ((next[candidate.id] || '') !== autoVal) {
+          if (autoVal) next[candidate.id] = autoVal
+          else delete next[candidate.id]
+          changed = true
+        }
+      }
+      return changed ? next : current
+    })
+  }, [
+    charAssignments,
+    defaultOtherFolder,
+    manualOverwriteChoices,
+    modNames,
+    modsByChar,
+    parsed.candidates
+  ])
 
   const otherLabel = t('common.other')
 
@@ -186,6 +228,15 @@ export function ImportPreviewModal({
       }
       return next
     })
+    setManualOverwriteChoices((current) => {
+      const next = new Set(current)
+      for (const candidate of parsed.candidates) {
+        if (selectedIds.has(candidate.id)) {
+          next.delete(candidate.id)
+        }
+      }
+      return next
+    })
   }
 
   async function handleConfirm() {
@@ -196,7 +247,9 @@ export function ImportPreviewModal({
         .filter((candidate) => selectedIds.has(candidate.id))
         .map((candidate) => {
           const customName = (modNames[candidate.id] ?? candidate.modName).trim()
-          const overwriteTarget = overwriteTargets[candidate.id]?.trim() || undefined
+          const rawTarget = overwriteTargets[candidate.id]?.trim()
+          const overwriteTarget =
+            rawTarget && rawTarget !== KEEP_BOTH_VALUE ? rawTarget : undefined
           return {
             id: candidate.id,
             characterFolder: charAssignments[candidate.id] || defaultOtherFolder,
@@ -345,6 +398,16 @@ export function ImportPreviewModal({
             const assigned = charAssignments[candidate.id] || defaultOtherFolder
             const existingMods = modsByChar[assigned] ?? []
             const selectedOverwrite = overwriteTargets[candidate.id] || ''
+            const isKeepBoth = selectedOverwrite === KEEP_BOTH_VALUE
+            const activeReplaceTarget = !isKeepBoth && selectedOverwrite ? selectedOverwrite : ''
+            const bareTarget = stripDisabledPrefix(
+              (modNames[candidate.id] ?? candidate.modName).trim()
+            ).toLowerCase()
+            const sameNameMatch = bareTarget
+              ? existingMods.find(
+                  (m) => stripDisabledPrefix(m.folderName).toLowerCase() === bareTarget
+                )
+              : undefined
             return (
               <div
                 key={candidate.id}
@@ -365,9 +428,16 @@ export function ImportPreviewModal({
                 >
                   <div className="import-candidate-title">
                     <strong>{candidate.modName}</strong>
-                    {selectedOverwrite ? (
+                    {sameNameMatch ? (
                       <span className="tag warn">
-                        {t('importModal.upgradeTargetBadge', { target: selectedOverwrite })}
+                        {isKeepBoth
+                          ? t('importModal.sameNameKeepNewBadge')
+                          : t('importModal.sameNameDetected')}
+                      </span>
+                    ) : null}
+                    {activeReplaceTarget ? (
+                      <span className="tag warn">
+                        {t('importModal.upgradeTargetBadge', { target: activeReplaceTarget })}
                       </span>
                     ) : null}
                     {!candidate.hasIni ? (
@@ -405,12 +475,18 @@ export function ImportPreviewModal({
                     <select
                       className="select compact-select import-upgrade-select"
                       value={selectedOverwrite}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        const value = event.target.value
+                        setManualOverwriteChoices((current) => {
+                          const next = new Set(current)
+                          next.add(candidate.id)
+                          return next
+                        })
                         setOverwriteTargets((current) => ({
                           ...current,
-                          [candidate.id]: event.target.value
+                          [candidate.id]: value
                         }))
-                      }
+                      }}
                       title={t('importModal.upgradeTargetTooltip')}
                       disabled={submitting || existingMods.length === 0}
                     >
@@ -419,6 +495,9 @@ export function ImportPreviewModal({
                           ? t('importModal.upgradeTargetAuto')
                           : t('importModal.upgradeTargetNoExisting')}
                       </option>
+                      {existingMods.length > 0 ? (
+                        <option value={KEEP_BOTH_VALUE}>{t('importModal.keepBothOption')}</option>
+                      ) : null}
                       {existingMods.map((mod) => (
                         <option key={mod.folderName} value={mod.folderName}>
                           {t('importModal.upgradeTargetOption', {
@@ -442,6 +521,12 @@ export function ImportPreviewModal({
                     setOverwriteTargets((current) => {
                       const next = { ...current }
                       delete next[candidate.id]
+                      return next
+                    })
+                    setManualOverwriteChoices((current) => {
+                      if (!current.has(candidate.id)) return current
+                      const next = new Set(current)
+                      next.delete(candidate.id)
                       return next
                     })
                   }}

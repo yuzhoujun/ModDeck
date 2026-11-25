@@ -1096,6 +1096,11 @@ fn open_path(state: State<'_, AppState>, kind: String, game_id: Option<String>) 
             let _ = fs::create_dir_all(&dir);
             dir
         }
+        "backups" => {
+            let dir = guard.base_dir.join("backups");
+            let _ = fs::create_dir_all(&dir);
+            dir
+        }
         "languages" | "locales" => {
             let exe_langs = std::env::current_exe()
                 .ok()
@@ -1166,6 +1171,21 @@ fn open_in_explorer(target: &Path) -> SimpleResult {
         Err(e) => SimpleResult {
             ok: false,
             error: Some(e.to_string()),
+        },
+    }
+}
+
+#[tauri::command]
+fn open_backup_folder(state: State<'_, AppState>, backup_id: String) -> SimpleResult {
+    let base_dir = {
+        let guard = state.0.lock().expect("state lock");
+        guard.base_dir.clone()
+    };
+    match storage::resolve_mod_backup_path(&base_dir, &backup_id) {
+        Ok(path) => open_in_explorer(&path),
+        Err(err) => SimpleResult {
+            ok: false,
+            error: Some(err),
         },
     }
 }
@@ -2218,6 +2238,47 @@ async fn stage_dropped_file(
     .await
     .map_err(|e| format!("Drop staging failed: {e}"))??;
     Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn stage_dropped_folder_file(
+    state: State<'_, AppState>,
+    request: tauri::ipc::Request<'_>,
+) -> Result<String, String> {
+    let base_dir = {
+        let guard = state.0.lock().expect("state lock");
+        guard.base_dir.clone()
+    };
+
+    let (session_id, rel_path, bytes): (String, String, Vec<u8>) = match request.body() {
+        tauri::ipc::InvokeBody::Raw(raw) => {
+            let session_id = request
+                .headers()
+                .get("x-drop-session")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string();
+            let encoded_rel = request
+                .headers()
+                .get("x-rel-path")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            let rel_path = percent_encoding::percent_decode_str(encoded_rel)
+                .decode_utf8_lossy()
+                .into_owned();
+            (session_id, rel_path, raw.clone())
+        }
+        tauri::ipc::InvokeBody::Json(_) => {
+            return Err("Expected raw bytes payload for stage_dropped_folder_file".to_string());
+        }
+    };
+
+    let root_path = tauri::async_runtime::spawn_blocking(move || {
+        imports::stage_dropped_folder_file(&base_dir, &session_id, &rel_path, &bytes)
+    })
+    .await
+    .map_err(|e| format!("Drop folder staging failed: {e}"))??;
+    Ok(root_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -4299,6 +4360,7 @@ pub fn run() {
             pick_import_folder,
             pick_import_folders,
             stage_dropped_file,
+            stage_dropped_folder_file,
             cleanup_staged_drops,
             import_parse,
             import_commit,
@@ -4306,6 +4368,7 @@ pub fn run() {
             import_run,
             get_storage_overview,
             restore_mod_backup,
+            open_backup_folder,
             delete_mod_backup,
             prune_mod_backups,
             clean_legacy_electron_data,

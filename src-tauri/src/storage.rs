@@ -589,6 +589,22 @@ impl<T> LastIndexHelper for Vec<T> {
     }
 }
 
+pub fn resolve_mod_backup_path(base_dir: &Path, backup_id: &str) -> Result<PathBuf, String> {
+    let backups_root = base_dir.join("backups");
+    let segments: Vec<&str> = backup_id.split('/').filter(|s| !s.is_empty()).collect();
+    if segments.is_empty() || segments.iter().any(|s| *s == "." || *s == "..") {
+        return Err("Invalid backup ID".to_string());
+    }
+    let mut backup_path = backups_root.clone();
+    for seg in &segments {
+        backup_path.push(seg);
+    }
+    if !is_inside(&backups_root, &backup_path) || !backup_path.exists() {
+        return Err("Backup folder does not exist or path is invalid".to_string());
+    }
+    Ok(backup_path)
+}
+
 pub fn restore_mod_backup(
     base_dir: &Path,
     backup_id: &str,
@@ -596,16 +612,14 @@ pub fn restore_mod_backup(
 ) -> ToggleResult {
     let backups_root = base_dir.join("backups");
     let segments: Vec<&str> = backup_id.split('/').filter(|s| !s.is_empty()).collect();
-    if segments.len() < 3 || segments.iter().any(|s| *s == "." || *s == "..") {
+    if segments.len() < 3 {
         return ToggleResult::err("Invalid backup ID");
     }
-    let mut backup_path = backups_root.clone();
-    for seg in &segments {
-        backup_path.push(seg);
-    }
-    if !is_inside(&backups_root, &backup_path) || !backup_path.is_dir() {
-        return ToggleResult::err("Backup folder does not exist or path is invalid");
-    }
+    let backup_path = match resolve_mod_backup_path(base_dir, backup_id) {
+        Ok(p) if p.is_dir() => p,
+        Ok(_) => return ToggleResult::err("Backup folder does not exist or path is invalid"),
+        Err(err) => return ToggleResult::err(err),
+    };
 
     let game_id = segments[1];
     let rest = &segments[2..];
@@ -667,17 +681,10 @@ pub fn restore_mod_backup(
 
 pub fn delete_mod_backup(base_dir: &Path, backup_id: &str) -> ToggleResult {
     let backups_root = base_dir.join("backups");
-    let segments: Vec<&str> = backup_id.split('/').filter(|s| !s.is_empty()).collect();
-    if segments.is_empty() || segments.iter().any(|s| *s == "." || *s == "..") {
-        return ToggleResult::err("Invalid backup ID");
-    }
-    let mut backup_path = backups_root.clone();
-    for seg in &segments {
-        backup_path.push(seg);
-    }
-    if !is_inside(&backups_root, &backup_path) || !backup_path.exists() {
-        return ToggleResult::err("Backup folder does not exist");
-    }
+    let backup_path = match resolve_mod_backup_path(base_dir, backup_id) {
+        Ok(p) => p,
+        Err(err) => return ToggleResult::err(err),
+    };
     let res = if backup_path.is_dir() {
         fs::remove_dir_all(&backup_path)
     } else {

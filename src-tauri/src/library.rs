@@ -647,7 +647,7 @@ pub fn list_mods(
     Ok(mods)
 }
 
-fn strip_disabled_prefix(name: &str) -> &str {
+pub fn strip_disabled_prefix(name: &str) -> &str {
     // Compare ASCII bytes first so byte index 9 is guaranteed to be a valid UTF-8 boundary.
     if name
         .as_bytes()
@@ -1480,15 +1480,38 @@ pub fn sanitize_segment(raw: &str, fallback: &str) -> String {
 }
 
 /// Returns a unique directory name under `parent` by appending `(2)`, `(3)`, ... when needed.
+/// Checks if a sibling mod directory already claims `bare_name` (enabled or `DISABLED_`-prefixed).
+fn has_bare_dir_conflict(parent: &Path, bare_name: &str) -> bool {
+    if parent.join(bare_name).exists() || parent.join(format!("DISABLED_{bare_name}")).exists() {
+        return true;
+    }
+    let Ok(entries) = fs::read_dir(parent) else {
+        return false;
+    };
+    entries.flatten().any(|entry| {
+        entry
+            .file_name()
+            .to_str()
+            .is_some_and(|fname| strip_disabled_prefix(fname).eq_ignore_ascii_case(bare_name))
+    })
+}
+
 pub fn unique_dir_name(parent: &Path, base_name: &str) -> String {
     let clean = sanitize_segment(base_name, "mod");
-    if !parent.join(&clean).exists() {
+    let has_disabled = clean.len() != strip_disabled_prefix(&clean).len();
+    let bare = strip_disabled_prefix(&clean);
+    if !parent.join(&clean).exists() && !has_bare_dir_conflict(parent, bare) {
         return clean;
     }
     let mut idx = 2usize;
     loop {
-        let candidate = format!("{clean} ({idx})");
-        if !parent.join(&candidate).exists() {
+        let candidate_bare = format!("{bare} ({idx})");
+        let candidate = if has_disabled {
+            format!("DISABLED_{candidate_bare}")
+        } else {
+            candidate_bare.clone()
+        };
+        if !parent.join(&candidate).exists() && !has_bare_dir_conflict(parent, &candidate_bare) {
             return candidate;
         }
         idx += 1;

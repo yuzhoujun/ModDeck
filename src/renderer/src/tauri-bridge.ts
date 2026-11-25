@@ -56,6 +56,129 @@ export async function resolveDroppedFilePath(file: File): Promise<string> {
   return ''
 }
 
+const MAX_DROP_STAGING_BYTES = 2 * 1024 * 1024 * 1024
+
+interface CollectedDropDirFile {
+  relPath: string
+  file: File
+}
+
+async function readAllDirectoryEntries(reader: FileSystemDirectoryReader): Promise<FileSystemEntry[]> {
+  const all: FileSystemEntry[] = []
+  while (true) {
+    const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => {
+      reader.readEntries(resolve, reject)
+    })
+    if (batch.length === 0) break
+    all.push(...batch)
+  }
+  return all
+}
+
+async function collectDirectoryFiles(
+  entry: FileSystemDirectoryEntry,
+  prefix = entry.name
+): Promise<CollectedDropDirFile[]> {
+  const children = await readAllDirectoryEntries(entry.createReader())
+  const collected: CollectedDropDirFile[] = []
+  for (const child of children) {
+    const childRel = `${prefix}/${child.name}`
+    if (child.isFile) {
+      const file = await new Promise<File>((resolve, reject) => {
+        ;(child as FileSystemFileEntry).file(resolve, reject)
+      })
+      collected.push({ relPath: childRel, file })
+    } else if (child.isDirectory) {
+      const nested = await collectDirectoryFiles(child as FileSystemDirectoryEntry, childRel)
+      collected.push(...nested)
+    }
+  }
+  return collected
+}
+
+/**
+ * Captures dropped items synchronously before any `await`, supporting both files and directories.
+ */
+export async function resolveDroppedItems(
+  dataTransfer: DataTransfer
+): Promise<{ paths: string[]; tooLarge?: boolean }> {
+  type CapturedItem =
+    | { kind: 'dir'; entry: FileSystemDirectoryEntry }
+    | { kind: 'file'; file: File }
+
+  const captured: CapturedItem[] = []
+  const itemList = Array.from(dataTransfer.items || [])
+  for (const item of itemList) {
+    if (item.kind !== 'file') continue
+    const entry = item.webkitGetAsEntry?.()
+    if (entry?.isDirectory) {
+      captured.push({ kind: 'dir', entry: entry as FileSystemDirectoryEntry })
+    } else {
+      const file = item.getAsFile()
+      if (file) captured.push({ kind: 'file', file })
+    }
+  }
+  if (captured.length === 0) {
+    for (const file of Array.from(dataTransfer.files || [])) {
+      captured.push({ kind: 'file', file })
+    }
+  }
+
+  const hasDirs = captured.some((item) => item.kind === 'dir')
+  if (!hasDirs) {
+    const paths = (
+      await Promise.all(
+        captured
+          .filter((item): item is { kind: 'file'; file: File } => item.kind === 'file')
+          .map((item) => resolveDroppedFilePath(item.file))
+      )
+    ).filter((item): item is string => Boolean(item))
+    return { paths }
+  }
+
+  // First collect all directory files to verify total size before staging over IPC.
+  const dirFileBatches: Array<{ rootName: string; files: CollectedDropDirFile[] }> = []
+  let totalBytes = 0
+  for (const item of captured) {
+    if (item.kind === 'dir') {
+      const files = await collectDirectoryFiles(item.entry, item.entry.name)
+      for (const f of files) totalBytes += f.file.size
+      dirFileBatches.push({ rootName: item.entry.name, files })
+    } else {
+      totalBytes += item.file.size
+    }
+  }
+
+  if (totalBytes > MAX_DROP_STAGING_BYTES) {
+    return { paths: [], tooLarge: true }
+  }
+
+  const paths: string[] = []
+  const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  for (const batch of dirFileBatches) {
+    let stagedRoot = ''
+    for (const item of batch.files) {
+      const buffer = await item.file.arrayBuffer()
+      stagedRoot = await invoke<string>('stage_dropped_folder_file', buffer, {
+        headers: {
+          'x-drop-session': sessionId,
+          'x-rel-path': encodeURIComponent(item.relPath)
+        }
+      })
+    }
+    if (stagedRoot) paths.push(stagedRoot)
+  }
+
+  for (const item of captured) {
+    if (item.kind === 'file') {
+      const resolved = await resolveDroppedFilePath(item.file)
+      if (resolved) paths.push(resolved)
+    }
+  }
+
+  return { paths }
+}
+
 export async function cleanupStagedDrops(paths: string[]): Promise<void> {
   if (paths.length === 0) return
   if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
@@ -98,6 +221,7 @@ export function ensureTauriBridge(): void {
     openCharacterFolder: (gameId, characterFolder) =>
       invoke('open_character_folder', { gameId, characterFolder }),
     openPath: (kind, gameId) => invoke('open_path', { kind, gameId }),
+    openBackupFolder: (backupId) => invoke<ToggleResult>('open_backup_folder', { backupId }),
     openExternalUrl: (url) => invoke<SimpleResult>('open_external_url', { url }),
     pickModsFolder: () => invoke<string | null>('pick_mods_folder'),
     pickXxmiRoot: () => invoke<AutoDetectPathsResult>('pick_xxmi_root'),

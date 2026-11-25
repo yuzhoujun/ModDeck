@@ -28,7 +28,7 @@ import { LibraryView } from './views/LibraryView'
 import { SettingsView } from './views/SettingsView'
 import { errorMessage, formatBytes } from './utils'
 import { useI18n, getLocaleGameShortName, getLocaleGameName } from './i18n'
-import { cleanupStagedDrops, resolveDroppedFilePath } from './tauri-bridge'
+import { cleanupStagedDrops, resolveDroppedItems } from './tauri-bridge'
 
 type View = 'library' | 'character' | 'settings'
 type ToastKind = 'ok' | 'err' | 'info'
@@ -729,15 +729,21 @@ export default function App() {
     if (!isExternalFileDrag(event)) return
     event.preventDefault()
     setDropActive(false)
-    const files = Array.from(event.dataTransfer.files)
-    if (files.length === 0) return
     setBusy(true)
     let paths: string[] = []
+    let tooLarge = false
     try {
-      paths = (await Promise.all(files.map((file) => resolveDroppedFilePath(file))))
-        .filter((item): item is string => Boolean(item))
+      const resolved = await resolveDroppedItems(event.dataTransfer)
+      paths = resolved.paths
+      tooLarge = Boolean(resolved.tooLarge)
+    } catch (error) {
+      notify(errorMessage(error), 'err')
     } finally {
       if (paths.length === 0) setBusy(false)
+    }
+    if (tooLarge) {
+      notify(t('common.dropTooLarge'), 'err')
+      return
     }
     if (paths.length === 0) return
     const targetCharacter = view === 'character' && selected ? selected.folder : undefined

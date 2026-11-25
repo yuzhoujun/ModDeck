@@ -185,7 +185,8 @@ export interface ModDeckApi {
   deleteMods(gameId: GameId, characterFolder: string, modFolders: string[]): Promise<ToggleResult>
   openModFolder(gameId: GameId, characterFolder: string, modFolder: string): Promise<ToggleResult>
   openCharacterFolder(gameId: GameId, characterFolder: string): Promise<ToggleResult>
-  openPath(kind: 'mods' | 'game' | 'loader' | 'data' | 'logs' | 'languages' | 'locales', gameId?: GameId): Promise<ToggleResult>
+  openPath(kind: 'mods' | 'game' | 'loader' | 'data' | 'logs' | 'backups' | 'languages' | 'locales', gameId?: GameId): Promise<ToggleResult>
+  openBackupFolder(backupId: string): Promise<ToggleResult>
   openExternalUrl(url: string): Promise<SimpleResult>
   pickModsFolder(): Promise<string | null>
   pickXxmiRoot(): Promise<AutoDetectPathsResult>
