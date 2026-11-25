@@ -1,4 +1,7 @@
-use crate::models::{GameDef, RosterCacheFile, RosterEntry, RosterSyncResult, RosterSyncStatus};
+use crate::models::{
+    normalize_roster_aliases, GameDef, RosterCacheFile, RosterEntry, RosterSyncResult,
+    RosterSyncStatus,
+};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -49,14 +52,7 @@ pub fn sanitize_roster_entry(entry: &RosterEntry) -> Option<RosterEntry> {
     }
     let en = entry.en.trim().to_string();
     let pinyin = entry.pinyin.trim().to_lowercase();
-    let mut seen_aliases = HashSet::new();
-    let mut aliases = Vec::new();
-    for a in &entry.aliases {
-        let cleaned = a.trim().to_string();
-        if !cleaned.is_empty() && seen_aliases.insert(cleaned.clone()) {
-            aliases.push(cleaned);
-        }
-    }
+    let aliases = normalize_roster_aliases(entry.aliases.iter().map(String::as_str));
     let kind = match entry.kind.as_deref() {
         Some("utility") => Some("utility".to_string()),
         Some("character") => Some("character".to_string()),
@@ -771,5 +767,29 @@ mod tests {
         );
         let map = get_roster_map(&builtin_games(), Some(&cache), false);
         assert!(map["endfield"].iter().any(|n| n == "测试新角色"));
+    }
+
+    #[test]
+    fn parses_comma_separated_and_array_aliases() {
+        let from_str: RosterEntry = serde_json::from_str(
+            r#"{"zh":"提弗洛斯","en":"Typhoeus","pinyin":"tifuluosi","aliases":"Tiphlos, AltOne ， AltOne , AltTwo"}"#,
+        )
+        .unwrap();
+        assert_eq!(from_str.aliases, vec!["Tiphlos", "AltOne", "AltTwo"]);
+
+        let from_mixed_arr: RosterEntry = serde_json::from_str(
+            r#"{"zh":"提弗洛斯","en":"Typhoeus","pinyin":"tifuluosi","aliases":["Tiphlos, AltOne","AltTwo"]}"#,
+        )
+        .unwrap();
+        assert_eq!(from_mixed_arr.aliases, vec!["Tiphlos", "AltOne", "AltTwo"]);
+
+        let from_null: RosterEntry =
+            serde_json::from_str(r#"{"zh":"祀","en":"Si","pinyin":"si","aliases":null}"#).unwrap();
+        assert!(from_null.aliases.is_empty());
+
+        assert_eq!(
+            find_canonical_en("endfield", "Tiphlos", None).as_deref(),
+            Some("Typhoeus")
+        );
     }
 }

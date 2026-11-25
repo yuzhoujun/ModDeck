@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use serde::de::{self, Deserializer, SeqAccess, Visitor};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -405,6 +407,80 @@ fn default_roster_schema_version() -> u32 {
     1
 }
 
+/// Splits comma-delimited alias strings (ASCII `,` or full-width `，`), trims, and deduplicates while preserving order.
+pub fn normalize_roster_aliases<'a, I>(items: I) -> Vec<String>
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for item in items {
+        for part in item.split([',', '，']) {
+            let cleaned = part.trim();
+            if !cleaned.is_empty() && seen.insert(cleaned.to_string()) {
+                out.push(cleaned.to_string());
+            }
+        }
+    }
+    out
+}
+
+fn deserialize_roster_aliases<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct AliasesVisitor;
+
+    impl<'de> Visitor<'de> for AliasesVisitor {
+        type Value = Vec<String>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a comma-separated string, an array of strings, or null")
+        }
+
+        fn visit_unit<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Vec::new())
+        }
+
+        fn visit_none<E>(self) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(Vec::new())
+        }
+
+        fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(normalize_roster_aliases([v]))
+        }
+
+        fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(normalize_roster_aliases([v.as_str()]))
+        }
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: SeqAccess<'de>,
+        {
+            let mut raw = Vec::new();
+            while let Some(item) = seq.next_element::<String>()? {
+                raw.push(item);
+            }
+            Ok(normalize_roster_aliases(raw.iter().map(String::as_str)))
+        }
+    }
+
+    deserializer.deserialize_any(AliasesVisitor)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RosterEntry {
@@ -413,7 +489,7 @@ pub struct RosterEntry {
     pub en: String,
     #[serde(default)]
     pub pinyin: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, deserialize_with = "deserialize_roster_aliases")]
     pub aliases: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,

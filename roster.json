@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-26",
+  "updatedAt": "2026-11-25",
   "games": {
     "wuthering-waves": [
       {
@@ -34,12 +34,14 @@
       {
         "zh": "长离",
         "en": "Changli",
-        "pinyin": "changli"
+        "pinyin": "changli",
+        "aliases": []
       },
       {
         "zh": "椿",
         "en": "Camellya",
-        "pinyin": "chun"
+        "pinyin": "chun",
+        "aliases": []
       },
       {
         "zh": "守岸人",
@@ -52,17 +54,20 @@
       {
         "zh": "珂莱塔",
         "en": "Carlotta",
-        "pinyin": "kelaita"
+        "pinyin": "kelaita",
+        "aliases": []
       },
       {
         "zh": "吟霖",
         "en": "Yinlin",
-        "pinyin": "yinlin"
+        "pinyin": "yinlin",
+        "aliases": []
       },
       {
         "zh": "折枝",
         "en": "Zhezhi",
-        "pinyin": "zhezhi"
+        "pinyin": "zhezhi",
+        "aliases": []
       },
       {
         "zh": "相里要",
@@ -75,167 +80,200 @@
       {
         "zh": "忌炎",
         "en": "Jiyan",
-        "pinyin": "jiyan"
+        "pinyin": "jiyan",
+        "aliases": []
       },
       {
         "zh": "维里奈",
         "en": "Verina",
-        "pinyin": "weilinai"
+        "pinyin": "weilinai",
+        "aliases": []
       },
       {
         "zh": "安可",
         "en": "Encore",
-        "pinyin": "anke"
+        "pinyin": "anke",
+        "aliases": []
       },
       {
         "zh": "卡卡罗",
         "en": "Calcharo",
-        "pinyin": "kakaluo"
+        "pinyin": "kakaluo",
+        "aliases": []
       },
       {
         "zh": "鉴心",
         "en": "Jianxin",
-        "pinyin": "jianxin"
+        "pinyin": "jianxin",
+        "aliases": []
       },
       {
         "zh": "凌阳",
         "en": "Lingyang",
-        "pinyin": "lingyang"
+        "pinyin": "lingyang",
+        "aliases": []
       },
       {
         "zh": "散华",
         "en": "Sanhua",
-        "pinyin": "sanhua"
+        "pinyin": "sanhua",
+        "aliases": []
       },
       {
         "zh": "白芷",
         "en": "Baizhi",
-        "pinyin": "baizhi"
+        "pinyin": "baizhi",
+        "aliases": []
       },
       {
         "zh": "秧秧",
         "en": "Yangyang",
-        "pinyin": "yangyang"
+        "pinyin": "yangyang",
+        "aliases": []
       },
       {
         "zh": "炽霞",
         "en": "Chixia",
-        "pinyin": "chixia"
+        "pinyin": "chixia",
+        "aliases": []
       },
       {
         "zh": "丹瑾",
         "en": "Danjin",
-        "pinyin": "danjin"
+        "pinyin": "danjin",
+        "aliases": []
       },
       {
         "zh": "桃祈",
         "en": "Taoqi",
-        "pinyin": "taoqi"
+        "pinyin": "taoqi",
+        "aliases": []
       },
       {
         "zh": "莫特斐",
         "en": "Mortefi",
-        "pinyin": "motefei"
+        "pinyin": "motefei",
+        "aliases": []
       },
       {
         "zh": "渊武",
         "en": "Yuanwu",
-        "pinyin": "yuanwu"
+        "pinyin": "yuanwu",
+        "aliases": []
       },
       {
         "zh": "秋水",
         "en": "Aalto",
-        "pinyin": "qiushui"
+        "pinyin": "qiushui",
+        "aliases": []
       },
       {
         "zh": "釉瑚",
         "en": "Youhu",
-        "pinyin": "youhu"
+        "pinyin": "youhu",
+        "aliases": []
       },
       {
         "zh": "灯灯",
         "en": "Lumi",
-        "pinyin": "dengdeng"
+        "pinyin": "dengdeng",
+        "aliases": []
       },
       {
         "zh": "洛可可",
         "en": "Roccia",
-        "pinyin": "luokeke"
+        "pinyin": "luokeke",
+        "aliases": []
       },
       {
         "zh": "布兰特",
         "en": "Brant",
-        "pinyin": "bulante"
+        "pinyin": "bulante",
+        "aliases": []
       },
       {
         "zh": "菲比",
         "en": "Phoebe",
-        "pinyin": "feibi"
+        "pinyin": "feibi",
+        "aliases": []
       },
       {
         "zh": "坎特蕾拉",
         "en": "Cantarella",
-        "pinyin": "kanteleila"
+        "pinyin": "kanteleila",
+        "aliases": []
       },
       {
         "zh": "赞妮",
         "en": "Zani",
-        "pinyin": "zanni"
+        "pinyin": "zanni",
+        "aliases": []
       },
       {
         "zh": "夏空",
         "en": "Ciaccona",
-        "pinyin": "xiakong"
+        "pinyin": "xiakong",
+        "aliases": []
       },
       {
         "zh": "卡提希娅",
         "en": "Cartethyia",
-        "pinyin": "katixiya"
+        "pinyin": "katixiya",
+        "aliases": []
       },
       {
         "zh": "露帕",
         "en": "Lupa",
-        "pinyin": "lupa"
+        "pinyin": "lupa",
+        "aliases": []
       },
       {
         "zh": "弗洛洛",
         "en": "Phrolova",
-        "pinyin": "fuluoluo"
+        "pinyin": "fuluoluo",
+        "aliases": []
       },
       {
         "zh": "奥古斯塔",
         "en": "Augusta",
-        "pinyin": "aogusita"
+        "pinyin": "aogusita",
+        "aliases": []
       },
       {
         "zh": "尤诺",
         "en": "Iuno",
-        "pinyin": "younuo"
+        "pinyin": "younuo",
+        "aliases": []
       },
       {
         "zh": "嘉贝莉娜",
         "en": "Galbrena",
-        "pinyin": "jiabeilina"
+        "pinyin": "jiabeilina",
+        "aliases": []
       },
       {
         "zh": "仇远",
         "en": "Qiuyuan",
-        "pinyin": "qiuyuan"
+        "pinyin": "qiuyuan",
+        "aliases": []
       },
       {
         "zh": "千咲",
         "en": "Chisa",
-        "pinyin": "qianxiao"
+        "pinyin": "qianxiao",
+        "aliases": []
       },
       {
         "zh": "卜灵",
         "en": "Buling",
-        "pinyin": "buling"
+        "pinyin": "buling",
+        "aliases": []
       },
       {
         "zh": "爱弥斯",
         "en": "Aemeath",
-        "pinyin": "aimisi"
+        "pinyin": "aimisi",
+        "aliases": []
       },
       {
         "zh": "绯雪",
@@ -265,18 +303,21 @@
       {
         "zh": "琳奈",
         "en": "Lynae",
-        "pinyin": "linnai"
+        "pinyin": "linnai",
+        "aliases": []
       },
       {
         "zh": "莫宁",
         "en": "Mornye",
-        "pinyin": "moning"
+        "pinyin": "moning",
+        "aliases": []
       },
       {
-        "zh": "希格莉卡",
+        "zh": "西格莉卡",
         "en": "Sigrika",
         "pinyin": "xigelika",
         "aliases": [
+          "希格莉卡",
           "希格丽卡"
         ]
       },
@@ -291,12 +332,14 @@
       {
         "zh": "丽贝卡",
         "en": "Rebecca",
-        "pinyin": "libeika"
+        "pinyin": "libeika",
+        "aliases": []
       },
       {
         "zh": "露西",
         "en": "Lucy",
-        "pinyin": "luxi"
+        "pinyin": "luxi",
+        "aliases": []
       },
       {
         "zh": "穗穗",
@@ -314,6 +357,86 @@
           "YangyangXuanling",
           "秧秧・玄翎"
         ]
+      },
+      {
+        "zh": "清宵",
+        "en": "Qingxiao",
+        "pinyin": "qingxiao",
+        "aliases": [
+          "青霄"
+        ]
+      },
+      {
+        "zh": "景燃",
+        "en": "Jingran",
+        "pinyin": "jingran",
+        "aliases": [
+          "景然"
+        ]
+      },
+      {
+        "zh": "锁暝",
+        "en": "Suoming",
+        "pinyin": "suoming",
+        "aliases": [
+          "朔明"
+        ]
+      },
+      {
+        "zh": "心",
+        "en": "Hsin",
+        "pinyin": "xin",
+        "aliases": []
+      },
+      {
+        "zh": "莉莉",
+        "en": "Lily",
+        "pinyin": "lili",
+        "aliases": []
+      },
+      {
+        "zh": "安娜",
+        "en": "Anna",
+        "pinyin": "anna",
+        "aliases": []
+      },
+      {
+        "zh": "露希尔",
+        "en": "Lucielle",
+        "pinyin": "luxier",
+        "aliases": []
+      },
+      {
+        "zh": "爱普利",
+        "en": "April",
+        "pinyin": "aipuli",
+        "aliases": []
+      },
+      {
+        "zh": "砂",
+        "en": "Cairn",
+        "pinyin": "sha",
+        "aliases": []
+      },
+      {
+        "zh": "格尔黛",
+        "en": "Gordia",
+        "pinyin": "geerdai",
+        "aliases": []
+      },
+      {
+        "zh": "艾娅",
+        "en": "I.YA",
+        "pinyin": "aiya",
+        "aliases": [
+          "I.Ya"
+        ]
+      },
+      {
+        "zh": "塞谬塞",
+        "en": "Simulsys",
+        "pinyin": "saimiusai",
+        "aliases": []
       },
       {
         "zh": "武器",
@@ -346,6 +469,7 @@
         "zh": "UI",
         "en": "UI",
         "pinyin": "ui",
+        "aliases": [],
         "kind": "utility"
       },
       {
@@ -371,6 +495,7 @@
         "zh": "NPC",
         "en": "NPC",
         "pinyin": "npc",
+        "aliases": [],
         "kind": "utility"
       },
       {
@@ -417,30 +542,36 @@
       {
         "zh": "黄泉",
         "en": "Acheron",
-        "pinyin": "huangquan"
+        "pinyin": "huangquan",
+        "aliases": []
       },
       {
         "zh": "飞霄",
         "en": "Feixiao",
-        "pinyin": "feixiao"
+        "pinyin": "feixiao",
+        "aliases": []
       },
       {
         "zh": "知更鸟",
         "en": "Robin",
-        "pinyin": "zhigengniao"
+        "pinyin": "zhigengniao",
+        "aliases": []
       },
       {
         "zh": "阮梅",
         "en": "Ruan Mei",
         "pinyin": "ruanmei",
         "aliases": [
-          "RuanMei"
+          "RuanMei",
+          "阮•梅",
+          "阮·梅"
         ]
       },
       {
         "zh": "花火",
         "en": "Sparkle",
-        "pinyin": "huahuo"
+        "pinyin": "huahuo",
+        "aliases": []
       },
       {
         "zh": "黑天鹅",
@@ -453,12 +584,14 @@
       {
         "zh": "卡芙卡",
         "en": "Kafka",
-        "pinyin": "kafuka"
+        "pinyin": "kafuka",
+        "aliases": []
       },
       {
         "zh": "镜流",
         "en": "Jingliu",
-        "pinyin": "jingliu"
+        "pinyin": "jingliu",
+        "aliases": []
       },
       {
         "zh": "丹恒-饮月",
@@ -467,7 +600,9 @@
         "aliases": [
           "饮月",
           "DHIL",
-          "Imbibitor Lunae"
+          "Imbibitor Lunae",
+          "丹恒•饮月",
+          "丹恒·饮月"
         ]
       },
       {
@@ -476,7 +611,9 @@
         "pinyin": "danhengtenghuang",
         "aliases": [
           "DHPT",
-          "Permansor Terrae"
+          "Permansor Terrae",
+          "丹恒•腾荒",
+          "丹恒·腾荒"
         ]
       },
       {
@@ -494,13 +631,18 @@
         "aliases": [
           "三月七",
           "March7",
-          "March 7"
+          "March 7",
+          "三月七•存护"
         ]
       },
       {
         "zh": "三月七-巡猎",
         "en": "March 7th: The Hunt",
-        "pinyin": "sanyueqixunlie"
+        "pinyin": "sanyueqixunlie",
+        "aliases": [
+          "三月七•巡猎",
+          "March 7th: The Hunt"
+        ]
       },
       {
         "zh": "符玄",
@@ -521,27 +663,32 @@
       {
         "zh": "银狼LV.999",
         "en": "Silver Wolf LV.999",
-        "pinyin": "yinlanglv999"
+        "pinyin": "yinlanglv999",
+        "aliases": []
       },
       {
         "zh": "希儿",
         "en": "Seele",
-        "pinyin": "xier"
+        "pinyin": "xier",
+        "aliases": []
       },
       {
         "zh": "布洛妮娅",
         "en": "Bronya",
-        "pinyin": "buluoniya"
+        "pinyin": "buluoniya",
+        "aliases": []
       },
       {
         "zh": "姬子",
         "en": "Himeko",
-        "pinyin": "jizi"
+        "pinyin": "jizi",
+        "aliases": []
       },
       {
         "zh": "瓦尔特",
         "en": "Welt",
-        "pinyin": "waerte"
+        "pinyin": "waerte",
+        "aliases": []
       },
       {
         "zh": "景元",
@@ -554,17 +701,26 @@
       {
         "zh": "刃",
         "en": "Blade",
-        "pinyin": "ren"
+        "pinyin": "ren",
+        "aliases": []
       },
       {
-        "zh": "刃-千治",
+        "zh": "千冶•刃",
         "en": "Mortenax Blade",
-        "pinyin": "renqianzhi"
+        "pinyin": "qianyeren",
+        "aliases": [
+          "千冶·刃",
+          "千冶-刃",
+          "千冶",
+          "刃-千治",
+          "刃-千冶"
+        ]
       },
       {
         "zh": "罗刹",
         "en": "Luocha",
-        "pinyin": "luocha"
+        "pinyin": "luocha",
+        "aliases": []
       },
       {
         "zh": "托帕&账账",
@@ -573,18 +729,21 @@
         "aliases": [
           "托帕",
           "Topaz",
-          "Numby"
+          "Numby",
+          "Topaz and Numby"
         ]
       },
       {
         "zh": "藿藿",
         "en": "Huohuo",
-        "pinyin": "huohuo"
+        "pinyin": "huohuo",
+        "aliases": []
       },
       {
         "zh": "银枝",
         "en": "Argenti",
-        "pinyin": "yinzhi"
+        "pinyin": "yinzhi",
+        "aliases": []
       },
       {
         "zh": "真理医生",
@@ -598,42 +757,50 @@
       {
         "zh": "砂金",
         "en": "Aventurine",
-        "pinyin": "shajin"
+        "pinyin": "shajin",
+        "aliases": []
       },
       {
         "zh": "波提欧",
         "en": "Boothill",
-        "pinyin": "botiou"
+        "pinyin": "botiou",
+        "aliases": []
       },
       {
         "zh": "翡翠",
         "en": "Jade",
-        "pinyin": "feicui"
+        "pinyin": "feicui",
+        "aliases": []
       },
       {
         "zh": "云璃",
         "en": "Yunli",
-        "pinyin": "yunli"
+        "pinyin": "yunli",
+        "aliases": []
       },
       {
         "zh": "椒丘",
         "en": "Jiaoqiu",
-        "pinyin": "jiaoqiu"
+        "pinyin": "jiaoqiu",
+        "aliases": []
       },
       {
         "zh": "灵砂",
         "en": "Lingsha",
-        "pinyin": "lingsha"
+        "pinyin": "lingsha",
+        "aliases": []
       },
       {
         "zh": "乱破",
         "en": "Rappa",
-        "pinyin": "luanpo"
+        "pinyin": "luanpo",
+        "aliases": []
       },
       {
         "zh": "星期日",
         "en": "Sunday",
-        "pinyin": "xingqiri"
+        "pinyin": "xingqiri",
+        "aliases": []
       },
       {
         "zh": "忘归人",
@@ -654,72 +821,86 @@
       {
         "zh": "阿格莱雅",
         "en": "Aglaea",
-        "pinyin": "agelaiya"
+        "pinyin": "agelaiya",
+        "aliases": []
       },
       {
         "zh": "缇宝",
         "en": "Tribbie",
-        "pinyin": "tibao"
+        "pinyin": "tibao",
+        "aliases": []
       },
       {
         "zh": "万敌",
         "en": "Mydei",
-        "pinyin": "wandi"
+        "pinyin": "wandi",
+        "aliases": []
       },
       {
         "zh": "遐蝶",
         "en": "Castorice",
-        "pinyin": "xiadie"
+        "pinyin": "xiadie",
+        "aliases": []
       },
       {
         "zh": "那刻夏",
         "en": "Anaxa",
-        "pinyin": "nakexia"
+        "pinyin": "nakexia",
+        "aliases": []
       },
       {
         "zh": "风堇",
         "en": "Hyacine",
-        "pinyin": "fengjin"
+        "pinyin": "fengjin",
+        "aliases": []
       },
       {
         "zh": "赛飞儿",
         "en": "Cipher",
-        "pinyin": "saifeier"
+        "pinyin": "saifeier",
+        "aliases": []
       },
       {
         "zh": "白厄",
         "en": "Phainon",
-        "pinyin": "baie"
+        "pinyin": "baie",
+        "aliases": []
       },
       {
         "zh": "Saber",
         "en": "Saber",
-        "pinyin": "saber"
+        "pinyin": "saber",
+        "aliases": []
       },
       {
         "zh": "Archer",
         "en": "Archer",
-        "pinyin": "archer"
+        "pinyin": "archer",
+        "aliases": []
       },
       {
         "zh": "海瑟音",
         "en": "Hysilens",
-        "pinyin": "haiseyin"
+        "pinyin": "haiseyin",
+        "aliases": []
       },
       {
         "zh": "刻律德菈",
         "en": "Cerydra",
-        "pinyin": "kelvdela"
+        "pinyin": "kelvdela",
+        "aliases": []
       },
       {
         "zh": "长夜月",
         "en": "Evernight",
-        "pinyin": "changyeyue"
+        "pinyin": "changyeyue",
+        "aliases": []
       },
       {
         "zh": "昔涟",
         "en": "Cyrene",
-        "pinyin": "xilian"
+        "pinyin": "xilian",
+        "aliases": []
       },
       {
         "zh": "大丽花",
@@ -740,137 +921,253 @@
       {
         "zh": "火花",
         "en": "Sparxie",
-        "pinyin": "huohua"
+        "pinyin": "huohua",
+        "aliases": []
       },
       {
         "zh": "不死途",
         "en": "Ashveil",
-        "pinyin": "busitu"
+        "pinyin": "busitu",
+        "aliases": [
+          "拉曼查"
+        ]
       },
       {
         "zh": "绯英",
         "en": "Evanescia",
-        "pinyin": "feiying"
+        "pinyin": "feiying",
+        "aliases": []
       },
       {
         "zh": "白露",
         "en": "Bailu",
-        "pinyin": "bailu"
+        "pinyin": "bailu",
+        "aliases": []
       },
       {
         "zh": "克拉拉",
         "en": "Clara",
-        "pinyin": "kelala"
+        "pinyin": "kelala",
+        "aliases": []
       },
       {
         "zh": "杰帕德",
         "en": "Gepard",
-        "pinyin": "jiepade"
+        "pinyin": "jiepade",
+        "aliases": []
       },
       {
         "zh": "彦卿",
         "en": "Yanqing",
-        "pinyin": "yanqing"
+        "pinyin": "yanqing",
+        "aliases": []
       },
       {
         "zh": "黑塔",
         "en": "Herta",
-        "pinyin": "heita"
+        "pinyin": "heita",
+        "aliases": []
       },
       {
         "zh": "停云",
         "en": "Tingyun",
-        "pinyin": "tingyun"
+        "pinyin": "tingyun",
+        "aliases": []
       },
       {
         "zh": "青雀",
         "en": "Qingque",
-        "pinyin": "qingque"
+        "pinyin": "qingque",
+        "aliases": []
       },
       {
         "zh": "佩拉",
         "en": "Pela",
-        "pinyin": "peila"
+        "pinyin": "peila",
+        "aliases": []
       },
       {
         "zh": "艾丝妲",
         "en": "Asta",
-        "pinyin": "aisida"
+        "pinyin": "aisida",
+        "aliases": []
       },
       {
         "zh": "娜塔莎",
         "en": "Natasha",
-        "pinyin": "natasha"
+        "pinyin": "natasha",
+        "aliases": []
       },
       {
         "zh": "素裳",
         "en": "Sushang",
-        "pinyin": "sushang"
+        "pinyin": "sushang",
+        "aliases": [
+          "李素裳",
+          "Li Sushang"
+        ]
       },
       {
         "zh": "希露瓦",
         "en": "Serval",
-        "pinyin": "xiluwa"
+        "pinyin": "xiluwa",
+        "aliases": []
       },
       {
         "zh": "桑博",
         "en": "Sampo",
-        "pinyin": "sangbo"
+        "pinyin": "sangbo",
+        "aliases": []
       },
       {
         "zh": "虎克",
         "en": "Hook",
-        "pinyin": "huke"
+        "pinyin": "huke",
+        "aliases": []
       },
       {
         "zh": "阿兰",
         "en": "Arlan",
-        "pinyin": "alan"
+        "pinyin": "alan",
+        "aliases": []
       },
       {
         "zh": "驭空",
         "en": "Yukong",
-        "pinyin": "yukong"
+        "pinyin": "yukong",
+        "aliases": []
       },
       {
         "zh": "卢卡",
         "en": "Luka",
-        "pinyin": "luka"
+        "pinyin": "luka",
+        "aliases": []
       },
       {
         "zh": "玲可",
         "en": "Lynx",
-        "pinyin": "lingke"
+        "pinyin": "lingke",
+        "aliases": []
       },
       {
         "zh": "桂乃芬",
         "en": "Guinaifen",
-        "pinyin": "guinaifen"
+        "pinyin": "guinaifen",
+        "aliases": []
       },
       {
         "zh": "寒鸦",
         "en": "Hanya",
-        "pinyin": "hanya"
+        "pinyin": "hanya",
+        "aliases": []
       },
       {
         "zh": "雪衣",
         "en": "Xueyi",
-        "pinyin": "xueyi"
+        "pinyin": "xueyi",
+        "aliases": []
       },
       {
         "zh": "米沙",
         "en": "Misha",
-        "pinyin": "misha"
+        "pinyin": "misha",
+        "aliases": []
       },
       {
         "zh": "加拉赫",
         "en": "Gallagher",
-        "pinyin": "jialahe"
+        "pinyin": "jialahe",
+        "aliases": []
       },
       {
         "zh": "貊泽",
         "en": "Moze",
-        "pinyin": "moze"
+        "pinyin": "moze",
+        "aliases": []
+      },
+      {
+        "zh": "吉尔伽美什",
+        "en": "Gilgamesh",
+        "pinyin": "jierjiameishi",
+        "aliases": []
+      },
+      {
+        "zh": "远坂凛",
+        "en": "Rin Tohsaka",
+        "pinyin": "yuanbanlin",
+        "aliases": [
+          "Rin"
+        ]
+      },
+      {
+        "zh": "砂金•戏浪",
+        "en": "Aventurine • Waveflair",
+        "pinyin": "shajinxilang",
+        "aliases": [
+          "Aventurine•Waveflair",
+          "Aventurine - Waveflair",
+          "Aventurine Waveflair",
+          "砂金·戏浪",
+          "砂金-戏浪"
+        ]
+      },
+      {
+        "zh": "知更鸟•晴歌",
+        "en": "Robin • Summeretto",
+        "pinyin": "zhigengniaoqingge",
+        "aliases": [
+          "Robin•Summeretto",
+          "Robin - Summeretto",
+          "Robin Summeretto",
+          "知更鸟·晴歌",
+          "知更鸟-晴歌"
+        ]
+      },
+      {
+        "zh": "姬子•启行",
+        "en": "Himeko • Nova",
+        "pinyin": "jiziqixing",
+        "aliases": [
+          "Himeko•Nova",
+          "Himeko - Nova",
+          "Himeko Nova",
+          "姬子·启行",
+          "姬子-启行"
+        ]
+      },
+      {
+        "zh": "真珠",
+        "en": "Pearl",
+        "pinyin": "zhenzhu",
+        "aliases": []
+      },
+      {
+        "zh": "星神★阿哈",
+        "en": "Aeon ★ Aha",
+        "pinyin": "xingshenaha",
+        "aliases": [
+          "Aeon★Aha",
+          "阿哈",
+          "Aha"
+        ]
+      },
+      {
+        "zh": "耀嘉音",
+        "en": "Astra Yao",
+        "pinyin": "yaojiayin",
+        "aliases": [
+          "Astra"
+        ]
+      },
+      {
+        "zh": "艾莲",
+        "en": "Ellen",
+        "pinyin": "ailian",
+        "aliases": [
+          "Ellen Joe",
+          "艾莲·乔",
+          "艾莲•乔"
+        ]
       },
       {
         "zh": "光锥",
@@ -888,6 +1185,7 @@
         "zh": "UI",
         "en": "UI",
         "pinyin": "ui",
+        "aliases": [],
         "kind": "utility"
       },
       {
@@ -913,6 +1211,7 @@
         "zh": "NPC",
         "en": "NPC",
         "pinyin": "npc",
+        "aliases": [],
         "kind": "utility"
       },
       {
@@ -975,7 +1274,8 @@
       {
         "zh": "青衣",
         "en": "Qingyi",
-        "pinyin": "qingyi"
+        "pinyin": "qingyi",
+        "aliases": []
       },
       {
         "zh": "简",
@@ -1015,7 +1315,8 @@
       {
         "zh": "莱特",
         "en": "Lighter",
-        "pinyin": "laite"
+        "pinyin": "laite",
+        "aliases": []
       },
       {
         "zh": "悠真",
@@ -1070,12 +1371,17 @@
       {
         "zh": "雨果",
         "en": "Hugo",
-        "pinyin": "yuguo"
+        "pinyin": "yuguo",
+        "aliases": [
+          "Hugo Vlad",
+          "雨果·维拉德"
+        ]
       },
       {
         "zh": "仪玄",
         "en": "Yixuan",
-        "pinyin": "yixuan"
+        "pinyin": "yixuan",
+        "aliases": []
       },
       {
         "zh": "橘福福",
@@ -1117,7 +1423,9 @@
         "pinyin": "aofeisi",
         "aliases": [
           "Orphie Magnusson & Magus",
-          "奥菲丝"
+          "奥菲丝&「鬼火」",
+          "奥菲丝",
+          "Magus"
         ]
       },
       {
@@ -1139,12 +1447,14 @@
       {
         "zh": "琉音",
         "en": "Dialyn",
-        "pinyin": "liuyin"
+        "pinyin": "liuyin",
+        "aliases": []
       },
       {
         "zh": "般岳",
         "en": "Banyue",
-        "pinyin": "banyue"
+        "pinyin": "banyue",
+        "aliases": []
       },
       {
         "zh": "叶瞬光",
@@ -1157,17 +1467,20 @@
       {
         "zh": "照",
         "en": "Zhao",
-        "pinyin": "zhao"
+        "pinyin": "zhao",
+        "aliases": []
       },
       {
         "zh": "千夏",
         "en": "Sunna",
-        "pinyin": "qianxia"
+        "pinyin": "qianxia",
+        "aliases": []
       },
       {
         "zh": "爱芮",
         "en": "Aria",
-        "pinyin": "airui"
+        "pinyin": "airui",
+        "aliases": []
       },
       {
         "zh": "南宫羽",
@@ -1189,22 +1502,32 @@
       {
         "zh": "普罗米娅",
         "en": "Promeia",
-        "pinyin": "puluomiya"
+        "pinyin": "puluomiya",
+        "aliases": []
       },
       {
         "zh": "维琳娜",
         "en": "Velina",
-        "pinyin": "weilinna"
+        "pinyin": "weilinna",
+        "aliases": [
+          "Velina Airgid",
+          "维琳娜·艾嘉德"
+        ]
       },
       {
         "zh": "诺姆",
         "en": "Norma",
-        "pinyin": "nuomu"
+        "pinyin": "nuomu",
+        "aliases": [
+          "Norma Hollowell",
+          "诺姆·霍洛维尔"
+        ]
       },
       {
         "zh": "佩洛伊斯",
         "en": "Pyrois",
-        "pinyin": "peiluoyisi"
+        "pinyin": "peiluoyisi",
+        "aliases": []
       },
       {
         "zh": "安比",
@@ -1292,6 +1615,7 @@
         "en": "Rina",
         "pinyin": "lina",
         "aliases": [
+          "Alexandrina Sebastiane",
           "Alexandrina Sebastian"
         ]
       },
@@ -1306,12 +1630,17 @@
       {
         "zh": "苍角",
         "en": "Soukaku",
-        "pinyin": "cangjiao"
+        "pinyin": "cangjiao",
+        "aliases": []
       },
       {
         "zh": "露西",
         "en": "Lucy",
-        "pinyin": "luxi"
+        "pinyin": "luxi",
+        "aliases": [
+          "Luciana de Montefio",
+          "Luciana Auxesis Theodoro de Montefio"
+        ]
       },
       {
         "zh": "派派",
@@ -1355,6 +1684,96 @@
         ]
       },
       {
+        "zh": "星徽·比利",
+        "en": "Starlight - Billy",
+        "pinyin": "xinghuibili",
+        "aliases": [
+          "Starlight - Billy Kid",
+          "Starlight Billy",
+          "星徽·比利·奇德",
+          "星徽・比利・奇德",
+          "星徽比利"
+        ]
+      },
+      {
+        "zh": "蕾米埃尔",
+        "en": "Remielle Dan",
+        "pinyin": "leimiaier",
+        "aliases": [
+          "Remielle",
+          "蕾米埃尔·丹"
+        ]
+      },
+      {
+        "zh": "希格莉德",
+        "en": "Sigrid de L'Azur",
+        "pinyin": "xigelide",
+        "aliases": [
+          "Sigrid",
+          "希格莉德·德拉叙尔"
+        ]
+      },
+      {
+        "zh": "克拉蕾",
+        "en": "Claret Flint",
+        "pinyin": "kelalei",
+        "aliases": [
+          "Claret",
+          "克拉蕾·弗林特"
+        ]
+      },
+      {
+        "zh": "洛克茜",
+        "en": "Roxy Ifrita Pryce",
+        "pinyin": "luokexi",
+        "aliases": [
+          "Roxy",
+          "洛克茜·伊芙莉塔·普莱斯"
+        ]
+      },
+      {
+        "zh": "菲欧妮",
+        "en": "Phoenix Reffaella",
+        "pinyin": "feiouni",
+        "aliases": [
+          "Phoenix",
+          "菲欧妮·蕾法爱菈",
+          "菲欧妮・蕾法爱菈"
+        ]
+      },
+      {
+        "zh": "赛维里安",
+        "en": "Severian Lowell",
+        "pinyin": "saiweilian",
+        "aliases": [
+          "Severian",
+          "赛维里安·洛威尔",
+          "赛维里安・洛威尔"
+        ]
+      },
+      {
+        "zh": "挽昼",
+        "en": "Sunbringer",
+        "pinyin": "wanzhou",
+        "aliases": [
+          "Eldreda Sunbringer",
+          "Lindverne Sunbringer",
+          "Dracaene Sunbringer"
+        ]
+      },
+      {
+        "zh": "知更鸟",
+        "en": "Robin",
+        "pinyin": "zhigengniao",
+        "aliases": []
+      },
+      {
+        "zh": "卡芙卡",
+        "en": "Kafka",
+        "pinyin": "kafuka",
+        "aliases": []
+      },
+      {
         "zh": "武器",
         "en": "Weapons",
         "pinyin": "wuqi",
@@ -1367,6 +1786,7 @@
         "zh": "UI",
         "en": "UI",
         "pinyin": "ui",
+        "aliases": [],
         "kind": "utility"
       },
       {
@@ -1392,6 +1812,7 @@
         "zh": "NPC",
         "en": "NPC",
         "pinyin": "npc",
+        "aliases": [],
         "kind": "utility"
       },
       {
@@ -1426,7 +1847,8 @@
       {
         "zh": "佩丽卡",
         "en": "Perlica",
-        "pinyin": "peilika"
+        "pinyin": "peilika",
+        "aliases": []
       },
       {
         "zh": "陈千语",
@@ -1441,27 +1863,32 @@
       {
         "zh": "莱万汀",
         "en": "Laevatain",
-        "pinyin": "laiwanting"
+        "pinyin": "laiwanting",
+        "aliases": []
       },
       {
         "zh": "伊冯",
         "en": "Yvonne",
-        "pinyin": "yifeng"
+        "pinyin": "yifeng",
+        "aliases": []
       },
       {
         "zh": "洁尔佩塔",
         "en": "Gilberta",
-        "pinyin": "jieerpeita"
+        "pinyin": "jieerpeita",
+        "aliases": []
       },
       {
         "zh": "艾尔黛拉",
         "en": "Ardelia",
-        "pinyin": "aierdaila"
+        "pinyin": "aierdaila",
+        "aliases": []
       },
       {
         "zh": "余烬",
         "en": "Ember",
-        "pinyin": "yujin"
+        "pinyin": "yujin",
+        "aliases": []
       },
       {
         "zh": "别礼",
@@ -1474,27 +1901,32 @@
       {
         "zh": "黎风",
         "en": "Lifeng",
-        "pinyin": "lifeng"
+        "pinyin": "lifeng",
+        "aliases": []
       },
       {
         "zh": "骏卫",
         "en": "Pogranichnik",
-        "pinyin": "junwei"
+        "pinyin": "junwei",
+        "aliases": []
       },
       {
         "zh": "阿列什",
         "en": "Alesh",
-        "pinyin": "alieshi"
+        "pinyin": "alieshi",
+        "aliases": []
       },
       {
         "zh": "弧光",
         "en": "Arclight",
-        "pinyin": "huguang"
+        "pinyin": "huguang",
+        "aliases": []
       },
       {
         "zh": "艾维文娜",
         "en": "Avywenna",
-        "pinyin": "aiweiwenna"
+        "pinyin": "aiweiwenna",
+        "aliases": []
       },
       {
         "zh": "大潘",
@@ -1507,52 +1939,62 @@
       {
         "zh": "昼雪",
         "en": "Snowshine",
-        "pinyin": "zhouxue"
+        "pinyin": "zhouxue",
+        "aliases": []
       },
       {
         "zh": "狼卫",
         "en": "Wulfgard",
-        "pinyin": "langwei"
+        "pinyin": "langwei",
+        "aliases": []
       },
       {
         "zh": "赛希",
         "en": "Xaihi",
-        "pinyin": "saixi"
+        "pinyin": "saixi",
+        "aliases": []
       },
       {
         "zh": "秋栗",
         "en": "Akekuri",
-        "pinyin": "qiuli"
+        "pinyin": "qiuli",
+        "aliases": []
       },
       {
         "zh": "安塔尔",
         "en": "Antal",
-        "pinyin": "antaer"
+        "pinyin": "antaer",
+        "aliases": []
       },
       {
         "zh": "卡契尔",
         "en": "Catcher",
-        "pinyin": "kaqier"
+        "pinyin": "kaqier",
+        "aliases": []
       },
       {
         "zh": "埃特拉",
         "en": "Estella",
-        "pinyin": "aitela"
+        "pinyin": "aitela",
+        "aliases": []
       },
       {
         "zh": "萤石",
         "en": "Fluorite",
-        "pinyin": "yingshi"
+        "pinyin": "yingshi",
+        "aliases": []
       },
       {
         "zh": "汤汤",
         "en": "Tangtang",
-        "pinyin": "tangtang"
+        "pinyin": "tangtang",
+        "aliases": []
       },
       {
         "zh": "洛茜",
         "en": "Rossi",
-        "pinyin": "luoxi"
+        "pinyin": "luoxi",
+        "aliases": []
       },
       {
         "zh": "庄方宜",
@@ -1573,11 +2015,11 @@
         ]
       },
       {
-        "zh": "卡繆",
+        "zh": "卡缪",
         "en": "Camille",
         "pinyin": "kamiu",
         "aliases": [
-          "卡缪"
+          "卡繆"
         ]
       },
       {
@@ -1599,12 +2041,38 @@
       {
         "zh": "祀",
         "en": "Si",
-        "pinyin": "si"
+        "pinyin": "si",
+        "aliases": []
       },
       {
         "zh": "提弗洛斯",
-        "en": "Tiphlos",
-        "pinyin": "tifuluosi"
+        "en": "Typhoeus",
+        "pinyin": "tifuluosi",
+        "aliases": [
+          "Tiphlos"
+        ]
+      },
+      {
+        "zh": "明河",
+        "en": "Argent Flow",
+        "pinyin": "minghe",
+        "aliases": [
+          "Ye Minghe"
+        ]
+      },
+      {
+        "zh": "小刻",
+        "en": "Kay",
+        "pinyin": "xiaoke",
+        "aliases": [
+          "Ceobe"
+        ]
+      },
+      {
+        "zh": "米米诺",
+        "en": "Mimino",
+        "pinyin": "miminuo",
+        "aliases": []
       },
       {
         "zh": "武器",
@@ -1619,6 +2087,7 @@
         "zh": "UI",
         "en": "UI",
         "pinyin": "ui",
+        "aliases": [],
         "kind": "utility"
       },
       {
@@ -1644,6 +2113,7 @@
         "zh": "NPC",
         "en": "NPC",
         "pinyin": "npc",
+        "aliases": [],
         "kind": "utility"
       },
       {
@@ -1678,60 +2148,81 @@
       {
         "zh": "薄荷",
         "en": "Mint",
-        "pinyin": "bohe"
+        "pinyin": "bohe",
+        "aliases": []
       },
       {
         "zh": "早雾",
-        "en": "Sayuri",
-        "pinyin": "zaowu"
+        "en": "Sakiri",
+        "pinyin": "zaowu",
+        "aliases": [
+          "Sayuri"
+        ]
       },
       {
         "zh": "娜娜莉",
         "en": "Nanally",
-        "pinyin": "nanali"
+        "pinyin": "nanali",
+        "aliases": []
       },
       {
         "zh": "浔",
-        "en": "Xun",
-        "pinyin": "xun"
+        "en": "Hotori",
+        "pinyin": "xun",
+        "aliases": [
+          "Xun",
+          "潯"
+        ]
       },
       {
-        "zh": "法蒂亚",
+        "zh": "法帝娅",
         "en": "Fadia",
-        "pinyin": "fadiya"
+        "pinyin": "fadiya",
+        "aliases": [
+          "法蒂亚",
+          "Fardiya"
+        ]
       },
       {
         "zh": "阿德勒",
         "en": "Adler",
-        "pinyin": "adele"
+        "pinyin": "adele",
+        "aliases": []
       },
       {
         "zh": "翳",
         "en": "Skia",
-        "pinyin": "yi"
+        "pinyin": "yi",
+        "aliases": []
       },
       {
         "zh": "安魂曲",
-        "en": "Requiem",
+        "en": "Lacrimosa",
         "pinyin": "anhunqu",
         "aliases": [
-          "Lacrimosa"
+          "Requiem"
         ]
       },
       {
         "zh": "九原",
         "en": "Jiuyuan",
-        "pinyin": "jiuyuan"
+        "pinyin": "jiuyuan",
+        "aliases": []
       },
       {
         "zh": "伊洛伊",
         "en": "Iroi",
-        "pinyin": "yiluoyi"
+        "pinyin": "yiluoyi",
+        "aliases": []
       },
       {
-        "zh": "凛子",
-        "en": "Lingko",
-        "pinyin": "linzi"
+        "zh": "灵可",
+        "en": "Linko",
+        "pinyin": "lingke",
+        "aliases": [
+          "凛子",
+          "Lingko"
+        ]
       },
       {
         "zh": "哈尼娅",
@@ -1744,25 +2235,30 @@
       {
         "zh": "哈索尔",
         "en": "Hathor",
-        "pinyin": "hasuoer"
+        "pinyin": "hasuoer",
+        "aliases": []
       },
       {
-        "zh": "埃德加",
+        "zh": "埃德嘉",
         "en": "Edgar",
-        "pinyin": "aidejia"
+        "pinyin": "aidejia",
+        "aliases": [
+          "埃德加"
+        ]
       },
       {
         "zh": "小吱",
-        "en": "Xiaozhi",
+        "en": "Chiz",
         "pinyin": "xiaozhi",
         "aliases": [
-          "Chiz"
+          "Xiaozhi"
         ]
       },
       {
         "zh": "尼察",
         "en": "Nitsa",
-        "pinyin": "nicha"
+        "pinyin": "nicha",
+        "aliases": []
       },
       {
         "zh": "真红",
@@ -1776,41 +2272,84 @@
       },
       {
         "zh": "海月",
-        "en": "Mitsuki",
-        "pinyin": "haiyue"
+        "en": "Aurelia",
+        "pinyin": "haiyue",
+        "aliases": [
+          "Mitsuki"
+        ]
       },
       {
         "zh": "白藏",
         "en": "Baicang",
-        "pinyin": "baicang"
+        "pinyin": "baicang",
+        "aliases": []
       },
       {
-        "zh": "赤音",
-        "en": "Akane",
-        "pinyin": "chiyin"
+        "zh": "明音凛",
+        "en": "Akane Rin",
+        "pinyin": "mingyinlin",
+        "aliases": [
+          "明音凜",
+          "赤音",
+          "Akane"
+        ]
       },
       {
         "zh": "达芙迪尔",
-        "en": "Daffodil",
-        "pinyin": "dafudier"
+        "en": "Daffodill",
+        "pinyin": "dafudier",
+        "aliases": [
+          "Daffodil"
+        ]
       },
       {
         "zh": "阿尔法德",
         "en": "Alphard",
-        "pinyin": "aerfade"
+        "pinyin": "aerfade",
+        "aliases": []
       },
       {
-        "zh": "黑鸟",
-        "en": "Black Bird",
-        "pinyin": "heiniao",
+        "zh": "黑羽",
+        "en": "Blackbird",
+        "pinyin": "heiyu",
         "aliases": [
+          "黑鸟",
+          "Black Bird",
           "black-bird"
         ]
       },
       {
         "zh": "卡厄斯",
         "en": "Chaos",
-        "pinyin": "kaesi"
+        "pinyin": "kaesi",
+        "aliases": []
+      },
+      {
+        "zh": "曳尔沐",
+        "en": "Elyms",
+        "pinyin": "yeermu",
+        "aliases": [
+          "Jerma",
+          "Ielmu"
+        ]
+      },
+      {
+        "zh": "残虹",
+        "en": "Zankou",
+        "pinyin": "canhong",
+        "aliases": []
+      },
+      {
+        "zh": "EXE",
+        "en": "Exe",
+        "pinyin": "exe",
+        "aliases": []
+      },
+      {
+        "zh": "艾丽",
+        "en": "Ellie",
+        "pinyin": "aili",
+        "aliases": []
       },
       {
         "zh": "武器",
@@ -1834,6 +2373,7 @@
         "zh": "UI",
         "en": "UI",
         "pinyin": "ui",
+        "aliases": [],
         "kind": "utility"
       },
       {
@@ -1859,6 +2399,7 @@
         "zh": "NPC",
         "en": "NPC",
         "pinyin": "npc",
+        "aliases": [],
         "kind": "utility"
       },
       {
