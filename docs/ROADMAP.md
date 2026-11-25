@@ -26,14 +26,31 @@ This document serves as the persistent in-repo tracker for upcoming versions, ar
 
 ---
 
-## Planned: v3.2.0 (Static INI Audit & Diagnostics Upgrade)
+## Planned: v3.2.0 (Consolidated Milestones & Issues #6–#9)
 
-- **Cross-Mod `IniParams` (`x100..x255`) Write Contention & `[Present]` Guard Checks (High Priority)**:
-  - Parse `[Present]` (and called `[CommandList*]`) assignments targeting global `x100..x255` registers to flag unguarded writes missing `$object_detected` / `$active` conditions.
-  - Detect cross-mod conflicts when an enabled mod writes `xN` (`N >= 100`) unconditionally while another active mod reads/writes `xN` (including `post run = CustomShader*`), highlighting both files/lines and clearly distinguishing same-character guaranteed collisions vs multi-character shared-template risks (only active when rendered concurrently).
+### Milestone `alpha.1` — Import, Conflict Detection & Backup UX (`#6`, `#7`, `#9`)
+
+- **Folder Drag-and-Drop & Multi-Folder Import (`#6`)**:
+  - Support dragging and dropping mod folders directly onto the main window / target character alongside archives, and enable multi-folder selection in the "Import Folder" file dialog (`directory: true, multiple: true`) queued cleanly through the import preview workflow.
+- **Same-Name Mod Conflict Detection & Overwrite/Backup (`#7`)**:
+  - Normalize existing folder names (stripping `DISABLED_` prefixes case-insensitively and whitespace) consistently for both archive and folder imports under the resolved character folder so duplicate/overwrite targets are detected reliably instead of defaulting to create-new.
+- **Mod Overwrite Backup History Directory Shortcuts (`#9`)**:
+  - Add an "Open Backup Folder" button to the **Mod Overwrite Backup History** section, mirror the action in **Settings -> Local Data & Storage**, and add a per-entry "Open Folder" action to inspect individual backed-up mod directories directly.
+
+### Milestone `alpha.2` — Main-View Conflict Surfacing & Hotkey Tiering (`#8`)
+
+- **Breathing Main-View Conflict Indicators & Pre-Launch Guard (`#8`)**:
+  - Surface subtle breathing indicator dots / colored borders on character cards and category chips that have active audit conflicts (colored by highest severity: error red / warning amber; silent when clean, respecting `prefers-reduced-motion`).
+  - Show a confirmation prompt when clicking Launch Game / Launch XXMI while error or warning conflicts exist (summary + launch anyway / view details / cancel, plus a "don't ask this session" option).
 - **Tiered Mod Conflict Audit Hotkey Collision Checks & Modal Category Filters**:
   - Scan active `[Key*]` bindings with low-noise severity separation: same-character mod key collisions or unguarded global hotkeys (missing `$active` / `condition`) surface as `warning`; cross-character coincidental key reuse groups into a collapsible `info` section so alerts stay high-signal.
   - Add category filter pills in the Conflict Audit modal (All / Shader & FX / IniParams & Registers / Hotkeys).
+
+### Milestone `alpha.3` — Static INI Audit & Diagnostics Upgrade
+
+- **Cross-Mod `IniParams` (`x100..x255`) Write Contention & `[Present]` Guard Checks**:
+  - Parse `[Present]` (and called `[CommandList*]`) assignments targeting global `x100..x255` registers to flag unguarded writes missing `$object_detected` / `$active` conditions.
+  - Detect cross-mod conflicts when an enabled mod writes `xN` (`N >= 100`) unconditionally while another active mod reads/writes `xN` (including `post run = CustomShader*`), highlighting both files/lines and clearly distinguishing same-character guaranteed collisions vs multi-character shared-template risks (only active when rendered concurrently).
 - **Small-Index Unguarded `handling = skip` & EFMI Architecture Advisories**:
   - Emit a low-noise advisory for `[TextureOverride*]` sections containing `handling = skip` with small index counts (`match_index_count <= 24`) and zero `$` variable guards, avoiding false positives on normal single-character mesh hides.
   - For Arknights: Endfield (`game_id == "endfield"` / `loader == "EFMI"`), flag legacy `CrossIBClassifier` / `record_bones_cs` / `redirect_cb1_cs` references and check `$required_efmi_version` mismatch advisories.
@@ -41,6 +58,9 @@ This document serves as the persistent in-repo tracker for upcoming versions, ar
   - Flag oversized single `.dds` files (`> 32 MiB`, such as `8192×8192`) by fast file-size inspection (zero heavy DDS decoding dependencies) in Mod Details / Static Diagnostics and aggregate them in Global Audit (`info`) complementing `cache_shaders = 1`.
 - **One-Click Compact Markdown Diagnostic Context Copy**:
   - Add a "Copy Diagnostic Summary" button in the Conflict Audit modal exporting sanitized relative paths, conflict hashes/registers/hotkeys, `.ini` line numbers, and `d3dx.ini` status as compact Markdown for pasting into AI sessions or `EFMI-MCP`.
+
+### Milestone `beta.1` — Updater Fallback Release Notes
+
 - **Release Notes Extraction on Non-API Update Fallbacks**:
   - Parse sanitized `<content type="html">` from `releases.atom` (or release tag pages on `github-web` / `mirror-atom`) following the standardized `## English` / `## 简体中文` Release template, so formatted release notes still render cleanly in **Settings -> About** when `api.github.com` is rate-limited.
 
