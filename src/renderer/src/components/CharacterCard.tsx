@@ -6,6 +6,7 @@ import { useI18n, getLocaleCharacterName } from '../i18n'
 export function CharacterCard({
   character,
   accent = '#10b981',
+  conflictSeverity,
   onOpen,
   draggable = false,
   dragging = false,
@@ -16,6 +17,7 @@ export function CharacterCard({
 }: {
   character: CharacterInfo
   accent?: string
+  conflictSeverity?: 'high' | 'warning'
   onOpen: () => void
   draggable?: boolean
   dragging?: boolean
@@ -26,12 +28,21 @@ export function CharacterCard({
 }) {
   const { t, effectiveLocale } = useI18n()
   const name = getLocaleCharacterName(character, effectiveLocale)
+  const conflictTip =
+    conflictSeverity === 'high'
+      ? t('audit.cardConflictHigh')
+      : conflictSeverity === 'warning'
+        ? t('audit.cardConflictWarning')
+        : undefined
 
   return (
     <button
-      className={`char-card${dragging ? ' is-dragging' : ''}`}
+      className={`char-card${dragging ? ' is-dragging' : ''}${conflictSeverity ? ` has-conflict-${conflictSeverity}` : ''}`}
       onClick={onOpen}
-      title={draggable ? `${character.folder} (${t('library.dragFolderHint')})` : character.folder}
+      title={
+        conflictTip ||
+        (draggable ? `${character.folder} (${t('library.dragFolderHint')})` : character.folder)
+      }
       draggable={draggable}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
@@ -46,6 +57,9 @@ export function CharacterCard({
             {initialOf(name)}
           </span>
         )}
+        {conflictSeverity ? (
+          <span className={`conflict-dot sev-${conflictSeverity}`} title={conflictTip} />
+        ) : null}
         {!character.known ? <span className="tag new">{t('character.tagNew')}</span> : null}
         {character.kind === 'utility' ? (
           <span className="tag utility">{t('character.tagUtility')}</span>

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import type {
   Bootstrap,
   CharacterInfo,
   EnvironmentCheck,
+  GameConflictAuditReport,
   GameDef,
   GameId,
   GameSnapshot,
@@ -59,6 +60,9 @@ export default function App() {
   const [editingCustomGame, setEditingCustomGame] = useState<GameDef | null>(null)
   const [showRosterPresets, setShowRosterPresets] = useState(false)
   const [showConflictAudit, setShowConflictAudit] = useState(false)
+  const [auditReport, setAuditReport] = useState<GameConflictAuditReport | null>(null)
+  const [suppressLaunchConflictWarn, setSuppressLaunchConflictWarn] = useState(false)
+  const [pendingLaunch, setPendingLaunch] = useState<'game' | 'loader' | null>(null)
   const [envWarning, setEnvWarning] = useState<EnvironmentCheck | null>(null)
   const [legacyStorage, setLegacyStorage] = useState<StorageOverview | null>(null)
   const [cleaningLegacy, setCleaningLegacy] = useState(false)
@@ -928,8 +932,73 @@ export default function App() {
     }
   }
 
-  async function launchConfigured(kind: 'game' | 'loader') {
+  useEffect(() => {
+    if (!snapshot?.modsPathExists) {
+      setAuditReport(null)
+      return
+    }
+    const targetGameId = snapshot.game.id
+    let cancelled = false
+    window.moddeck
+      .auditGameConflicts(targetGameId)
+      .then((report) => {
+        if (!cancelled) setAuditReport(report)
+      })
+      .catch(() => {
+        if (!cancelled) setAuditReport(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [snapshot?.game.id, snapshot?.modsPathExists, snapshot?.enabledMods, snapshot?.totalMods])
+
+  const { conflictByCharacter, globalConflictSeverity, activeConflictCount } = useMemo(() => {
+    if (!auditReport || !snapshot || auditReport.gameId !== snapshot.game.id) {
+      return {
+        conflictByCharacter: {} as Record<string, 'high' | 'warning'>,
+        globalConflictSeverity: null as 'high' | 'warning' | null,
+        activeConflictCount: 0
+      }
+    }
+    const byChar: Record<string, 'high' | 'warning'> = {}
+    let hasHigh = auditReport.summary.high > 0
+    let hasWarning = auditReport.summary.warning > 0
+    for (const item of auditReport.items) {
+      if (item.severity !== 'high' && item.severity !== 'warning') continue
+      if (item.severity === 'high') hasHigh = true
+      if (item.severity === 'warning') hasWarning = true
+      for (const loc of item.locations) {
+        if (!loc.characterFolder) continue
+        if (item.severity === 'high' || byChar[loc.characterFolder] !== 'high') {
+          byChar[loc.characterFolder] = item.severity
+        }
+      }
+    }
+    const globalSev: 'high' | 'warning' | null = hasHigh ? 'high' : hasWarning ? 'warning' : null
+    return {
+      conflictByCharacter: byChar,
+      globalConflictSeverity: globalSev,
+      activeConflictCount: auditReport.summary.high + auditReport.summary.warning
+    }
+  }, [auditReport, snapshot])
+
+  async function launchConfigured(kind: 'game' | 'loader', bypassGuard = false) {
     if (!snapshot) return
+    if (!bypassGuard && !suppressLaunchConflictWarn && snapshot.modsPathExists) {
+      try {
+        const report =
+          auditReport && auditReport.gameId === snapshot.game.id
+            ? auditReport
+            : await window.moddeck.auditGameConflicts(snapshot.game.id)
+        setAuditReport(report)
+        if (report.summary.high > 0 || report.summary.warning > 0) {
+          setPendingLaunch(kind)
+          return
+        }
+      } catch {
+        // Proceed if audit check itself errors out
+      }
+    }
     try {
       const result =
         kind === 'game'
@@ -1262,11 +1331,87 @@ export default function App() {
             onAdd={() => setCreating(true)}
             onOpenRosterPresets={() => setShowRosterPresets(true)}
             onOpenConflictAudit={() => setShowConflictAudit(true)}
+            conflictByCharacter={conflictByCharacter}
+            globalConflictSeverity={globalConflictSeverity}
+            activeConflictCount={activeConflictCount}
             isConfiguredFilterActive={boot.settings.onlyShowConfiguredGames}
             onDisableConfiguredFilter={() => void toggleOnlyShowConfigured()}
           />
         )}
       </main>
+
+      {pendingLaunch && snapshot && auditReport ? (
+        <Modal
+          title={t('audit.launchGuardTitle')}
+          onClose={() => setPendingLaunch(null)}
+          width={560}
+          footer={
+            <>
+              <label className="check-row" style={{ padding: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={suppressLaunchConflictWarn}
+                  onChange={(event) => setSuppressLaunchConflictWarn(event.target.checked)}
+                />
+                <span>{t('audit.launchGuardDontAskSession')}</span>
+              </label>
+              <div className="grow" />
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setPendingLaunch(null)
+                  setShowConflictAudit(true)
+                }}
+              >
+                <Icon name="info" size={14} />
+                {t('audit.launchGuardViewDetails')}
+              </button>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => setPendingLaunch(null)}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  const target = pendingLaunch
+                  setPendingLaunch(null)
+                  void launchConfigured(target, true)
+                }}
+              >
+                <Icon name="external" size={14} />
+                {t('audit.launchGuardContinue')}
+              </button>
+            </>
+          }
+        >
+          <p className="muted" style={{ marginTop: 0 }}>
+            {t('audit.launchGuardSummary', {
+              high: auditReport.summary.high,
+              warning: auditReport.summary.warning
+            })}
+          </p>
+          <ul className="launch-guard-list">
+            {auditReport.items
+              .filter((item) => item.severity === 'high' || item.severity === 'warning')
+              .slice(0, 5)
+              .map((item) => (
+                <li key={item.id}>
+                  <span className={`tag sev-${item.severity}`} style={{ marginRight: 8 }}>
+                    {item.severity === 'high'
+                      ? t('audit.severityHigh')
+                      : t('audit.severityWarning')}
+                  </span>
+                  {item.message}
+                </li>
+              ))}
+          </ul>
+        </Modal>
+      ) : null}
 
       {customGameModalOpen && boot ? (
         <AddCustomGameModal
@@ -1296,6 +1441,7 @@ export default function App() {
           onClose={() => setShowConflictAudit(false)}
           onNotify={notify}
           onMutated={() => void refreshSnapshot(snapshot.game.id)}
+          onReportLoaded={setAuditReport}
         />
       ) : null}
       {editing ? (

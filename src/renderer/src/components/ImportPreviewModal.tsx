@@ -130,6 +130,31 @@ export function ImportPreviewModal({
     parsed.candidates
   ])
 
+  const batchConflictIds = useMemo(() => {
+    const groups = new Map<string, string[]>()
+    for (const candidate of parsed.candidates) {
+      if (!selectedIds.has(candidate.id)) continue
+      const selectedTarget = overwriteTargets[candidate.id]?.trim() || ''
+      if (selectedTarget === KEEP_BOTH_VALUE) continue
+      const charKey = (charAssignments[candidate.id] || defaultOtherFolder).trim().toLowerCase()
+      const bareName = stripDisabledPrefix(
+        selectedTarget || (modNames[candidate.id] ?? candidate.modName).trim()
+      ).toLowerCase()
+      if (!bareName) continue
+      const key = `${charKey}::${bareName}`
+      const list = groups.get(key)
+      if (list) list.push(candidate.id)
+      else groups.set(key, [candidate.id])
+    }
+    const conflicts = new Set<string>()
+    for (const ids of groups.values()) {
+      if (ids.length >= 2) {
+        for (const id of ids) conflicts.add(id)
+      }
+    }
+    return conflicts
+  }, [charAssignments, defaultOtherFolder, modNames, overwriteTargets, parsed.candidates, selectedIds])
+
   const otherLabel = t('common.other')
 
   const characterOptions = useMemo(() => {
@@ -310,6 +335,11 @@ export function ImportPreviewModal({
               selected: selectedIds.size,
               total: parsed.candidates.length
             })}
+            {batchConflictIds.size > 0 ? (
+              <span className="error-text" style={{ marginLeft: 10 }}>
+                {t('importModal.batchConflictHint')}
+              </span>
+            ) : null}
           </span>
           <div className="grow" />
           <button className="btn ghost" onClick={onCancel} disabled={submitting}>
@@ -318,7 +348,7 @@ export function ImportPreviewModal({
           <button
             className="btn primary"
             onClick={() => void handleConfirm()}
-            disabled={submitting || selectedIds.size === 0}
+            disabled={submitting || selectedIds.size === 0 || batchConflictIds.size > 0}
           >
             <Icon name="check" size={15} />
             {submitting
@@ -428,6 +458,9 @@ export function ImportPreviewModal({
                 >
                   <div className="import-candidate-title">
                     <strong>{candidate.modName}</strong>
+                    {batchConflictIds.has(candidate.id) ? (
+                      <span className="tag sev-high">{t('importModal.batchConflictBadge')}</span>
+                    ) : null}
                     {sameNameMatch ? (
                       <span className="tag warn">
                         {isKeepBoth

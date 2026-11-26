@@ -445,6 +445,7 @@ export type AuditRuleCategory =
   | 'duplicate-fx-plugin'
   | 'mutually-exclusive-fx'
   | 'hash-collision'
+  | 'hotkey-collision'
   | 'shader-fixes'
   | 'shader-cache'
 

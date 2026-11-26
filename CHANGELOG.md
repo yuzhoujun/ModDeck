@@ -8,6 +8,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ### Added
 
+- **Main-View Conflict Indicators & Pre-Launch Guard (`#8`)**: Added background conflict scans on library/mod state changes to surface severity-colored breathing indicators (`high` red / `warning` amber, silent when clean and respecting `prefers-reduced-motion`) on affected character cards, a toolbar Conflict Audit count badge (plus off-filter indicator), and a pre-launch confirmation dialog listing top active conflicts with "Don't ask again this session" before starting the game or XXMI.
+- **Tiered Hotkey Collision Audit & Modal Category Filters**: Extended `audit_game_mods_conflicts` to normalize `[Key*]` bindings and classify same-character collisions and unguarded global collisions as `warning`, while grouping `$active`/`condition`-guarded cross-character key reuse into a collapsible `info` group; added **All / Render & Plugins / Hotkeys** category filter pills to `ConflictAuditModal`.
+- **Import Batch Duplicate Target Guard**: Highlighted multiple checked items targeting the same character mod folder within a single import batch and prevented accidental self-overwriting until renamed, switched to "Import as new (keep existing)", or unchecked.
 - **Mod Overwrite Backup Directory Shortcuts (`#9`)**: Added an **Open Backup Folder** action to both the **Local Data & Storage** overview and the **Mod Overwrite Backup History** header (`open_path("backups")`), along with a per-backup **Open Backup Directory** button (`open_backup_folder`) to open each snapshot directly in Explorer.
 - **Built-In Roster Refresh & Comma-Separated Aliases**: Updated [roster.json](roster.json) (`2026-11-25`) with verified official CN/EN entries across all five built-in games (including `Typhoeus` / `Tiphlos`), exposed `"aliases"` across all entries, and added comma-delimited string/array alias parsing (`deserialize_roster_aliases`).
 

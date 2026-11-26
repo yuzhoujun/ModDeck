@@ -880,6 +880,56 @@ fn dedupe_locs_by_mod(locs: &[ConflictAuditModLocation]) -> Vec<ConflictAuditMod
     out
 }
 
+fn normalize_ini_key_binding(raw: &str) -> Option<String> {
+    let mut modifiers: Vec<&'static str> = Vec::new();
+    let mut keys: Vec<String> = Vec::new();
+    for raw_tok in raw.split_whitespace() {
+        let tok = raw_tok.trim_matches('+').to_ascii_lowercase();
+        if tok.is_empty()
+            || matches!(
+                tok.as_str(),
+                "no_ctrl" | "no_alt" | "no_shift" | "no_modifiers" | "no_win"
+            )
+        {
+            continue;
+        }
+        match tok.as_str() {
+            "ctrl" | "control" | "lctrl" | "rctrl" | "vk_control" | "vk_lcontrol" | "vk_rcontrol" => {
+                if !modifiers.contains(&"ctrl") {
+                    modifiers.push("ctrl");
+                }
+            }
+            "alt" | "menu" | "lalt" | "ralt" | "vk_menu" | "vk_lmenu" | "vk_rmenu" => {
+                if !modifiers.contains(&"alt") {
+                    modifiers.push("alt");
+                }
+            }
+            "shift" | "lshift" | "rshift" | "vk_shift" | "vk_lshift" | "vk_rshift" => {
+                if !modifiers.contains(&"shift") {
+                    modifiers.push("shift");
+                }
+            }
+            "win" | "lwin" | "rwin" | "vk_lwin" | "vk_rwin" => {
+                if !modifiers.contains(&"win") {
+                    modifiers.push("win");
+                }
+            }
+            _ => keys.push(tok),
+        }
+    }
+    if keys.is_empty() {
+        return None;
+    }
+    let mut ordered = Vec::new();
+    for m in ["ctrl", "alt", "shift", "win"] {
+        if modifiers.contains(&m) {
+            ordered.push(m.to_string());
+        }
+    }
+    ordered.extend(keys);
+    Some(ordered.join("+"))
+}
+
 pub fn audit_game_mods_conflicts(
     game_id: &str,
     mods_path: &str,
@@ -891,10 +941,14 @@ pub fn audit_game_mods_conflicts(
     static FI_RX: OnceLock<Regex> = OnceLock::new();
     static SKIP_RX: OnceLock<Regex> = OnceLock::new();
     static HASH_RX: OnceLock<Regex> = OnceLock::new();
+    static KEY_RX: OnceLock<Regex> = OnceLock::new();
+    static COND_RX: OnceLock<Regex> = OnceLock::new();
     let sec_rx = SECTION_RX.get_or_init(|| Regex::new(r"^\[([^\]]+)\]").unwrap());
     let fi_rx = FI_RX.get_or_init(|| Regex::new(r"(?i)^filter_index\s*=\s*(.+)$").unwrap());
     let skip_rx = SKIP_RX.get_or_init(|| Regex::new(r"(?i)^handling\s*=\s*skip\b").unwrap());
     let hash_rx = HASH_RX.get_or_init(|| Regex::new(r"(?i)^hash\s*=\s*([0-9a-f]{4,16})\b").unwrap());
+    let key_rx = KEY_RX.get_or_init(|| Regex::new(r"(?i)^key\s*=\s*(.+)$").unwrap());
+    let cond_rx = COND_RX.get_or_init(|| Regex::new(r"(?i)^condition\s*=\s*(.+)$").unwrap());
 
     let mut items: Vec<GameConflictAuditItem> = Vec::new();
     let mut scanned_mods = 0usize;
@@ -1058,6 +1112,8 @@ pub fn audit_game_mods_conflicts(
         hashes: Vec<(String, usize)>,
         filter_index: Option<String>,
         has_handling_skip: bool,
+        key_bindings: Vec<(String, String, usize)>,
+        has_condition_guard: bool,
     }
 
     let mut rabbit_fx_locs: Vec<ConflictAuditModLocation> = Vec::new();
@@ -1066,6 +1122,8 @@ pub fn audit_game_mods_conflicts(
     let mut char_hash_map: HashMap<String, HashMap<String, (&'static str, Vec<ConflictAuditModLocation>)>> =
         HashMap::new();
     let mut global_so_map: HashMap<String, Vec<ConflictAuditModLocation>> = HashMap::new();
+    let mut hotkey_map: HashMap<String, Vec<(String, bool, ConflictAuditModLocation)>> =
+        HashMap::new();
 
     for unit in mod_units {
         scanned_mods += 1;
@@ -1144,6 +1202,8 @@ pub fn audit_game_mods_conflicts(
                         hashes: Vec::new(),
                         filter_index: None,
                         has_handling_skip: false,
+                        key_bindings: Vec::new(),
+                        has_condition_guard: false,
                     });
                     continue;
                 }
@@ -1153,6 +1213,20 @@ pub fn audit_game_mods_conflicts(
                 let clean = strip_ini_comment(trimmed);
                 if clean.is_empty() {
                     continue;
+                }
+                if cur.lower_section.starts_with("key") {
+                    if let Some(cap) = cond_rx.captures(clean) {
+                        let rhs = cap[1].trim();
+                        if !rhs.is_empty() && rhs != "1" && !rhs.eq_ignore_ascii_case("true") {
+                            cur.has_condition_guard = true;
+                        }
+                    }
+                    if let Some(cap) = key_rx.captures(clean) {
+                        let raw_key = cap[1].trim().to_string();
+                        if let Some(norm_key) = normalize_ini_key_binding(&raw_key) {
+                            cur.key_bindings.push((norm_key, raw_key, line_num));
+                        }
+                    }
                 }
                 if let Some(cap) = fi_rx.captures(clean) {
                     cur.filter_index = Some(cap[1].trim().to_string());
@@ -1186,6 +1260,21 @@ pub fn audit_game_mods_conflicts(
 
         let is_plugin = is_likely_fx_plugin_mod(&unit.folder_name, &active, &active_texts);
         for sec in sections_parsed {
+            for (norm_key, raw_key, line_num) in &sec.key_bindings {
+                hotkey_map.entry(norm_key.clone()).or_default().push((
+                    raw_key.clone(),
+                    sec.has_condition_guard,
+                    ConflictAuditModLocation {
+                        character_folder: unit.character_folder.clone(),
+                        folder_name: unit.folder_name.clone(),
+                        name: unit.name.clone(),
+                        file: sec.file.clone(),
+                        line: *line_num,
+                        section: Some(sec.section.clone()),
+                        snippet: Some(format!("key = {raw_key}")),
+                    },
+                ));
+            }
             if sec.lower_section.starts_with("shaderregex") && !is_plugin {
                 items.push(GameConflictAuditItem {
                     id: format!(
@@ -1380,6 +1469,126 @@ pub fn audit_game_mods_conflicts(
                 filter_index: None,
                 locations: locs,
             });
+        }
+    }
+
+    for (norm_key, entries) in hotkey_map {
+        let mut by_char: HashMap<String, Vec<(String, bool, ConflictAuditModLocation)>> =
+            HashMap::new();
+        for (display, guarded, loc) in &entries {
+            if !loc.character_folder.is_empty() {
+                by_char
+                    .entry(loc.character_folder.clone())
+                    .or_default()
+                    .push((display.clone(), *guarded, loc.clone()));
+            }
+        }
+        let mut single_char_covered: Vec<String> = Vec::new();
+        for (char_folder, char_entries) in &by_char {
+            let char_locs: Vec<ConflictAuditModLocation> =
+                char_entries.iter().map(|(_, _, l)| l.clone()).collect();
+            let distinct = dedupe_locs_by_mod(&char_locs);
+            if distinct.len() >= 2 {
+                single_char_covered.push(char_folder.clone());
+                let display_key = char_entries
+                    .first()
+                    .map(|(d, _, _)| d.as_str())
+                    .unwrap_or(norm_key.as_str());
+                items.push(GameConflictAuditItem {
+                    id: format!("hotkey:char:{char_folder}:{norm_key}"),
+                    severity: "warning".to_string(),
+                    category: "hotkey-collision".to_string(),
+                    message: if is_en {
+                        format!(
+                            "Hotkey collision in {char_folder}: {display_key} ({} mods)",
+                            distinct.len()
+                        )
+                    } else {
+                        format!(
+                            "角色「{char_folder}」快捷键冲突：{display_key}（涉及 {} 个 Mod）",
+                            distinct.len()
+                        )
+                    },
+                    detail: Some(if is_en {
+                        "Multiple enabled mods for this character bind the same key; pressing it will trigger both mods simultaneously.".to_string()
+                    } else {
+                        "同一角色下多个已启用 Mod 绑定了相同按键，游戏内按下该按键将同时触发多个 Mod 的切换。".to_string()
+                    }),
+                    hash: None,
+                    filter_index: None,
+                    locations: dedupe_locs_by_mod(&char_locs),
+                });
+            }
+        }
+
+        let all_locs: Vec<ConflictAuditModLocation> =
+            entries.iter().map(|(_, _, l)| l.clone()).collect();
+        let all_distinct = dedupe_locs_by_mod(&all_locs);
+        if all_distinct.len() >= 2 {
+            let distinct_chars: HashSet<&str> = entries
+                .iter()
+                .filter(|(_, _, l)| !l.character_folder.is_empty())
+                .map(|(_, _, l)| l.character_folder.as_str())
+                .collect();
+            let has_root_mod = entries.iter().any(|(_, _, l)| l.character_folder.is_empty());
+            if distinct_chars.len() > 1 || has_root_mod {
+                let any_unguarded = entries.iter().any(|(_, guarded, _)| !*guarded);
+                let display_key = entries
+                    .first()
+                    .map(|(d, _, _)| d.as_str())
+                    .unwrap_or(norm_key.as_str());
+                if any_unguarded {
+                    items.push(GameConflictAuditItem {
+                        id: format!("hotkey:global-unguarded:{norm_key}"),
+                        severity: "warning".to_string(),
+                        category: "hotkey-collision".to_string(),
+                        message: if is_en {
+                            format!(
+                                "Unguarded global hotkey collision: {display_key} ({} mods)",
+                                all_distinct.len()
+                            )
+                        } else {
+                            format!(
+                                "全局无门控快捷键冲突：{display_key}（涉及 {} 个 Mod）",
+                                all_distinct.len()
+                            )
+                        },
+                        detail: Some(if is_en {
+                            "Multiple mods across characters or root folders bind this hotkey without a condition/$active guard, so pressing it may toggle unrelated mods.".to_string()
+                        } else {
+                            "多个跨角色或全局 Mod 绑定了相同按键且缺少 condition / $active 条件门控，按下时可能误触其它角色的变体开关。".to_string()
+                        }),
+                        hash: None,
+                        filter_index: None,
+                        locations: all_distinct,
+                    });
+                } else {
+                    items.push(GameConflictAuditItem {
+                        id: format!("hotkey:cross-char:{norm_key}"),
+                        severity: "info".to_string(),
+                        category: "hotkey-collision".to_string(),
+                        message: if is_en {
+                            format!(
+                                "Cross-character guarded hotkey reuse: {display_key} ({} mods)",
+                                all_distinct.len()
+                            )
+                        } else {
+                            format!(
+                                "跨角色条件门控热键复用：{display_key}（涉及 {} 个 Mod）",
+                                all_distinct.len()
+                            )
+                        },
+                        detail: Some(if is_en {
+                            "All bindings declare condition/$active guards across different characters; usually harmless unless multiple affected characters are active on screen together.".to_string()
+                        } else {
+                            "相关快捷键均带有 condition / $active 条件门控，仅当对应多名角色同场渲染时才可能互串；一般无需处理。".to_string()
+                        }),
+                        hash: None,
+                        filter_index: None,
+                        locations: all_distinct,
+                    });
+                }
+            }
         }
     }
 
@@ -1589,6 +1798,70 @@ mod tests {
         assert!(txt.contains("deadbeef"));
         assert!(!txt.contains("EFMI-MCP"));
         assert!(!txt.contains("bridge.ini"));
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn scans_tiered_hotkey_collisions() {
+        let root = std::env::temp_dir().join(format!("moddeck-hotkey-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let mods_dir = root.join("Mods");
+
+        // (a) Same-character collision: Mod1 & Mod2 under Anke both bind K -> warning
+        let anke_1 = mods_dir.join("Anke").join("Mod1");
+        let anke_2 = mods_dir.join("Anke").join("Mod2");
+        // (b) Cross-character unguarded collision: Jinhsi & Changli both bind unguarded Ctrl+G -> warning
+        let jinhsi_u = mods_dir.join("Jinhsi").join("DressA");
+        let changli_u = mods_dir.join("Changli").join("DressB");
+        // (c) Cross-character condition-guarded reuse: Sanhua & Verina both bind Alt+H with $active == 1 -> info
+        let sanhua_g = mods_dir.join("Sanhua").join("SkinA");
+        let verina_g = mods_dir.join("Verina").join("SkinB");
+
+        for d in [&anke_1, &anke_2, &jinhsi_u, &changli_u, &sanhua_g, &verina_g] {
+            fs::create_dir_all(d).unwrap();
+        }
+        fs::write(anke_1.join("a.ini"), "[KeySwap]\nkey = K\n").unwrap();
+        fs::write(anke_2.join("b.ini"), "[KeyVar]\nkey = no_modifiers k\n").unwrap();
+        fs::write(jinhsi_u.join("c.ini"), "[KeyMode]\nkey = ctrl G\n").unwrap();
+        fs::write(changli_u.join("d.ini"), "[KeyMode]\nkey = Control G\n").unwrap();
+        fs::write(
+            sanhua_g.join("e.ini"),
+            "[KeyCycle]\ncondition = $active == 1\nkey = alt H\n",
+        )
+        .unwrap();
+        fs::write(
+            verina_g.join("f.ini"),
+            "[KeyCycle]\ncondition = $object_detected\nkey = Alt h\n",
+        )
+        .unwrap();
+
+        let report =
+            audit_game_mods_conflicts("wuthering-waves", &mods_dir.to_string_lossy(), None, &[], true);
+
+        let same_char = report
+            .items
+            .iter()
+            .find(|i| i.id == "hotkey:char:Anke:k")
+            .expect("expected same-character hotkey collision");
+        assert_eq!(same_char.severity, "warning");
+        assert_eq!(same_char.category, "hotkey-collision");
+
+        let cross_unguarded = report
+            .items
+            .iter()
+            .find(|i| i.id == "hotkey:global-unguarded:ctrl+g")
+            .expect("expected unguarded global hotkey collision");
+        assert_eq!(cross_unguarded.severity, "warning");
+        assert_eq!(cross_unguarded.category, "hotkey-collision");
+
+        let cross_guarded = report
+            .items
+            .iter()
+            .find(|i| i.id == "hotkey:cross-char:alt+h")
+            .expect("expected guarded cross-character hotkey info");
+        assert_eq!(cross_guarded.severity, "info");
+        assert_eq!(cross_guarded.category, "hotkey-collision");
 
         let _ = fs::remove_dir_all(&root);
     }

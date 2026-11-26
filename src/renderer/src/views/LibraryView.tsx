@@ -31,6 +31,9 @@ export function LibraryView({
   onAdd,
   onOpenRosterPresets,
   onOpenConflictAudit,
+  conflictByCharacter,
+  globalConflictSeverity,
+  activeConflictCount = 0,
   isConfiguredFilterActive,
   onDisableConfiguredFilter
 }: {
@@ -53,6 +56,9 @@ export function LibraryView({
   onAdd: () => void
   onOpenRosterPresets?: () => void
   onOpenConflictAudit?: () => void
+  conflictByCharacter?: Record<string, 'high' | 'warning'>
+  globalConflictSeverity?: 'high' | 'warning' | null
+  activeConflictCount?: number
   isConfiguredFilterActive?: boolean
   onDisableConfiguredFilter?: () => void
 }) {
@@ -90,6 +96,15 @@ export function LibraryView({
       return haystack.includes(value)
     })
   }, [filter, query, snapshot.characters, effectiveLocale])
+
+  const visibleFolderSet = useMemo(
+    () => new Set(characters.map((c) => c.folder)),
+    [characters]
+  )
+  const hiddenConflictCount = useMemo(() => {
+    if (!conflictByCharacter) return 0
+    return Object.keys(conflictByCharacter).filter((folder) => !visibleFolderSet.has(folder)).length
+  }, [conflictByCharacter, visibleFolderSet])
 
   function handleDrop(targetFolder: string) {
     if (!dragFolder || dragFolder === targetFolder) return
@@ -148,13 +163,22 @@ export function LibraryView({
             {t('common.refresh')}
           </button>
           <button
-            className="btn ghost"
+            className={`btn ghost${globalConflictSeverity ? ` has-conflict-${globalConflictSeverity}` : ''}`}
             onClick={onOpenConflictAudit}
             disabled={!snapshot.modsPathExists}
             title={t('audit.toolbarTooltip')}
           >
-            <Icon name="info" size={16} />
+            {globalConflictSeverity ? (
+              <span className={`conflict-dot inline sev-${globalConflictSeverity}`} />
+            ) : (
+              <Icon name="info" size={16} />
+            )}
             {t('audit.toolbarBtn')}
+            {activeConflictCount > 0 ? (
+              <span className={`conflict-count-pill sev-${globalConflictSeverity || 'warning'}`}>
+                {activeConflictCount}
+              </span>
+            ) : null}
           </button>
           <button className="btn ghost" onClick={onOpenRosterPresets} title={t('library.rosterPresetsTooltip')}>
             <Icon name="box" size={16} />
@@ -229,6 +253,16 @@ export function LibraryView({
               <option value="count">{t('library.sortByCount')}</option>
             </select>
             {sort === 'custom' ? <span className="hint">{t('library.dragFolderHint')}</span> : null}
+            {hiddenConflictCount > 0 ? (
+              <button
+                type="button"
+                className="conflict-filter-hint-chip"
+                onClick={onOpenConflictAudit}
+              >
+                <span className={`conflict-dot inline sev-${globalConflictSeverity || 'warning'}`} />
+                {t('audit.hiddenCategoryConflicts', { count: hiddenConflictCount })}
+              </button>
+            ) : null}
             <button
               className="path-chip"
               title={snapshot.settings.modsPath}
@@ -265,6 +299,7 @@ export function LibraryView({
                   key={character.folder}
                   character={character}
                   accent={game.accent || '#10b981'}
+                  conflictSeverity={conflictByCharacter?.[character.folder]}
                   onOpen={() => onOpenCharacter(character)}
                   draggable={sort === 'custom'}
                   dragging={dragFolder === character.folder}

@@ -20,17 +20,20 @@ export function ConflictAuditModal({
   game,
   onClose,
   onNotify,
-  onMutated
+  onMutated,
+  onReportLoaded
 }: {
   game: GameDef
   onClose: () => void
   onNotify: (text: string, kind?: 'ok' | 'err' | 'info') => void
   onMutated?: () => void
+  onReportLoaded?: (report: GameConflictAuditReport) => void
 }) {
   const { t, effectiveLocale } = useI18n()
   const [loading, setLoading] = useState(true)
   const [report, setReport] = useState<GameConflictAuditReport | null>(null)
   const [filter, setFilter] = useState<'all' | ConflictSeverity>('all')
+  const [catFilter, setCatFilter] = useState<'all' | 'render' | 'hotkeys'>('all')
   const [clearingCache, setClearingCache] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [disablingKey, setDisablingKey] = useState<string | null>(null)
@@ -40,6 +43,7 @@ export function ConflictAuditModal({
     try {
       const next = await window.moddeck.auditGameConflicts(game.id)
       setReport(next)
+      onReportLoaded?.(next)
     } catch (error) {
       onNotify(errorMessage(error), 'err')
     } finally {
@@ -108,9 +112,118 @@ export function ConflictAuditModal({
     }
   }
 
-  const visibleItems = (report?.items || []).filter(
-    (item) => filter === 'all' || item.severity === filter
-  )
+  const items = report?.items || []
+  const hotkeyCount = items.filter((item) => item.category === 'hotkey-collision').length
+  const renderCount = items.length - hotkeyCount
+
+  const visibleItems = items.filter((item) => {
+    const matchesSeverity = filter === 'all' || item.severity === filter
+    const isHotkey = item.category === 'hotkey-collision'
+    const matchesCategory =
+      catFilter === 'all' ||
+      (catFilter === 'hotkeys' && isHotkey) ||
+      (catFilter === 'render' && !isHotkey)
+    return matchesSeverity && matchesCategory
+  })
+
+  const shouldCollapseCrossCharHotkeys = filter === 'all' && catFilter === 'all'
+  const crossCharInfoHotkeys = shouldCollapseCrossCharHotkeys
+    ? visibleItems.filter(
+        (item) => item.severity === 'info' && item.category === 'hotkey-collision'
+      )
+    : []
+  const mainItems = shouldCollapseCrossCharHotkeys
+    ? visibleItems.filter(
+        (item) => !(item.severity === 'info' && item.category === 'hotkey-collision')
+      )
+    : visibleItems
+
+  function renderAuditCard(item: GameConflictAuditReport['items'][number]) {
+    const seenMods = new Set<string>()
+    return (
+      <div key={item.id} className={`audit-card sev-${item.severity}`}>
+        <div className="audit-card-head">
+          <span className={`tag sev-${item.severity}`}>
+            {item.severity === 'high'
+              ? t('audit.severityHigh')
+              : item.severity === 'warning'
+                ? t('audit.severityWarning')
+                : t('audit.severityInfo')}
+          </span>
+          <strong className="audit-card-title">{item.message}</strong>
+        </div>
+        {item.detail ? <div className="muted small">{item.detail}</div> : null}
+        {item.locations.length > 0 ? (
+          <div className="audit-loc-list">
+            {item.locations.slice(0, 12).map((loc, idx) => {
+              const modKey = `${loc.characterFolder}/${loc.folderName}`
+              const showAction = !seenMods.has(modKey)
+              seenMods.add(modKey)
+              return (
+                <div key={`${modKey}-${loc.file}-${loc.line}-${idx}`} className="audit-loc-row">
+                  <div className="audit-loc-text">
+                    <span className="audit-mod-name">
+                      {loc.characterFolder ? `${loc.characterFolder} / ${loc.name}` : loc.name}
+                    </span>
+                    <code className="audit-file-loc">
+                      {loc.file}
+                      {loc.line > 0 ? `:${loc.line}` : ''}
+                    </code>
+                    {loc.section ? <span className="tag">[{loc.section}]</span> : null}
+                  </div>
+                  {showAction ? (
+                    <div className="audit-loc-actions">
+                      {loc.characterFolder ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn ghost tiny-btn"
+                            onClick={() =>
+                              void window.moddeck.openModFolder(
+                                game.id,
+                                loc.characterFolder,
+                                loc.folderName
+                              )
+                            }
+                          >
+                            <Icon name="folder" size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn ghost tiny-btn"
+                            disabled={disablingKey === modKey}
+                            onClick={() =>
+                              void handleDisableMod(loc.characterFolder, loc.folderName)
+                            }
+                          >
+                            {t('audit.disableMod')}
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn ghost tiny-btn"
+                          onClick={() => void window.moddeck.openPath('mods', game.id)}
+                        >
+                          <Icon name="folder" size={12} />
+                          {t('audit.openModsFolder')}
+                        </button>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })}
+            {item.locations.length > 12 ? (
+              <div className="muted small">
+                {t('audit.moreLocations', { count: item.locations.length - 12 })}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
 
   return (
     <Modal
@@ -182,6 +295,30 @@ export function ConflictAuditModal({
             </div>
           </div>
 
+          <div className="audit-filter-chips">
+            <button
+              type="button"
+              className={`chip-btn${catFilter === 'all' ? ' active' : ''}`}
+              onClick={() => setCatFilter('all')}
+            >
+              {t('audit.catAll')} ({items.length})
+            </button>
+            <button
+              type="button"
+              className={`chip-btn${catFilter === 'render' ? ' active' : ''}`}
+              onClick={() => setCatFilter('render')}
+            >
+              {t('audit.catRender')} ({renderCount})
+            </button>
+            <button
+              type="button"
+              className={`chip-btn${catFilter === 'hotkeys' ? ' active' : ''}`}
+              onClick={() => setCatFilter('hotkeys')}
+            >
+              {t('audit.catHotkeys')} ({hotkeyCount})
+            </button>
+          </div>
+
           {report.environment?.shaderCache?.dirExists &&
           report.environment.shaderCache.fileCount > 0 ? (
             <div className="audit-cache-bar">
@@ -211,92 +348,17 @@ export function ConflictAuditModal({
             </div>
           ) : (
             <div className="audit-list">
-              {visibleItems.map((item) => {
-                const seenMods = new Set<string>()
-                return (
-                  <div key={item.id} className={`audit-card sev-${item.severity}`}>
-                    <div className="audit-card-head">
-                      <span className={`tag sev-${item.severity}`}>
-                        {item.severity === 'high'
-                          ? t('audit.severityHigh')
-                          : item.severity === 'warning'
-                            ? t('audit.severityWarning')
-                            : t('audit.severityInfo')}
-                      </span>
-                      <strong className="audit-card-title">{item.message}</strong>
-                    </div>
-                    {item.detail ? <div className="muted small">{item.detail}</div> : null}
-                    {item.locations.length > 0 ? (
-                      <div className="audit-loc-list">
-                        {item.locations.slice(0, 12).map((loc, idx) => {
-                          const modKey = `${loc.characterFolder}/${loc.folderName}`
-                          const showAction = !seenMods.has(modKey)
-                          seenMods.add(modKey)
-                          return (
-                            <div key={`${modKey}-${loc.file}-${loc.line}-${idx}`} className="audit-loc-row">
-                              <div className="audit-loc-text">
-                                <span className="audit-mod-name">
-                                  {loc.characterFolder ? `${loc.characterFolder} / ${loc.name}` : loc.name}
-                                </span>
-                                <code className="audit-file-loc">
-                                  {loc.file}
-                                  {loc.line > 0 ? `:${loc.line}` : ''}
-                                </code>
-                                {loc.section ? <span className="tag">[{loc.section}]</span> : null}
-                              </div>
-                              {showAction ? (
-                                <div className="audit-loc-actions">
-                                  {loc.characterFolder ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className="btn ghost tiny-btn"
-                                        onClick={() =>
-                                          void window.moddeck.openModFolder(
-                                            game.id,
-                                            loc.characterFolder,
-                                            loc.folderName
-                                          )
-                                        }
-                                      >
-                                        <Icon name="folder" size={12} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn ghost tiny-btn"
-                                        disabled={disablingKey === modKey}
-                                        onClick={() =>
-                                          void handleDisableMod(loc.characterFolder, loc.folderName)
-                                        }
-                                      >
-                                        {t('audit.disableMod')}
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className="btn ghost tiny-btn"
-                                      onClick={() => void window.moddeck.openPath('mods', game.id)}
-                                    >
-                                      <Icon name="folder" size={12} />
-                                      {t('audit.openModsFolder')}
-                                    </button>
-                                  )}
-                                </div>
-                              ) : null}
-                            </div>
-                          )
-                        })}
-                        {item.locations.length > 12 ? (
-                          <div className="muted small">
-                            {t('audit.moreLocations', { count: item.locations.length - 12 })}
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
+              {mainItems.map((item) => renderAuditCard(item))}
+              {crossCharInfoHotkeys.length > 0 ? (
+                <details className="audit-collapsible-group">
+                  <summary className="audit-collapsible-summary">
+                    {t('audit.crossCharGuardedGroup', { count: crossCharInfoHotkeys.length })}
+                  </summary>
+                  <div className="audit-collapsible-items">
+                    {crossCharInfoHotkeys.map((item) => renderAuditCard(item))}
                   </div>
-                )
-              })}
+                </details>
+              ) : null}
             </div>
           )}
         </div>
